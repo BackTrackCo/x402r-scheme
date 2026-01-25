@@ -1,0 +1,49 @@
+{
+  "name": "@x402r/evm",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Escrow payment scheme for x402 using Base Commerce Payments",
+  "license": "MIT",
+  "author": "x402r",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BackTrackCo/x402r-scheme.git",
+    "directory": "packages/evm"
+  },
+  "exports": {
+    "./escrow/client": {
+      "types": "./dist/escrow/client/index.d.ts",
+      "import": "./dist/escrow/client/index.js"
+    },
+    "./escrow/server": {
+      "types": "./dist/escrow/server/index.d.ts",
+      "import": "./dist/escrow/server/index.js"
+    },
+    "./escrow/facilitator": {
+      "types": "./dist/escrow/facilitator/index.d.ts",
+      "import": "./dist/escrow/facilitator/index.js"
+    },
+    "./escrow/types": {
+      "types": "./dist/shared/types.d.ts",
+      "import": "./dist/shared/types.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "peerDependencies": {
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
