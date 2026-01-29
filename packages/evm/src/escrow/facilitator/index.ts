@@ -8,6 +8,23 @@ import { OPERATOR_ABI } from '../../shared/constants.js';
 import { verifyERC3009Signature } from '../../shared/nonce.js';
 import type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
 
+/**
+ * Parse chainId from CAIP-2 network identifier
+ * @param network - CAIP-2 network identifier (e.g., 'eip155:84532')
+ * @returns The chain ID as a number
+ */
+function parseChainId(network: string): number {
+  const parts = network.split(':');
+  if (parts.length !== 2 || parts[0] !== 'eip155') {
+    throw new Error(`Invalid network format: ${network}. Expected 'eip155:<chainId>'`);
+  }
+  const chainId = parseInt(parts[1], 10);
+  if (isNaN(chainId)) {
+    throw new Error(`Invalid chainId in network: ${network}`);
+  }
+  return chainId;
+}
+
 export interface PaymentPayload {
   x402Version: number;
   scheme: string;
@@ -93,13 +110,14 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
   ): Promise<VerifyResponse> {
     const escrowPayload = payload.payload as EscrowPayload;
     const extra = requirements.extra;
+    const chainId = parseChainId(requirements.network);
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
       this.signer,
       escrowPayload.authorization,
       escrowPayload.signature,
-      extra
+      { ...extra, chainId }
     );
 
     if (!isValidSignature) {

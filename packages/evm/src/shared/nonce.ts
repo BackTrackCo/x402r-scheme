@@ -88,6 +88,10 @@ export async function signERC3009(
 
 /**
  * Verify ERC-3009 signature (facilitator-side)
+ * @param signer - The signer with verifyTypedData method
+ * @param authorization - ERC-3009 authorization data
+ * @param signature - The signature to verify
+ * @param extra - Extra configuration including chainId
  */
 export async function verifyERC3009Signature(
   signer: {
@@ -102,12 +106,12 @@ export async function verifyERC3009Signature(
   },
   authorization: EscrowPayload['authorization'],
   signature: `0x${string}`,
-  extra: EscrowExtra
+  extra: EscrowExtra & { chainId: number }
 ): Promise<boolean> {
   const domain = {
     name: extra.name ?? 'USD Coin',
     version: extra.version ?? '2',
-    chainId: 84532, // TODO: get from network
+    chainId: extra.chainId,
     verifyingContract: authorization.to,
   };
 
