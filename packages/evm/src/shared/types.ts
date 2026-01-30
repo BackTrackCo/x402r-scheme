@@ -6,6 +6,7 @@ export interface EscrowExtra {
   authorizeAddress?: `0x${string}`;
   minDeposit?: string;
   maxDeposit?: string;
+  preApprovalExpirySeconds?: number;
   authorizationExpirySeconds?: number;
   refundExpirySeconds?: number;
   minFeeBps?: number;
@@ -31,6 +32,7 @@ export interface EscrowPayload {
     receiver: `0x${string}`;
     token: `0x${string}`;
     maxAmount: string;
+    preApprovalExpiry: number;
     authorizationExpiry: number;
     refundExpiry: number;
     minFeeBps: number;

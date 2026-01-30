@@ -2,19 +2,20 @@ export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as cons
 export const MAX_UINT48 = 281474976710655;
 export const MAX_UINT32 = 4294967295;
 
-// PaymentInfo struct for AuthCaptureEscrow
+// PaymentInfo struct for AuthCaptureEscrow (matches commerce-payments contract)
 export const PAYMENT_INFO_COMPONENTS = [
-  { name: 'payer', type: 'address' },
   { name: 'operator', type: 'address' },
+  { name: 'payer', type: 'address' },
   { name: 'receiver', type: 'address' },
   { name: 'token', type: 'address' },
-  { name: 'maxAmount', type: 'uint256' },
-  { name: 'authorizationExpiry', type: 'uint32' },
+  { name: 'maxAmount', type: 'uint120' },
+  { name: 'preApprovalExpiry', type: 'uint48' },
+  { name: 'authorizationExpiry', type: 'uint48' },
   { name: 'refundExpiry', type: 'uint48' },
   { name: 'minFeeBps', type: 'uint16' },
   { name: 'maxFeeBps', type: 'uint16' },
   { name: 'feeReceiver', type: 'address' },
-  { name: 'salt', type: 'bytes32' },
+  { name: 'salt', type: 'uint256' },
 ] as const;
 
 export const OPERATOR_ABI = [

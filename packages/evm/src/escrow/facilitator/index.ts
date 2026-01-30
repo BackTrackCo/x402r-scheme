@@ -153,17 +153,18 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     const { authorizeAddress, operatorAddress, tokenCollector } = requirements.extra;
 
     const paymentInfo = {
-      payer: escrowPayload.authorization.from,
       operator: escrowPayload.paymentInfo.operator,
+      payer: escrowPayload.authorization.from,
       receiver: escrowPayload.paymentInfo.receiver,
       token: escrowPayload.paymentInfo.token,
       maxAmount: BigInt(escrowPayload.paymentInfo.maxAmount),
+      preApprovalExpiry: escrowPayload.paymentInfo.preApprovalExpiry,
       authorizationExpiry: escrowPayload.paymentInfo.authorizationExpiry,
       refundExpiry: escrowPayload.paymentInfo.refundExpiry,
       minFeeBps: escrowPayload.paymentInfo.minFeeBps,
       maxFeeBps: escrowPayload.paymentInfo.maxFeeBps,
       feeReceiver: escrowPayload.paymentInfo.feeReceiver,
-      salt: escrowPayload.paymentInfo.salt,
+      salt: BigInt(escrowPayload.paymentInfo.salt),
     };
 
     const collectorData = encodeAbiParameters(

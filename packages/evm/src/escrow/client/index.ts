@@ -5,7 +5,7 @@
 
 import type { WalletClient } from 'viem';
 import { computeEscrowNonce, signERC3009, generateSalt } from '../../shared/nonce.js';
-import { MAX_UINT32, MAX_UINT48 } from '../../shared/constants.js';
+import { MAX_UINT48 } from '../../shared/constants.js';
 import type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
 
 export interface PaymentRequirements {
@@ -31,6 +31,7 @@ export async function createPaymentPayload(
     minFeeBps = 0,
     maxFeeBps = 0,
     feeReceiver,
+    preApprovalExpirySeconds,
     refundExpirySeconds,
     authorizationExpirySeconds,
   } = requirements.extra;
@@ -42,7 +43,8 @@ export async function createPaymentPayload(
     receiver: requirements.payTo,
     token: requirements.asset,
     maxAmount: requirements.maxAmountRequired,
-    authorizationExpiry: authorizationExpirySeconds ?? MAX_UINT32,
+    preApprovalExpiry: preApprovalExpirySeconds ?? MAX_UINT48,
+    authorizationExpiry: authorizationExpirySeconds ?? MAX_UINT48,
     refundExpiry: refundExpirySeconds ?? MAX_UINT48,
     minFeeBps,
     maxFeeBps,

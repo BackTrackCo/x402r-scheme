@@ -17,17 +17,18 @@ export function computeEscrowNonce(
   paymentInfo: EscrowPayload['paymentInfo']
 ): `0x${string}` {
   const paymentInfoWithZeroPayer = {
-    payer: ZERO_ADDRESS,
     operator: paymentInfo.operator,
+    payer: ZERO_ADDRESS,
     receiver: paymentInfo.receiver,
     token: paymentInfo.token,
     maxAmount: BigInt(paymentInfo.maxAmount),
+    preApprovalExpiry: paymentInfo.preApprovalExpiry,
     authorizationExpiry: paymentInfo.authorizationExpiry,
     refundExpiry: paymentInfo.refundExpiry,
     minFeeBps: paymentInfo.minFeeBps,
     maxFeeBps: paymentInfo.maxFeeBps,
     feeReceiver: paymentInfo.feeReceiver,
-    salt: paymentInfo.salt,
+    salt: BigInt(paymentInfo.salt),
   };
 
   const encoded = encodeAbiParameters(
