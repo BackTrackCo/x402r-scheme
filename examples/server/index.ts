@@ -25,7 +25,7 @@ const routes = {
         asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
         extra: {
-          escrowAddress: '0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8',
+          escrowAddress: '0xb9488351E48b23D798f24e8174514F28B741Eb4f',
           operatorAddress: process.env.OPERATOR_ADDRESS as `0x${string}`,
           tokenCollector: '0xed02d3E5167BCc9582D851885A89b050AB816a56',
           name: 'USDC',

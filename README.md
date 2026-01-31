@@ -50,11 +50,12 @@ See the [examples](./examples) directory for complete working examples:
 
 ## Contract Addresses (Base Sepolia)
 
-| Contract | Address |
-|----------|---------|
-| AuthCaptureEscrow | [`0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8`](https://sepolia.basescan.org/address/0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8) |
-| ERC3009PaymentCollector | [`0xed02d3E5167BCc9582D851885A89b050AB816a56`](https://sepolia.basescan.org/address/0xed02d3E5167BCc9582D851885A89b050AB816a56) |
-| ArbitrationOperatorFactory | [`0x46C44071BDf9753482400B76d88A5850318b776F`](https://sepolia.basescan.org/address/0x46C44071BDf9753482400B76d88A5850318b776F) |
+| Contract | Address | Source |
+|----------|---------|--------|
+| AuthCaptureEscrow | [`0xb9488351E48b23D798f24e8174514F28B741Eb4f`](https://sepolia.basescan.org/address/0xb9488351E48b23D798f24e8174514F28B741Eb4f) | x402r-contracts |
+| PaymentOperatorFactory | [`0xFa8C4Cb156053b867Ae7489220A29b5939E3Df70`](https://sepolia.basescan.org/address/0xFa8C4Cb156053b867Ae7489220A29b5939E3Df70) | x402r-contracts |
+| RefundRequest | [`0x6926c05193c714ED4bA3867Ee93d6816Fdc14128`](https://sepolia.basescan.org/address/0x6926c05193c714ED4bA3867Ee93d6816Fdc14128) | x402r-contracts |
+| ERC3009PaymentCollector | [`0xed02d3E5167BCc9582D851885A89b050AB816a56`](https://sepolia.basescan.org/address/0xed02d3E5167BCc9582D851885A89b050AB816a56) | Base Commerce Payments |
 
 **USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e)
 
