@@ -27,7 +27,7 @@ const routes = {
         extra: {
           escrowAddress: '0xb9488351E48b23D798f24e8174514F28B741Eb4f',
           operatorAddress: process.env.OPERATOR_ADDRESS as `0x${string}`,
-          tokenCollector: '0xed02d3E5167BCc9582D851885A89b050AB816a56',
+          tokenCollector: '0xC80cd08d609673061597DE7fe54Af3978f10A825',
           name: 'USDC',
           version: '2',
         },
