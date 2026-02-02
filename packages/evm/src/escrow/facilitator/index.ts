@@ -3,7 +3,6 @@
  * Handles verification and settlement of escrow payments
  */
 
-import { encodeAbiParameters, parseAbiParameters } from 'viem';
 import { OPERATOR_ABI } from '../../shared/constants.js';
 import { verifyERC3009Signature } from '../../shared/nonce.js';
 import type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
@@ -117,7 +116,8 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       this.signer,
       escrowPayload.authorization,
       escrowPayload.signature,
-      { ...extra, chainId }
+      { ...extra, chainId },
+      requirements.asset
     );
 
     if (!isValidSignature) {
@@ -167,10 +167,8 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       salt: BigInt(escrowPayload.paymentInfo.salt),
     };
 
-    const collectorData = encodeAbiParameters(
-      parseAbiParameters('bytes, bytes'),
-      [escrowPayload.signature, '0x']
-    );
+    // Pass raw signature - ERC3009PaymentCollector expects raw bytes, not ABI-encoded
+    const collectorData = escrowPayload.signature;
 
     const target = authorizeAddress ?? operatorAddress;
 
