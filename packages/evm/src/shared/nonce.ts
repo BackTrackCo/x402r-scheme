@@ -83,9 +83,10 @@ export async function signERC3009(
   extra: EscrowExtra,
   tokenAddress: `0x${string}`
 ): Promise<`0x${string}`> {
-  // Note: Base Sepolia/Mainnet USDC uses "USDC" as name, not "USD Coin"
+  // EIP-712 domain - name must match the token's EIP-712 domain
+  // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
-    name: extra.name ?? 'USDC',
+    name: extra.name,
     version: extra.version ?? '2',
     chainId: await wallet.getChainId(),
     verifyingContract: tokenAddress,
@@ -145,9 +146,10 @@ export async function verifyERC3009Signature(
   extra: EscrowExtra & { chainId: number },
   tokenAddress: `0x${string}`
 ): Promise<boolean> {
-  // Note: Base Sepolia/Mainnet USDC uses "USDC" as name, not "USD Coin"
+  // EIP-712 domain - name must match the token's EIP-712 domain
+  // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
-    name: extra.name ?? 'USDC',
+    name: extra.name,
     version: extra.version ?? '2',
     chainId: extra.chainId,
     verifyingContract: tokenAddress,
