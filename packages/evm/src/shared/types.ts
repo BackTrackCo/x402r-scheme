@@ -12,7 +12,7 @@ export interface EscrowExtra {
   minFeeBps?: number;
   maxFeeBps?: number;
   feeReceiver?: `0x${string}`;
-  name?: string;
+  name: string; // EIP-712 domain name (e.g., "USDC" for Base USDC)
   version?: string;
 }
 

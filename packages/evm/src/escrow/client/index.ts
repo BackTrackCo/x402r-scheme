@@ -54,16 +54,18 @@ export async function createPaymentPayload(
 
   const nonce = computeEscrowNonce(chainId, escrowAddress, paymentInfo);
 
+  // ERC-3009 authorization - validBefore MUST match what contract passes to receiveWithAuthorization
+  // The contract uses paymentInfo.preApprovalExpiry as validBefore
   const authorization = {
     from: wallet.account!.address,
     to: tokenCollector,
     value: requirements.maxAmountRequired,
     validAfter: '0',
-    validBefore: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour
+    validBefore: String(paymentInfo.preApprovalExpiry),
     nonce,
   };
 
-  const signature = await signERC3009(wallet, authorization, requirements.extra);
+  const signature = await signERC3009(wallet, authorization, requirements.extra, requirements.asset);
 
   return { authorization, signature, paymentInfo };
 }
