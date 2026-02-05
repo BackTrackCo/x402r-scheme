@@ -17,27 +17,31 @@ pnpm add @x402r/evm
 ### Client
 
 ```typescript
-import { EscrowScheme } from '@x402r/evm/escrow/client';
+import { createPaymentPayload } from "@x402r/evm/escrow/client";
 
-const payload = await EscrowScheme.createPaymentPayload(requirements, wallet);
+// Accepts both x402 v2 `amount` and legacy `maxAmountRequired`
+const payload = await createPaymentPayload(requirements, wallet);
 ```
 
 ### Server
 
 ```typescript
-import { EscrowServerScheme } from '@x402r/evm/escrow/server';
+import { EscrowServerScheme } from "@x402r/evm/escrow/server";
 
-const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register('eip155:84532', new EscrowServerScheme());
+// Register on an x402 resource server — parsePrice returns AssetAmount
+const resourceServer = new x402ResourceServer(facilitatorClient).register(
+  "eip155:84532",
+  new EscrowServerScheme(),
+);
 ```
 
 ### Facilitator
 
 ```typescript
-import { registerEscrowScheme } from '@x402r/evm/escrow/facilitator';
+import { registerEscrowScheme } from "@x402r/evm/escrow/facilitator";
 
 const facilitator = new x402Facilitator();
-registerEscrowScheme(facilitator, { signer, networks: 'eip155:84532' });
+registerEscrowScheme(facilitator, { signer, networks: "eip155:84532" });
 ```
 
 ## Examples

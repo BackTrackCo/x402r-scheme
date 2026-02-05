@@ -3,15 +3,22 @@
  * Creates payment payloads for escrow payments
  */
 
-import type { WalletClient } from 'viem';
-import { computeEscrowNonce, signERC3009, generateSalt } from '../../shared/nonce.js';
-import { MAX_UINT48 } from '../../shared/constants.js';
-import type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
+import type { WalletClient } from "viem";
+import {
+  computeEscrowNonce,
+  signERC3009,
+  generateSalt,
+} from "../../shared/nonce.js";
+import { MAX_UINT48 } from "../../shared/constants.js";
+import type { EscrowExtra, EscrowPayload } from "../../shared/types.js";
 
 export interface PaymentRequirements {
   scheme: string;
   network: string;
-  maxAmountRequired: string;
+  /** x402r field name */
+  maxAmountRequired?: string;
+  /** x402 v2 field name (takes precedence if both present) */
+  amount?: string;
   asset: `0x${string}`;
   payTo: `0x${string}`;
   extra: EscrowExtra;
@@ -22,7 +29,7 @@ export interface PaymentRequirements {
  */
 export async function createPaymentPayload(
   requirements: PaymentRequirements,
-  wallet: WalletClient
+  wallet: WalletClient,
 ): Promise<EscrowPayload> {
   const {
     escrowAddress,
@@ -37,12 +44,18 @@ export async function createPaymentPayload(
   } = requirements.extra;
 
   const chainId = await wallet.getChainId();
+  const maxAmount = requirements.amount ?? requirements.maxAmountRequired;
+  if (!maxAmount) {
+    throw new Error(
+      "PaymentRequirements must include either amount or maxAmountRequired",
+    );
+  }
 
   const paymentInfo = {
     operator: operatorAddress,
     receiver: requirements.payTo,
     token: requirements.asset,
-    maxAmount: requirements.maxAmountRequired,
+    maxAmount,
     preApprovalExpiry: preApprovalExpirySeconds ?? MAX_UINT48,
     authorizationExpiry: authorizationExpirySeconds ?? MAX_UINT48,
     refundExpiry: refundExpirySeconds ?? MAX_UINT48,
@@ -59,20 +72,25 @@ export async function createPaymentPayload(
   const authorization = {
     from: wallet.account!.address,
     to: tokenCollector,
-    value: requirements.maxAmountRequired,
-    validAfter: '0',
+    value: maxAmount,
+    validAfter: "0",
     validBefore: String(paymentInfo.preApprovalExpiry),
     nonce,
   };
 
-  const signature = await signERC3009(wallet, authorization, requirements.extra, requirements.asset);
+  const signature = await signERC3009(
+    wallet,
+    authorization,
+    requirements.extra,
+    requirements.asset,
+  );
 
   return { authorization, signature, paymentInfo };
 }
 
 export const EscrowScheme = {
-  scheme: 'escrow' as const,
+  scheme: "escrow" as const,
   createPaymentPayload,
 };
 
-export type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
+export type { EscrowExtra, EscrowPayload } from "../../shared/types.js";
