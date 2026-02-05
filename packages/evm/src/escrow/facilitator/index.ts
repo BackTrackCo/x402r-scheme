@@ -3,6 +3,7 @@
  * Handles verification and settlement of escrow payments
  */
 
+import type { PublicClient, WalletClient } from 'viem';
 import { OPERATOR_ABI } from '../../shared/constants.js';
 import { verifyERC3009Signature } from '../../shared/nonce.js';
 import type { EscrowExtra, EscrowPayload } from '../../shared/types.js';
@@ -84,6 +85,57 @@ export interface SchemeNetworkFacilitator {
   settle(payload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse>;
   getSigners(network: Network): FacilitatorEvmSigner[];
   getExtra(network: Network): Record<string, unknown>;
+}
+
+/**
+ * Create a FacilitatorEvmSigner from viem clients.
+ *
+ * Bridges viem's WalletClient and PublicClient into the FacilitatorEvmSigner
+ * interface required by EscrowFacilitatorScheme.
+ *
+ * @param walletClient - viem WalletClient with an account for write operations
+ * @param publicClient - viem PublicClient for signature verification
+ * @returns A FacilitatorEvmSigner ready for use with EscrowFacilitatorScheme
+ *
+ * @example
+ * ```typescript
+ * import { createFacilitatorSigner, EscrowFacilitatorScheme } from '@x402r/evm/escrow/facilitator';
+ *
+ * const signer = createFacilitatorSigner(walletClient, publicClient);
+ * const facilitator = new EscrowFacilitatorScheme(signer);
+ * ```
+ */
+export function createFacilitatorSigner(
+  walletClient: WalletClient,
+  publicClient: PublicClient
+): FacilitatorEvmSigner {
+  const account = walletClient.account!;
+
+  return {
+    address: account.address,
+    async writeContract(args) {
+      const hash = await walletClient.writeContract({
+        chain: walletClient.chain,
+        account,
+        address: args.address,
+        abi: args.abi,
+        functionName: args.functionName,
+        args: args.args as unknown[],
+      });
+      return hash;
+    },
+    async verifyTypedData(args) {
+      const valid = await publicClient.verifyTypedData({
+        address: args.address,
+        domain: args.domain,
+        types: args.types,
+        primaryType: args.primaryType,
+        message: args.message,
+        signature: args.signature,
+      } as Parameters<typeof publicClient.verifyTypedData>[0]);
+      return valid;
+    },
+  };
 }
 
 /**
