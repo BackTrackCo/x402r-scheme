@@ -2,61 +2,61 @@
  * Example server - demonstrates both exact and escrow payment schemes
  */
 
-import 'dotenv/config';
-import express from 'express';
+import "dotenv/config";
+import express from "express";
 // import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 // import { ExactEvmScheme } from '@x402/evm/exact/server';
-import { EscrowServerScheme } from '@x402r/evm/escrow/server';
+import { EscrowServerScheme } from "@x402r/evm/escrow/server";
 // import { HTTPFacilitatorClient } from '@x402/core/server';
 
 const app = express();
-const network = 'eip155:84532';
+const network = "eip155:84532";
 
 // Payment routes configuration
 const routes = {
   // Endpoint accepting both escrow and exact payments
-  'GET /weather': {
+  "GET /weather": {
     accepts: [
       // Escrow option - funds held in escrow, refundable
       {
-        scheme: 'escrow',
+        scheme: "escrow",
         network,
-        maxAmountRequired: '1000000', // 1 USDC
-        asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+        maxAmountRequired: "1000000", // 1 USDC
+        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
         extra: {
-          escrowAddress: '0xb9488351E48b23D798f24e8174514F28B741Eb4f',
+          escrowAddress: "0xb9488351E48b23D798f24e8174514F28B741Eb4f",
           operatorAddress: process.env.OPERATOR_ADDRESS as `0x${string}`,
-          tokenCollector: '0xC80cd08d609673061597DE7fe54Af3978f10A825',
-          name: 'USDC',
-          version: '2',
+          tokenCollector: "0xC80cd08d609673061597DE7fe54Af3978f10A825",
+          name: "USDC",
+          version: "2",
         },
       },
       // Exact option - immediate transfer, non-refundable
       {
-        scheme: 'exact',
+        scheme: "exact",
         network,
-        maxAmountRequired: '1000000',
-        asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+        maxAmountRequired: "1000000",
+        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
-        extra: { name: 'USDC', version: '2' },
+        extra: { name: "USDC", version: "2" },
       },
     ],
-    description: 'Weather data',
+    description: "Weather data",
   },
   // Endpoint accepting only exact payments (low value, no refund needed)
-  'GET /time': {
+  "GET /time": {
     accepts: [
       {
-        scheme: 'exact',
+        scheme: "exact",
         network,
-        maxAmountRequired: '10000', // 0.01 USDC
-        asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+        maxAmountRequired: "10000", // 0.01 USDC
+        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
-        extra: { name: 'USDC', version: '2' },
+        extra: { name: "USDC", version: "2" },
       },
     ],
-    description: 'Current time',
+    description: "Current time",
   },
 };
 
@@ -74,7 +74,7 @@ app.use((req, res, next) => {
   }
 
   // Check for payment header
-  const paymentHeader = req.headers['x-payment'];
+  const paymentHeader = req.headers["x-payment"];
   if (!paymentHeader) {
     return res.status(402).json({
       x402Version: 2,
@@ -88,18 +88,18 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/weather', (_req, res) => {
-  res.json({ weather: 'sunny', temperature: 70 });
+app.get("/weather", (_req, res) => {
+  res.json({ weather: "sunny", temperature: 70 });
 });
 
-app.get('/time', (_req, res) => {
+app.get("/time", (_req, res) => {
   res.json({ time: new Date().toISOString() });
 });
 
 const PORT = process.env.PORT || 4021;
 app.listen(PORT, () => {
   console.log(`Server at http://localhost:${PORT}`);
-  console.log('Routes:');
-  console.log('  GET /weather - escrow + exact (1 USDC)');
-  console.log('  GET /time - exact only (0.01 USDC)');
+  console.log("Routes:");
+  console.log("  GET /weather - escrow + exact (1 USDC)");
+  console.log("  GET /time - exact only (0.01 USDC)");
 });
