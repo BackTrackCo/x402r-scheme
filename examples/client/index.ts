@@ -24,6 +24,7 @@ interface PaymentRequired {
     amount: string;
     asset: `0x${string}`;
     payTo: `0x${string}`;
+    maxTimeoutSeconds: number;
     extra: Record<string, unknown>;
   }>;
 }
@@ -47,11 +48,16 @@ async function makePayment(paymentRequired: PaymentRequired) {
       escrowOption as any,
       wallet,
     );
-    paymentPayload = { x402Version: 2, scheme: "escrow", payload };
+    paymentPayload = {
+      x402Version: 2,
+      resource: { url: "http://localhost:4021/weather", method: "GET" },
+      accepted: escrowOption,
+      payload,
+    };
   } else if (exactOption) {
     // Use exact scheme (immediate transfer, non-refundable)
     // const payload = await ExactScheme.createPaymentPayload(exactOption, wallet);
-    // paymentPayload = { x402Version: 2, scheme: 'exact', payload };
+    // paymentPayload = { x402Version: 2, resource: { url: "http://localhost:4021/weather", method: "GET" }, accepted: exactOption, payload };
     throw new Error("Exact scheme not implemented in this example");
   } else {
     throw new Error("No supported payment scheme");
@@ -83,9 +89,9 @@ async function main() {
   const response = await fetch("http://localhost:4021/weather");
 
   if (response.status === 402) {
-    const paymentRequiredHeader = response.headers.get("payment-required");
+    const paymentRequiredHeader = response.headers.get("PAYMENT-REQUIRED");
     if (!paymentRequiredHeader) {
-      throw new Error("Missing payment-required header in 402 response");
+      throw new Error("Missing PAYMENT-REQUIRED header in 402 response");
     }
     const paymentRequired = JSON.parse(
       Buffer.from(paymentRequiredHeader, "base64").toString(),

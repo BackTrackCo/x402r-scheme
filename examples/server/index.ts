@@ -83,7 +83,7 @@ app.use((req, res, next) => {
         description: route.description,
       }),
     ).toString("base64");
-    res.setHeader("payment-required", requirementsPayload);
+    res.setHeader("PAYMENT-REQUIRED", requirementsPayload);
     return res.status(402).json({
       x402Version: 2,
       accepts: route.accepts,

@@ -33,7 +33,7 @@ const evmSigner = toFacilitatorEvmSigner({
   address: account.address,
   readContract: (args) =>
     publicClient.readContract({ ...args, args: args.args || [] }),
-  verifyTypedData: (args) => publicClient.verifyTypedData(args as never),
+  verifyTypedData: (args) => publicClient.verifyTypedData(args as any),
   writeContract: (args) =>
     walletClient.writeContract({
       ...args,
