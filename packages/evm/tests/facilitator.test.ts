@@ -2,13 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import { EscrowFacilitatorScheme } from "../src/escrow/facilitator/index.js";
 
 describe("EscrowFacilitatorScheme", () => {
-  // Mock signer for testing
+  // Mock signer matching x402's FacilitatorEvmSigner interface
   const mockSigner = {
-    address: "0x1234567890123456789012345678901234567890" as const,
+    getAddresses: () =>
+      ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
+    readContract: vi.fn(),
     writeContract: vi
       .fn()
       .mockResolvedValue("0xabcdef1234567890" as `0x${string}`),
     verifyTypedData: vi.fn().mockResolvedValue(true),
+    sendTransaction: vi.fn(),
+    waitForTransactionReceipt: vi.fn(),
+    getCode: vi.fn(),
   };
 
   describe("constructor and properties", () => {
@@ -17,35 +22,47 @@ describe("EscrowFacilitatorScheme", () => {
       expect(scheme.scheme).toBe("escrow");
     });
 
-    it('should have caipFamily set to "eip155"', () => {
+    it('should have caipFamily set to "eip155:*"', () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
-      expect(scheme.caipFamily).toBe("eip155");
+      expect(scheme.caipFamily).toBe("eip155:*");
     });
   });
 
   describe("getSigners", () => {
-    it("should return array containing the configured signer", () => {
+    it("should return array of signer addresses as strings", () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
       const signers = scheme.getSigners("eip155:84532");
 
       expect(signers).toHaveLength(1);
-      expect(signers[0]).toBe(mockSigner);
+      expect(signers[0]).toBe(
+        "0x1234567890123456789012345678901234567890",
+      );
     });
   });
 
   describe("getExtra", () => {
-    it("should return empty object", () => {
+    it("should return undefined", () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
       const extra = scheme.getExtra("eip155:84532");
 
-      expect(extra).toEqual({});
+      expect(extra).toBeUndefined();
     });
   });
 
   describe("verify", () => {
     const mockPayload = {
-      x402Version: 1,
+      x402Version: 2,
       scheme: "escrow",
+      resource: { url: "https://example.com/weather", method: "GET" },
+      accepted: {
+        scheme: "escrow",
+        network: "eip155:84532",
+        amount: "1000000",
+        asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        payTo: "0xdddddddddddddddddddddddddddddddddddddddd",
+        maxTimeoutSeconds: 60,
+        extra: {},
+      },
       payload: {
         authorization: {
           from: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const,
@@ -62,6 +79,7 @@ describe("EscrowFacilitatorScheme", () => {
           receiver: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
           token: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
           maxAmount: "1000000",
+          preApprovalExpiry: 0,
           authorizationExpiry: 4294967295,
           refundExpiry: 281474976710655,
           minFeeBps: 0,
@@ -78,6 +96,7 @@ describe("EscrowFacilitatorScheme", () => {
       amount: "1000000",
       asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
       payTo: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
+      maxTimeoutSeconds: 60,
       extra: {
         escrowAddress:
           "0xffffffffffffffffffffffffffffffffffffffffffff" as const,
@@ -173,8 +192,6 @@ describe("EscrowFacilitatorScheme", () => {
     it("should parse chainId from network correctly", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 
-      // This tests that parseChainId is called correctly internally
-      // by checking verify works with different network formats
       const mainnetRequirements = {
         ...mockRequirements,
         network: "eip155:8453",
@@ -187,8 +204,18 @@ describe("EscrowFacilitatorScheme", () => {
 
   describe("settle", () => {
     const mockPayload = {
-      x402Version: 1,
+      x402Version: 2,
       scheme: "escrow",
+      resource: { url: "https://example.com/weather", method: "GET" },
+      accepted: {
+        scheme: "escrow",
+        network: "eip155:84532",
+        amount: "1000000",
+        asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        payTo: "0xdddddddddddddddddddddddddddddddddddddddd",
+        maxTimeoutSeconds: 60,
+        extra: {},
+      },
       payload: {
         authorization: {
           from: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const,
@@ -205,6 +232,7 @@ describe("EscrowFacilitatorScheme", () => {
           receiver: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
           token: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
           maxAmount: "1000000",
+          preApprovalExpiry: 0,
           authorizationExpiry: 4294967295,
           refundExpiry: 281474976710655,
           minFeeBps: 0,
@@ -221,6 +249,7 @@ describe("EscrowFacilitatorScheme", () => {
       amount: "1000000",
       asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
       payTo: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
+      maxTimeoutSeconds: 60,
       extra: {
         escrowAddress:
           "0xffffffffffffffffffffffffffffffffffffffffffff" as const,
@@ -251,7 +280,7 @@ describe("EscrowFacilitatorScheme", () => {
       );
     });
 
-    it("should return error when writeContract fails", async () => {
+    it("should return error with empty transaction when writeContract fails", async () => {
       const failingSigner = {
         ...mockSigner,
         writeContract: vi
@@ -264,6 +293,7 @@ describe("EscrowFacilitatorScheme", () => {
 
       expect(result.success).toBe(false);
       expect(result.errorReason).toBe("Transaction failed");
+      expect(result.transaction).toBe("");
       expect(result.network).toBe("eip155:84532");
     });
 

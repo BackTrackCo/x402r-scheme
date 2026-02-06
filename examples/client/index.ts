@@ -21,7 +21,7 @@ interface PaymentRequired {
   accepts: Array<{
     scheme: string;
     network: string;
-    maxAmountRequired: string;
+    amount: string;
     asset: `0x${string}`;
     payTo: `0x${string}`;
     extra: Record<string, unknown>;
@@ -57,8 +57,12 @@ async function makePayment(paymentRequired: PaymentRequired) {
     throw new Error("No supported payment scheme");
   }
 
+  const paymentHeader = Buffer.from(JSON.stringify(paymentPayload)).toString(
+    "base64",
+  );
+
   const response = await fetch("http://localhost:4021/weather", {
-    headers: { "X-Payment": JSON.stringify(paymentPayload) },
+    headers: { "Payment-Signature": paymentHeader },
   });
 
   if (response.ok) {
@@ -79,7 +83,13 @@ async function main() {
   const response = await fetch("http://localhost:4021/weather");
 
   if (response.status === 402) {
-    const paymentRequired = (await response.json()) as PaymentRequired;
+    const paymentRequiredHeader = response.headers.get("payment-required");
+    if (!paymentRequiredHeader) {
+      throw new Error("Missing payment-required header in 402 response");
+    }
+    const paymentRequired = JSON.parse(
+      Buffer.from(paymentRequiredHeader, "base64").toString(),
+    ) as PaymentRequired;
     console.log("Payment required:", paymentRequired);
     await makePayment(paymentRequired);
   } else {

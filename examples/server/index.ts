@@ -21,7 +21,7 @@ const routes = {
       {
         scheme: "escrow",
         network,
-        maxAmountRequired: "1000000", // 1 USDC
+        amount: "1000000", // 1 USDC
         asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
         extra: {
@@ -36,7 +36,7 @@ const routes = {
       {
         scheme: "exact",
         network,
-        maxAmountRequired: "1000000",
+        amount: "1000000",
         asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
         extra: { name: "USDC", version: "2" },
@@ -50,7 +50,7 @@ const routes = {
       {
         scheme: "exact",
         network,
-        maxAmountRequired: "10000", // 0.01 USDC
+        amount: "10000", // 0.01 USDC
         asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: process.env.RECEIVER_ADDRESS as `0x${string}`,
         extra: { name: "USDC", version: "2" },
@@ -74,8 +74,16 @@ app.use((req, res, next) => {
   }
 
   // Check for payment header
-  const paymentHeader = req.headers["x-payment"];
+  const paymentHeader = req.headers["payment-signature"];
   if (!paymentHeader) {
+    const requirementsPayload = Buffer.from(
+      JSON.stringify({
+        x402Version: 2,
+        accepts: route.accepts,
+        description: route.description,
+      }),
+    ).toString("base64");
+    res.setHeader("payment-required", requirementsPayload);
     return res.status(402).json({
       x402Version: 2,
       accepts: route.accepts,
