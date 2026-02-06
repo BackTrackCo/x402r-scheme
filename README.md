@@ -19,7 +19,6 @@ pnpm add @x402r/evm
 ```typescript
 import { createPaymentPayload } from "@x402r/evm/escrow/client";
 
-// Accepts both x402 v2 `amount` and legacy `maxAmountRequired`
 const payload = await createPaymentPayload(requirements, wallet);
 ```
 

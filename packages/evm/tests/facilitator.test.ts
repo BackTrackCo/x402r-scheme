@@ -75,7 +75,7 @@ describe("EscrowFacilitatorScheme", () => {
     const mockRequirements = {
       scheme: "escrow",
       network: "eip155:84532",
-      maxAmountRequired: "1000000",
+      amount: "1000000",
       asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
       payTo: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
       extra: {
@@ -218,7 +218,7 @@ describe("EscrowFacilitatorScheme", () => {
     const mockRequirements = {
       scheme: "escrow",
       network: "eip155:84532",
-      maxAmountRequired: "1000000",
+      amount: "1000000",
       asset: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const,
       payTo: "0xdddddddddddddddddddddddddddddddddddddddd" as const,
       extra: {

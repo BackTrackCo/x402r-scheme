@@ -15,10 +15,7 @@ import type { EscrowExtra, EscrowPayload } from "../../shared/types.js";
 export interface PaymentRequirements {
   scheme: string;
   network: string;
-  /** x402r field name */
-  maxAmountRequired?: string;
-  /** x402 v2 field name (takes precedence if both present) */
-  amount?: string;
+  amount: string;
   asset: `0x${string}`;
   payTo: `0x${string}`;
   extra: EscrowExtra;
@@ -44,12 +41,7 @@ export async function createPaymentPayload(
   } = requirements.extra;
 
   const chainId = await wallet.getChainId();
-  const maxAmount = requirements.amount ?? requirements.maxAmountRequired;
-  if (!maxAmount) {
-    throw new Error(
-      "PaymentRequirements must include either amount or maxAmountRequired",
-    );
-  }
+  const maxAmount = requirements.amount;
 
   const paymentInfo = {
     operator: operatorAddress,

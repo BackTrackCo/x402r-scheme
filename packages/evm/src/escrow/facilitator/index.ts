@@ -36,7 +36,7 @@ export interface PaymentPayload {
 export interface PaymentRequirements {
   scheme: string;
   network: string;
-  maxAmountRequired: string;
+  amount: string;
   asset: `0x${string}`;
   payTo: `0x${string}`;
   extra: EscrowExtra;
@@ -190,7 +190,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     // Verify amount meets requirements
     if (
       BigInt(escrowPayload.authorization.value) <
-      BigInt(requirements.maxAmountRequired)
+      BigInt(requirements.amount)
     ) {
       return { isValid: false, invalidReason: "Insufficient payment amount" };
     }
