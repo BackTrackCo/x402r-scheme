@@ -29,11 +29,11 @@ Single package at `packages/evm/` published as `@x402r/evm`:
 
 ## Key Files
 
-| Path | Purpose |
-|------|---------|
-| `packages/evm/src/` | Source code |
-| `packages/evm/tests/` | Test suite |
-| `packages/evm/dist/` | Build output |
+| Path                  | Purpose      |
+| --------------------- | ------------ |
+| `packages/evm/src/`   | Source code  |
+| `packages/evm/tests/` | Test suite   |
+| `packages/evm/dist/`  | Build output |
 
 ## Coding Conventions
 
