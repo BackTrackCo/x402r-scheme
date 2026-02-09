@@ -1,8 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  EscrowFacilitatorScheme,
-  type EscrowFacilitatorConfig,
-} from "../src/escrow/facilitator/index.js";
+import { EscrowFacilitatorScheme } from "../src/escrow/facilitator/index.js";
 import { x402Facilitator } from "@x402/core/facilitator";
 import { registerEscrowScheme } from "../src/escrow/facilitator/index.js";
 
@@ -46,72 +43,16 @@ describe("EscrowFacilitatorScheme", () => {
   });
 
   describe("getExtra", () => {
-    it("should return undefined when no config is provided", () => {
+    it("should return token constants (name, version)", () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
       const extra = scheme.getExtra("eip155:84532");
 
-      expect(extra).toBeUndefined();
-    });
-
-    it("should return escrow metadata when config is provided", () => {
-      const escrowConfig: EscrowFacilitatorConfig = {
-        operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
-        escrowAddress: "0xdddddddddddddddddddddddddddddddddddddddd",
-        tokenCollector: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      };
-      const scheme = new EscrowFacilitatorScheme(mockSigner, escrowConfig);
-      const extra = scheme.getExtra("eip155:84532");
-
-      expect(extra).toBeDefined();
-      expect(extra).toEqual({
-        operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
-        escrowAddress: "0xdddddddddddddddddddddddddddddddddddddddd",
-        tokenCollector: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        minFeeBps: 0,
-        maxFeeBps: 1000,
-        name: "USDC",
-        version: "2",
-      });
-    });
-
-    it("should use custom fee bps when provided", () => {
-      const escrowConfig: EscrowFacilitatorConfig = {
-        operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
-        escrowAddress: "0xdddddddddddddddddddddddddddddddddddddddd",
-        tokenCollector: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        minFeeBps: 50,
-        maxFeeBps: 500,
-      };
-      const scheme = new EscrowFacilitatorScheme(mockSigner, escrowConfig);
-      const extra = scheme.getExtra("eip155:84532");
-
-      expect(extra).toBeDefined();
-      expect(extra!.minFeeBps).toBe(50);
-      expect(extra!.maxFeeBps).toBe(500);
+      expect(extra).toEqual({ name: "USDC", version: "2" });
     });
   });
 
   describe("registerEscrowScheme", () => {
-    it("should pass config through to EscrowFacilitatorScheme", () => {
-      const facilitator = new x402Facilitator();
-      registerEscrowScheme(facilitator, {
-        signer: mockSigner,
-        networks: "eip155:84532",
-        operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc",
-        escrowAddress: "0xdddddddddddddddddddddddddddddddddddddddd",
-        tokenCollector: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      });
-
-      const supported = facilitator.getSupported();
-      const escrowKind = supported.kinds.find(k => k.scheme === "escrow");
-      expect(escrowKind).toBeDefined();
-      expect(escrowKind!.extra).toBeDefined();
-      expect(escrowKind!.extra!.operatorAddress).toBe(
-        "0xcccccccccccccccccccccccccccccccccccccccc",
-      );
-    });
-
-    it("should work without config for backward compatibility", () => {
+    it("should register escrow scheme with token constants in extra", () => {
       const facilitator = new x402Facilitator();
       registerEscrowScheme(facilitator, {
         signer: mockSigner,
@@ -121,7 +62,7 @@ describe("EscrowFacilitatorScheme", () => {
       const supported = facilitator.getSupported();
       const escrowKind = supported.kinds.find(k => k.scheme === "escrow");
       expect(escrowKind).toBeDefined();
-      expect(escrowKind!.extra).toBeUndefined();
+      expect(escrowKind!.extra).toEqual({ name: "USDC", version: "2" });
     });
   });
 

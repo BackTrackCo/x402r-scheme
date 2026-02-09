@@ -40,43 +40,24 @@ function parseChainId(network: string): number {
 }
 
 /**
- * Configuration for escrow facilitator metadata exposed via getExtra()
- */
-export interface EscrowFacilitatorConfig {
-  operatorAddress: `0x${string}`;
-  escrowAddress: `0x${string}`;
-  tokenCollector: `0x${string}`;
-  minFeeBps?: number;
-  maxFeeBps?: number;
-}
-
-/**
  * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
+ *
+ * The facilitator is operator-agnostic: it does not store operator/escrow/tokenCollector
+ * config. Those values are set by the merchant via `refundable()` and arrive in
+ * `requirements.extra` at verify/settle time.
  */
 export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly scheme = "escrow";
   readonly caipFamily = "eip155:*";
 
-  constructor(
-    private signer: FacilitatorEvmSigner,
-    private escrowConfig?: EscrowFacilitatorConfig,
-  ) {}
+  constructor(private signer: FacilitatorEvmSigner) {}
 
   getSigners(_network: string): string[] {
     return [...this.signer.getAddresses()];
   }
 
-  getExtra(_network: string): Record<string, unknown> | undefined {
-    if (!this.escrowConfig) return undefined;
-    return {
-      escrowAddress: this.escrowConfig.escrowAddress,
-      operatorAddress: this.escrowConfig.operatorAddress,
-      tokenCollector: this.escrowConfig.tokenCollector,
-      minFeeBps: this.escrowConfig.minFeeBps ?? 0,
-      maxFeeBps: this.escrowConfig.maxFeeBps ?? 1000,
-      name: "USDC",
-      version: "2",
-    };
+  getExtra(_network: string): Record<string, unknown> {
+    return { name: "USDC", version: "2" };
   }
 
   async verify(
@@ -193,15 +174,16 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
 /**
  * Register escrow scheme with x402Facilitator
  *
+ * The facilitator is operator-agnostic — it supports any operator. Operator,
+ * escrow, and tokenCollector addresses are provided per-request by the merchant
+ * via `refundable()` and arrive in `requirements.extra`.
+ *
  * @example
  * ```typescript
  * const facilitator = new x402Facilitator();
  * registerEscrowScheme(facilitator, {
  *   signer: evmSigner,
  *   networks: "eip155:84532",
- *   operatorAddress: "0x...",
- *   escrowAddress: "0x...",
- *   tokenCollector: "0x...",
  * });
  * ```
  */
@@ -210,26 +192,11 @@ export function registerEscrowScheme(
   config: {
     signer: FacilitatorEvmSigner;
     networks: Network | Network[];
-    operatorAddress?: `0x${string}`;
-    escrowAddress?: `0x${string}`;
-    tokenCollector?: `0x${string}`;
-    minFeeBps?: number;
-    maxFeeBps?: number;
   },
 ): x402Facilitator {
-  const escrowConfig =
-    config.operatorAddress && config.escrowAddress && config.tokenCollector
-      ? {
-          operatorAddress: config.operatorAddress,
-          escrowAddress: config.escrowAddress,
-          tokenCollector: config.tokenCollector,
-          minFeeBps: config.minFeeBps,
-          maxFeeBps: config.maxFeeBps,
-        }
-      : undefined;
   facilitator.register(
     config.networks,
-    new EscrowFacilitatorScheme(config.signer, escrowConfig),
+    new EscrowFacilitatorScheme(config.signer),
   );
   return facilitator;
 }
