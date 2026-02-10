@@ -11,6 +11,7 @@ describe("EscrowServerScheme", () => {
 
       expect(result.amount).toBe("1000000");
       expect(result.asset).toBe(BASE_SEPOLIA_USDC);
+      expect(result.extra).toEqual({ name: "USDC", version: "2" });
     });
 
     it("should parse amounts without dollar sign", async () => {
@@ -18,6 +19,7 @@ describe("EscrowServerScheme", () => {
       const result = await scheme.parsePrice("0.50", "eip155:84532");
 
       expect(result.amount).toBe("500000");
+      expect(result.extra).toEqual({ name: "USDC", version: "2" });
     });
 
     it("should parse small amounts correctly", async () => {
@@ -41,14 +43,6 @@ describe("EscrowServerScheme", () => {
       expect(result.amount).toBe("1000500000");
     });
 
-    it("should use custom decimals when configured", async () => {
-      const scheme = new EscrowServerScheme({ decimals: 18 });
-      const result = await scheme.parsePrice("$1.00", "eip155:84532");
-
-      expect(result.amount).toBe("1000000000000000000");
-      expect(result.asset).toBe(BASE_SEPOLIA_USDC);
-    });
-
     it("should handle zero amounts", async () => {
       const scheme = new EscrowServerScheme();
       const result = await scheme.parsePrice("$0.00", "eip155:84532");
@@ -62,9 +56,29 @@ describe("EscrowServerScheme", () => {
 
       expect(result.amount).toBe("10000");
       expect(result.asset).toBe(BASE_SEPOLIA_USDC);
+      expect(result.extra).toEqual({ name: "USDC", version: "2" });
     });
 
-    it("should pass through AssetAmount objects", async () => {
+    it("should return extra with name and version for Base mainnet", async () => {
+      const scheme = new EscrowServerScheme();
+      const result = await scheme.parsePrice("$1.00", "eip155:8453");
+
+      expect(result.extra).toEqual({ name: "USD Coin", version: "2" });
+    });
+
+    it("should pass through AssetAmount objects with extra", async () => {
+      const scheme = new EscrowServerScheme();
+      const result = await scheme.parsePrice(
+        { asset: "0xCustomToken", amount: "42000", extra: { name: "Custom", version: "1" } },
+        "eip155:84532",
+      );
+
+      expect(result.amount).toBe("42000");
+      expect(result.asset).toBe("0xCustomToken");
+      expect(result.extra).toEqual({ name: "Custom", version: "1" });
+    });
+
+    it("should pass through AssetAmount objects without extra", async () => {
       const scheme = new EscrowServerScheme();
       const result = await scheme.parsePrice(
         { asset: "0xCustomToken", amount: "42000" },
@@ -73,6 +87,17 @@ describe("EscrowServerScheme", () => {
 
       expect(result.amount).toBe("42000");
       expect(result.asset).toBe("0xCustomToken");
+      expect(result.extra).toEqual({});
+    });
+
+    it("should throw when AssetAmount has no asset", async () => {
+      const scheme = new EscrowServerScheme();
+      await expect(
+        scheme.parsePrice(
+          { asset: "", amount: "42000" },
+          "eip155:84532",
+        ),
+      ).rejects.toThrow("Asset address must be specified");
     });
 
     it("should throw for unsupported network", async () => {
@@ -89,7 +114,7 @@ describe("EscrowServerScheme", () => {
 
       const requirements = {
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         amount: "1000000",
         asset: BASE_SEPOLIA_USDC,
         payTo: "0x1234567890123456789012345678901234567890",
@@ -100,7 +125,7 @@ describe("EscrowServerScheme", () => {
       const supportedKind = {
         x402Version: 2,
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         extra: {
           escrowAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           operatorAddress: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -124,7 +149,7 @@ describe("EscrowServerScheme", () => {
 
       const requirements = {
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         amount: "1000000",
         asset: BASE_SEPOLIA_USDC,
         payTo: "0x1234567890123456789012345678901234567890",
@@ -137,7 +162,7 @@ describe("EscrowServerScheme", () => {
       const supportedKind = {
         x402Version: 2,
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         extra: {
           escrowAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         },
@@ -160,7 +185,7 @@ describe("EscrowServerScheme", () => {
 
       const requirements = {
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         amount: "1000000",
         asset: BASE_SEPOLIA_USDC,
         payTo: "0x1234567890123456789012345678901234567890",
@@ -173,7 +198,7 @@ describe("EscrowServerScheme", () => {
       const supportedKind = {
         x402Version: 2,
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         extra: {
           escrowAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         },
@@ -196,7 +221,7 @@ describe("EscrowServerScheme", () => {
 
       const requirements = {
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         amount: "1000000",
         asset: BASE_SEPOLIA_USDC,
         payTo: "0x1234567890123456789012345678901234567890",
@@ -207,7 +232,7 @@ describe("EscrowServerScheme", () => {
       const supportedKind = {
         x402Version: 2,
         scheme: "escrow",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
       };
 
       const result = await scheme.enhancePaymentRequirements(

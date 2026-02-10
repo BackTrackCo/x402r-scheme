@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EscrowFacilitatorScheme } from "../src/escrow/facilitator/index.js";
 import { x402Facilitator } from "@x402/core/facilitator";
 import { registerEscrowScheme } from "../src/escrow/facilitator/index.js";
 
 describe("EscrowFacilitatorScheme", () => {
   // Mock signer matching x402's FacilitatorEvmSigner interface
-  const mockSigner = {
+  const createMockSigner = () => ({
     getAddresses: () =>
       ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
     readContract: vi.fn(),
@@ -14,9 +14,17 @@ describe("EscrowFacilitatorScheme", () => {
       .mockResolvedValue("0xabcdef1234567890" as `0x${string}`),
     verifyTypedData: vi.fn().mockResolvedValue(true),
     sendTransaction: vi.fn(),
-    waitForTransactionReceipt: vi.fn(),
+    waitForTransactionReceipt: vi
+      .fn()
+      .mockResolvedValue({ status: "success" }),
     getCode: vi.fn(),
-  };
+  });
+
+  let mockSigner: ReturnType<typeof createMockSigner>;
+
+  beforeEach(() => {
+    mockSigner = createMockSigner();
+  });
 
   describe("constructor and properties", () => {
     it('should have scheme set to "escrow"', () => {
@@ -67,6 +75,9 @@ describe("EscrowFacilitatorScheme", () => {
   });
 
   describe("verify", () => {
+    // Use a far-future validBefore to avoid time validation issues in tests
+    const futureTimestamp = String(Math.floor(Date.now() / 1000) + 3600);
+
     const mockPayload = {
       x402Version: 2,
       scheme: "escrow",
@@ -86,7 +97,7 @@ describe("EscrowFacilitatorScheme", () => {
           to: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as const,
           value: "1000000",
           validAfter: "0",
-          validBefore: "9999999999",
+          validBefore: futureTimestamp,
           nonce:
             "0x1234567890123456789012345678901234567890123456789012345678901234" as const,
         },
@@ -130,7 +141,7 @@ describe("EscrowFacilitatorScheme", () => {
       expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
-    it("should return invalid when signature verification fails", async () => {
+    it("should return invalid with structured error when signature verification fails", async () => {
       const failingSigner = {
         ...mockSigner,
         verifyTypedData: vi.fn().mockResolvedValue(false),
@@ -140,10 +151,11 @@ describe("EscrowFacilitatorScheme", () => {
       const result = await scheme.verify(mockPayload, mockRequirements);
 
       expect(result.isValid).toBe(false);
-      expect(result.invalidReason).toBe("Invalid ERC-3009 signature");
+      expect(result.invalidReason).toBe("invalid_escrow_signature");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
-    it("should return invalid when amount is insufficient", async () => {
+    it("should return invalid with structured error when amount is insufficient", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 
       const insufficientPayload = {
@@ -160,10 +172,11 @@ describe("EscrowFacilitatorScheme", () => {
       const result = await scheme.verify(insufficientPayload, mockRequirements);
 
       expect(result.isValid).toBe(false);
-      expect(result.invalidReason).toBe("Insufficient payment amount");
+      expect(result.invalidReason).toBe("insufficient_amount");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
-    it("should return invalid when token mismatches", async () => {
+    it("should return invalid with structured error when token mismatches", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 
       const wrongTokenPayload = {
@@ -180,10 +193,11 @@ describe("EscrowFacilitatorScheme", () => {
       const result = await scheme.verify(wrongTokenPayload, mockRequirements);
 
       expect(result.isValid).toBe(false);
-      expect(result.invalidReason).toBe("Token mismatch");
+      expect(result.invalidReason).toBe("token_mismatch");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
-    it("should return invalid when receiver mismatches", async () => {
+    it("should return invalid with structured error when receiver mismatches", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 
       const wrongReceiverPayload = {
@@ -203,7 +217,8 @@ describe("EscrowFacilitatorScheme", () => {
       );
 
       expect(result.isValid).toBe(false);
-      expect(result.invalidReason).toBe("Receiver mismatch");
+      expect(result.invalidReason).toBe("receiver_mismatch");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
     it("should parse chainId from network correctly", async () => {
@@ -217,9 +232,118 @@ describe("EscrowFacilitatorScheme", () => {
       const result = await scheme.verify(mockPayload, mainnetRequirements);
       expect(result.isValid).toBe(true);
     });
+
+    it("should reject unsupported scheme", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const wrongSchemeRequirements = {
+        ...mockRequirements,
+        scheme: "exact",
+      };
+
+      const result = await scheme.verify(mockPayload, wrongSchemeRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("unsupported_scheme");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should reject invalid network format", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const badNetworkRequirements = {
+        ...mockRequirements,
+        network: "solana:mainnet",
+      };
+
+      const result = await scheme.verify(mockPayload, badNetworkRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("invalid_network");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should reject expired authorization", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const expiredPayload = {
+        ...mockPayload,
+        payload: {
+          ...mockPayload.payload,
+          authorization: {
+            ...mockPayload.payload.authorization,
+            validBefore: "0", // Already expired
+          },
+        },
+      };
+
+      const result = await scheme.verify(expiredPayload, mockRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("authorization_expired");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should reject authorization not yet valid", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const futureValidAfter = String(Math.floor(Date.now() / 1000) + 3600);
+      const notYetValidPayload = {
+        ...mockPayload,
+        payload: {
+          ...mockPayload.payload,
+          authorization: {
+            ...mockPayload.payload.authorization,
+            validAfter: futureValidAfter, // 1 hour in the future
+          },
+        },
+      };
+
+      const result = await scheme.verify(notYetValidPayload, mockRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("authorization_not_yet_valid");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should include payer in all error responses", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      // Test scheme mismatch
+      const result1 = await scheme.verify(mockPayload, {
+        ...mockRequirements,
+        scheme: "exact",
+      });
+      expect(result1.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+      // Test network mismatch
+      const result2 = await scheme.verify(mockPayload, {
+        ...mockRequirements,
+        network: "solana:mainnet",
+      });
+      expect(result2.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+      // Test expired
+      const result3 = await scheme.verify(
+        {
+          ...mockPayload,
+          payload: {
+            ...mockPayload.payload,
+            authorization: {
+              ...mockPayload.payload.authorization,
+              validBefore: "0",
+            },
+          },
+        },
+        mockRequirements,
+      );
+      expect(result3.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
   });
 
   describe("settle", () => {
+    const futureTimestamp = String(Math.floor(Date.now() / 1000) + 3600);
+
     const mockPayload = {
       x402Version: 2,
       scheme: "escrow",
@@ -239,7 +363,7 @@ describe("EscrowFacilitatorScheme", () => {
           to: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as const,
           value: "1000000",
           validAfter: "0",
-          validBefore: "9999999999",
+          validBefore: futureTimestamp,
           nonce:
             "0x1234567890123456789012345678901234567890123456789012345678901234" as const,
         },
@@ -295,6 +419,33 @@ describe("EscrowFacilitatorScheme", () => {
           functionName: "authorize",
         }),
       );
+    });
+
+    it("should call waitForTransactionReceipt after writeContract", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+      await scheme.settle(mockPayload, mockRequirements);
+
+      expect(mockSigner.waitForTransactionReceipt).toHaveBeenCalledWith({
+        hash: "0xabcdef1234567890",
+      });
+    });
+
+    it("should return failure when transaction reverts", async () => {
+      const revertingSigner = {
+        ...mockSigner,
+        waitForTransactionReceipt: vi
+          .fn()
+          .mockResolvedValue({ status: "reverted" }),
+      };
+
+      const scheme = new EscrowFacilitatorScheme(revertingSigner);
+      const result = await scheme.settle(mockPayload, mockRequirements);
+
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("transaction_reverted");
+      expect(result.transaction).toBe("0xabcdef1234567890");
+      expect(result.network).toBe("eip155:84532");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
     it("should return error with empty transaction when writeContract fails", async () => {

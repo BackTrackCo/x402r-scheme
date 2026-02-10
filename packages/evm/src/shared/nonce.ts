@@ -3,7 +3,8 @@
  * Adapted from @agentokratia/x402-escrow (MIT)
  */
 
-import { encodeAbiParameters, keccak256, type WalletClient } from "viem";
+import { encodeAbiParameters, keccak256 } from "viem";
+import type { ClientEvmSigner } from "@x402/evm";
 import { ZERO_ADDRESS, PAYMENT_INFO_COMPONENTS } from "./constants.js";
 import type { EscrowExtra, EscrowPayload } from "./types.js";
 
@@ -78,17 +79,18 @@ export function computeEscrowNonce(
  * Note: receiveWithAuthorization uses a different primary type than transferWithAuthorization
  */
 export async function signERC3009(
-  wallet: WalletClient,
+  signer: ClientEvmSigner,
   authorization: EscrowPayload["authorization"],
   extra: EscrowExtra,
   tokenAddress: `0x${string}`,
+  chainId: number,
 ): Promise<`0x${string}`> {
   // EIP-712 domain - name must match the token's EIP-712 domain
   // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
     name: extra.name,
     version: extra.version ?? "2",
-    chainId: await wallet.getChainId(),
+    chainId,
     verifyingContract: tokenAddress,
   };
 
@@ -113,8 +115,7 @@ export async function signERC3009(
     nonce: authorization.nonce,
   };
 
-  return wallet.signTypedData({
-    account: wallet.account!,
+  return signer.signTypedData({
     domain,
     types,
     primaryType: "ReceiveWithAuthorization",

@@ -65,8 +65,50 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     requirements: PaymentRequirements,
   ): Promise<VerifyResponse> {
     const escrowPayload = payload.payload as unknown as EscrowPayload;
+    const payer = escrowPayload.authorization.from;
+
+    // Validate scheme
+    if (requirements.scheme !== "escrow") {
+      return {
+        isValid: false,
+        invalidReason: "unsupported_scheme",
+        payer,
+      };
+    }
+
+    // Validate network format
+    const networkParts = requirements.network.split(":");
+    if (networkParts.length !== 2 || networkParts[0] !== "eip155") {
+      return {
+        isValid: false,
+        invalidReason: "invalid_network",
+        payer,
+      };
+    }
+
     const extra = requirements.extra as unknown as EscrowExtra;
     const chainId = parseChainId(requirements.network);
+
+    // Time window validation
+    const now = Math.floor(Date.now() / 1000);
+    const validBefore = Number(escrowPayload.authorization.validBefore);
+    const validAfter = Number(escrowPayload.authorization.validAfter);
+
+    if (validBefore <= now + 6) {
+      return {
+        isValid: false,
+        invalidReason: "authorization_expired",
+        payer,
+      };
+    }
+
+    if (validAfter > now) {
+      return {
+        isValid: false,
+        invalidReason: "authorization_not_yet_valid",
+        payer,
+      };
+    }
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
@@ -78,7 +120,11 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     );
 
     if (!isValidSignature) {
-      return { isValid: false, invalidReason: "Invalid ERC-3009 signature" };
+      return {
+        isValid: false,
+        invalidReason: "invalid_escrow_signature",
+        payer,
+      };
     }
 
     // Verify amount meets requirements
@@ -86,7 +132,11 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       BigInt(escrowPayload.authorization.value) <
       BigInt(requirements.amount)
     ) {
-      return { isValid: false, invalidReason: "Insufficient payment amount" };
+      return {
+        isValid: false,
+        invalidReason: "insufficient_amount",
+        payer,
+      };
     }
 
     // Verify token matches
@@ -94,7 +144,11 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       escrowPayload.paymentInfo.token.toLowerCase() !==
       requirements.asset.toLowerCase()
     ) {
-      return { isValid: false, invalidReason: "Token mismatch" };
+      return {
+        isValid: false,
+        invalidReason: "token_mismatch",
+        payer,
+      };
     }
 
     // Verify receiver matches
@@ -102,12 +156,16 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       escrowPayload.paymentInfo.receiver.toLowerCase() !==
       requirements.payTo.toLowerCase()
     ) {
-      return { isValid: false, invalidReason: "Receiver mismatch" };
+      return {
+        isValid: false,
+        invalidReason: "receiver_mismatch",
+        payer,
+      };
     }
 
     return {
       isValid: true,
-      payer: escrowPayload.authorization.from,
+      payer,
     };
   }
 
@@ -151,6 +209,21 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
           collectorData,
         ],
       });
+
+      // Wait for transaction confirmation
+      const receipt = await this.signer.waitForTransactionReceipt({
+        hash: txHash,
+      });
+
+      if (receipt.status !== "success") {
+        return {
+          success: false,
+          errorReason: "transaction_reverted",
+          transaction: txHash,
+          network: requirements.network,
+          payer: escrowPayload.authorization.from,
+        };
+      }
 
       return {
         success: true,
