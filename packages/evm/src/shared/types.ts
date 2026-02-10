@@ -1,3 +1,29 @@
+/**
+ * Type guard for EscrowPayload
+ */
+export function isEscrowPayload(value: unknown): value is EscrowPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "authorization" in value &&
+    "signature" in value &&
+    "paymentInfo" in value
+  );
+}
+
+/**
+ * Type guard for EscrowExtra
+ */
+export function isEscrowExtra(value: unknown): value is EscrowExtra {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "escrowAddress" in value &&
+    "operatorAddress" in value &&
+    "tokenCollector" in value
+  );
+}
+
 // EscrowExtra - fields in PaymentRequirements.extra
 export interface EscrowExtra {
   escrowAddress: `0x${string}`;

@@ -108,6 +108,53 @@ describe("EscrowServerScheme", () => {
     });
   });
 
+  describe("registerMoneyParser", () => {
+    it("should use custom parser when it returns a result", async () => {
+      const scheme = new EscrowServerScheme();
+      scheme.registerMoneyParser(async (amount, _network) => ({
+        asset: "0xCustomToken",
+        amount: String(amount * 1e18),
+        extra: { name: "Custom", version: "1" },
+      }));
+
+      const result = await scheme.parsePrice("$1.00", "eip155:84532");
+
+      expect(result.asset).toBe("0xCustomToken");
+      expect(result.amount).toBe(String(1e18));
+      expect(result.extra).toEqual({ name: "Custom", version: "1" });
+    });
+
+    it("should fall through to default when custom parser returns null", async () => {
+      const scheme = new EscrowServerScheme();
+      scheme.registerMoneyParser(async () => null);
+
+      const result = await scheme.parsePrice("$1.00", "eip155:84532");
+
+      expect(result.asset).toBe(BASE_SEPOLIA_USDC);
+      expect(result.amount).toBe("1000000");
+      expect(result.extra).toEqual({ name: "USDC", version: "2" });
+    });
+
+    it("should try parsers in registration order", async () => {
+      const scheme = new EscrowServerScheme();
+
+      // First parser returns null
+      scheme.registerMoneyParser(async () => null);
+
+      // Second parser returns a result
+      scheme.registerMoneyParser(async (amount, _network) => ({
+        asset: "0xSecondParser",
+        amount: String(amount * 100),
+        extra: {},
+      }));
+
+      const result = await scheme.parsePrice("$1.00", "eip155:84532");
+
+      expect(result.asset).toBe("0xSecondParser");
+      expect(result.amount).toBe("100");
+    });
+  });
+
   describe("enhancePaymentRequirements", () => {
     it("should merge extra fields from supportedKind", async () => {
       const scheme = new EscrowServerScheme();

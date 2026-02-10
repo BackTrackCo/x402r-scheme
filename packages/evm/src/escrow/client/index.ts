@@ -52,6 +52,19 @@ export class EscrowEvmScheme implements SchemeNetworkClient {
     requirements: PaymentRequirements,
   ): Promise<Pick<PaymentPayload, "x402Version" | "payload">> {
     const extra = requirements.extra as unknown as EscrowExtra;
+
+    // Validate required EIP-712 domain parameters (M3, M10)
+    if (!extra.name) {
+      throw new Error(
+        `EIP-712 domain parameter 'name' is required in payment requirements for asset ${requirements.asset}`,
+      );
+    }
+    if (!extra.version) {
+      throw new Error(
+        `EIP-712 domain parameter 'version' is required in payment requirements for asset ${requirements.asset}`,
+      );
+    }
+
     const {
       escrowAddress,
       operatorAddress,

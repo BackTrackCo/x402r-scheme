@@ -8,6 +8,7 @@
 
 import type {
   AssetAmount,
+  MoneyParser,
   Network,
   PaymentRequirements,
   Price,
@@ -109,6 +110,22 @@ function convertToTokenAmount(decimalAmount: string, decimals: number): string {
  */
 export class EscrowServerScheme implements SchemeNetworkServer {
   readonly scheme = "escrow";
+  private moneyParsers: MoneyParser[] = [];
+
+  /**
+   * Register a custom money parser in the parser chain.
+   * Multiple parsers can be registered — they will be tried in registration order.
+   * Each parser receives a decimal amount (e.g., 1.50 for $1.50).
+   * If a parser returns null, the next parser in the chain will be tried.
+   * The default parser (USDC) is always the final fallback.
+   *
+   * @param parser - Custom function to convert amount to AssetAmount (or null to skip)
+   * @returns The server instance for chaining
+   */
+  registerMoneyParser(parser: MoneyParser): EscrowServerScheme {
+    this.moneyParsers.push(parser);
+    return this;
+  }
 
   /**
    * Parse a price into an x402 AssetAmount.
@@ -137,26 +154,47 @@ export class EscrowServerScheme implements SchemeNetworkServer {
       };
     }
 
-    // Convert to number for calculation
-    let numericAmount: number;
-    if (typeof price === "number") {
-      numericAmount = price;
-    } else {
-      const cleaned = String(price).replace(/[$,]/g, "").trim();
-      numericAmount = parseFloat(cleaned);
+    // Parse Money to decimal number
+    const numericAmount = this.parseMoneyToDecimal(price);
+
+    // Try each custom money parser in order
+    for (const parser of this.moneyParsers) {
+      const result = await parser(numericAmount, network);
+      if (result !== null) {
+        return result;
+      }
     }
 
-    if (isNaN(numericAmount)) {
-      throw new Error(`Cannot parse price: ${price}`);
-    }
+    // All custom parsers returned null (or none registered), use default conversion
+    return this.defaultMoneyConversion(numericAmount, network);
+  }
 
+  /**
+   * Parse Money (string | number) to a decimal number.
+   */
+  private parseMoneyToDecimal(money: string | number): number {
+    if (typeof money === "number") {
+      return money;
+    }
+    const cleaned = String(money).replace(/[$,]/g, "").trim();
+    const amount = parseFloat(cleaned);
+    if (isNaN(amount)) {
+      throw new Error(`Cannot parse price: ${money}`);
+    }
+    return amount;
+  }
+
+  /**
+   * Default money conversion — converts decimal amount to the default stablecoin on the network.
+   */
+  private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
     const assetInfo = ASSET_INFO[network];
     if (!assetInfo) {
       throw new Error(`No USDC address configured for network: ${network}`);
     }
 
     const tokenAmount = convertToTokenAmount(
-      String(numericAmount),
+      String(amount),
       assetInfo.decimals,
     );
 

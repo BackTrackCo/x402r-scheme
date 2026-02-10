@@ -41,3 +41,18 @@ export const OPERATOR_ABI = [
 // ERC-3009 TransferWithAuthorization type hash
 export const TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
   "0x7c7c6cdb67a18743f49ec6fa9b35f50d52ed05cbed4cc592e13b44501c1a2267" as const;
+
+// EIP-6492 magic suffix (32 bytes) — appended to signatures from counterfactual smart wallets
+export const ERC6492_MAGIC_VALUE =
+  "0x6492649264926492649264926492649264926492649264926492649264926492" as const;
+
+// ERC-20 balanceOf ABI for balance checks
+export const ERC20_BALANCE_OF_ABI = [
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "balance", type: "uint256" }],
+  },
+] as const;

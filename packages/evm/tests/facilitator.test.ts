@@ -8,7 +8,7 @@ describe("EscrowFacilitatorScheme", () => {
   const createMockSigner = () => ({
     getAddresses: () =>
       ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
-    readContract: vi.fn(),
+    readContract: vi.fn().mockResolvedValue(BigInt("1000000000")),
     writeContract: vi
       .fn()
       .mockResolvedValue("0xabcdef1234567890" as `0x${string}`),
@@ -51,16 +51,16 @@ describe("EscrowFacilitatorScheme", () => {
   });
 
   describe("getExtra", () => {
-    it("should return token constants (name, version)", () => {
+    it("should return undefined (name/version come from server parsePrice)", () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
       const extra = scheme.getExtra("eip155:84532");
 
-      expect(extra).toEqual({ name: "USDC", version: "2" });
+      expect(extra).toBeUndefined();
     });
   });
 
   describe("registerEscrowScheme", () => {
-    it("should register escrow scheme with token constants in extra", () => {
+    it("should register escrow scheme with undefined extra", () => {
       const facilitator = new x402Facilitator();
       registerEscrowScheme(facilitator, {
         signer: mockSigner,
@@ -70,7 +70,7 @@ describe("EscrowFacilitatorScheme", () => {
       const supported = facilitator.getSupported();
       const escrowKind = supported.kinds.find(k => k.scheme === "escrow");
       expect(escrowKind).toBeDefined();
-      expect(escrowKind!.extra).toEqual({ name: "USDC", version: "2" });
+      expect(escrowKind!.extra).toBeUndefined();
     });
   });
 
@@ -130,6 +130,8 @@ describe("EscrowFacilitatorScheme", () => {
           "0xffffffffffffffffffffffffffffffffffffffffffff" as const,
         operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc" as const,
         tokenCollector: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as const,
+        name: "USDC",
+        version: "2",
       },
     };
 
@@ -306,6 +308,63 @@ describe("EscrowFacilitatorScheme", () => {
       expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     });
 
+    it("should reject invalid payload format (type guard)", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const badPayload = {
+        ...mockPayload,
+        payload: "not-an-object",
+      };
+
+      const result = await scheme.verify(badPayload, mockRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("invalid_payload_format");
+    });
+
+    it("should reject invalid escrow extra (type guard)", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const badExtraRequirements = {
+        ...mockRequirements,
+        extra: { someOtherField: "value" },
+      };
+
+      const result = await scheme.verify(mockPayload, badExtraRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("invalid_escrow_extra");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should reject insufficient token balance", async () => {
+      const lowBalanceSigner = {
+        ...mockSigner,
+        readContract: vi.fn().mockResolvedValue(BigInt("500000")), // Less than required 1000000
+      };
+
+      const scheme = new EscrowFacilitatorScheme(lowBalanceSigner);
+      const result = await scheme.verify(mockPayload, mockRequirements);
+
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("insufficient_balance");
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
+    it("should silently skip balance check on readContract failure", async () => {
+      const failingReadSigner = {
+        ...mockSigner,
+        readContract: vi.fn().mockRejectedValue(new Error("RPC error")),
+      };
+
+      const scheme = new EscrowFacilitatorScheme(failingReadSigner);
+      const result = await scheme.verify(mockPayload, mockRequirements);
+
+      // Should still pass — balance check error is swallowed
+      expect(result.isValid).toBe(true);
+      expect(result.payer).toBe("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    });
+
     it("should include payer in all error responses", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 
@@ -396,6 +455,8 @@ describe("EscrowFacilitatorScheme", () => {
           "0xffffffffffffffffffffffffffffffffffffffffffff" as const,
         operatorAddress: "0xcccccccccccccccccccccccccccccccccccccccc" as const,
         tokenCollector: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as const,
+        name: "USDC",
+        version: "2",
       },
     };
 
@@ -463,6 +524,29 @@ describe("EscrowFacilitatorScheme", () => {
       expect(result.errorReason).toBe("Transaction failed");
       expect(result.transaction).toBe("");
       expect(result.network).toBe("eip155:84532");
+    });
+
+    it("should fail settle when re-verification fails (expired auth)", async () => {
+      const scheme = new EscrowFacilitatorScheme(mockSigner);
+
+      const expiredPayload = {
+        ...mockPayload,
+        payload: {
+          ...mockPayload.payload,
+          authorization: {
+            ...mockPayload.payload.authorization,
+            validBefore: "0", // Already expired
+          },
+        },
+      };
+
+      const result = await scheme.settle(expiredPayload, mockRequirements);
+
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("authorization_expired");
+      expect(result.transaction).toBe("");
+      // writeContract should NOT have been called
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
     });
 
     it("should use authorizeAddress if provided in extra", async () => {
