@@ -13,25 +13,38 @@ npm install @x402r/evm
 ### Client — Create payment payloads
 
 ```typescript
-import { createPaymentPayload } from "@x402r/evm/escrow/client";
+import { EscrowEvmScheme, registerEscrowScheme } from "@x402r/evm/escrow/client";
+import { x402Client } from "@x402/core/client";
 
-const payload = await createPaymentPayload(requirements, walletClient);
+const client = new x402Client();
+registerEscrowScheme(client, { signer, networks: "eip155:84532" });
 ```
 
 ### Server — Register with x402 resource server
 
 ```typescript
-import { EscrowServerScheme } from "@x402r/evm/escrow/server";
+import { EscrowServerScheme, registerEscrowServerScheme } from "@x402r/evm/escrow/server";
+import { x402ResourceServer } from "@x402/core/server";
 
-const scheme = new EscrowServerScheme();
-server.register("eip155:84532", scheme);
+const server = new x402ResourceServer(facilitatorConfig);
+registerEscrowServerScheme(server, { networks: "eip155:84532" });
+```
+
+### Facilitator — Verify and settle payments
+
+```typescript
+import { EscrowFacilitatorScheme, registerEscrowScheme } from "@x402r/evm/escrow/facilitator";
+import { x402Facilitator } from "@x402/core/facilitator";
+
+const facilitator = new x402Facilitator();
+registerEscrowScheme(facilitator, { signer, networks: "eip155:84532" });
 ```
 
 ## Exports
 
-- `@x402r/evm/escrow/client` — `createPaymentPayload()`, `EscrowScheme`
-- `@x402r/evm/escrow/server` — `EscrowServerScheme`
-- `@x402r/evm/escrow/facilitator` — Settlement and verification
+- `@x402r/evm/escrow/client` — `EscrowEvmScheme`, `registerEscrowScheme()`
+- `@x402r/evm/escrow/server` — `EscrowServerScheme`, `registerEscrowServerScheme()`
+- `@x402r/evm/escrow/facilitator` — `EscrowFacilitatorScheme`, `registerEscrowScheme()`
 - `@x402r/evm/escrow/types` — `EscrowExtra`, `EscrowPayload`
 
 ## Links
