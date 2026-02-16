@@ -526,6 +526,28 @@ describe("EscrowFacilitatorScheme", () => {
       expect(result.network).toBe("eip155:84532");
     });
 
+    it("should return error when waitForTransactionReceipt times out", async () => {
+      const hangingSigner = {
+        ...mockSigner,
+        waitForTransactionReceipt: vi.fn().mockImplementation(
+          () => new Promise(() => {}), // never resolves
+        ),
+      };
+
+      const scheme = new EscrowFacilitatorScheme(hangingSigner);
+
+      // Use a short timeout by mocking setTimeout behavior via fake timers
+      vi.useFakeTimers();
+      const resultPromise = scheme.settle(mockPayload, mockRequirements);
+      await vi.advanceTimersByTimeAsync(60_000);
+      const result = await resultPromise;
+      vi.useRealTimers();
+
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toContain("timeout");
+      expect(result.transaction).toBe("");
+    });
+
     it("should fail settle when re-verification fails (expired auth)", async () => {
       const scheme = new EscrowFacilitatorScheme(mockSigner);
 

@@ -314,10 +314,17 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
         ],
       });
 
-      // Wait for transaction confirmation
-      const receipt = await this.signer.waitForTransactionReceipt({
+      // Wait for transaction confirmation with 60s timeout to avoid hanging on stuck txs
+      const receiptPromise = this.signer.waitForTransactionReceipt({
         hash: txHash,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Transaction receipt timeout after 60s")),
+          60_000,
+        ),
+      );
+      const receipt = await Promise.race([receiptPromise, timeoutPromise]);
 
       if (receipt.status !== "success") {
         return {

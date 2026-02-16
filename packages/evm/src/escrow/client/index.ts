@@ -51,6 +51,12 @@ export class EscrowEvmScheme implements SchemeNetworkClient {
     x402Version: number,
     requirements: PaymentRequirements,
   ): Promise<Pick<PaymentPayload, "x402Version" | "payload">> {
+    if (x402Version !== 2) {
+      throw new Error(
+        `Unsupported x402Version: ${x402Version}. Only version 2 is supported.`,
+      );
+    }
+
     const extra = requirements.extra as unknown as EscrowExtra;
 
     // Validate required EIP-712 domain parameters (M3, M10)
