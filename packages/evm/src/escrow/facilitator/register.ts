@@ -1,11 +1,11 @@
-import type { Network } from "@x402/core/types";
-import type { FacilitatorEvmSigner } from "@x402/evm";
-import { x402Facilitator } from "@x402/core/facilitator";
-import { EscrowFacilitatorScheme } from "./scheme";
+import type { Network } from '@x402/core/types'
+import type { FacilitatorEvmSigner } from '@x402/evm'
+import { x402Facilitator } from '@x402/core/facilitator'
+import { EscrowFacilitatorScheme } from './scheme'
 
 export interface EvmFacilitatorConfig {
-  signer: FacilitatorEvmSigner;
-  networks: Network | Network[];
+  signer: FacilitatorEvmSigner
+  networks: Network | Network[]
 }
 
 /**
@@ -28,9 +28,6 @@ export function registerEscrowEvmScheme(
   facilitator: x402Facilitator,
   config: EvmFacilitatorConfig,
 ): x402Facilitator {
-  facilitator.register(
-    config.networks,
-    new EscrowFacilitatorScheme(config.signer),
-  );
-  return facilitator;
+  facilitator.register(config.networks, new EscrowFacilitatorScheme(config.signer))
+  return facilitator
 }

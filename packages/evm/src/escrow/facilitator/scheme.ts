@@ -13,20 +13,14 @@ import type {
   SchemeNetworkFacilitator,
   SettleResponse,
   VerifyResponse,
-} from "@x402/core/types";
-import type { FacilitatorEvmSigner } from "@x402/evm";
-import { parseErc6492Signature } from "viem";
-import {
-  OPERATOR_ABI,
-  ERC20_BALANCE_OF_ABI,
-} from "../shared/constants";
-import { verifyERC3009Signature } from "../shared/nonce";
-import {
-  isEscrowPayload,
-  isEscrowExtra,
-} from "../shared/types";
-import type { EscrowExtra, EscrowPayload } from "../shared/types";
-import { parseChainId } from "../shared/utils";
+} from '@x402/core/types'
+import type { FacilitatorEvmSigner } from '@x402/evm'
+import { parseErc6492Signature } from 'viem'
+import { OPERATOR_ABI, ERC20_BALANCE_OF_ABI } from '../shared/constants'
+import { verifyERC3009Signature } from '../shared/nonce'
+import { isEscrowPayload, isEscrowExtra } from '../shared/types'
+import type { EscrowExtra, EscrowPayload } from '../shared/types'
+import { parseChainId } from '../shared/utils'
 
 /**
  * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
@@ -36,19 +30,19 @@ import { parseChainId } from "../shared/utils";
  * `requirements.extra` at verify/settle time.
  */
 export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
-  readonly scheme = "escrow";
-  readonly caipFamily = "eip155:*";
+  readonly scheme = 'escrow'
+  readonly caipFamily = 'eip155:*'
 
   constructor(private signer: FacilitatorEvmSigner) {}
 
   getSigners(_network: string): string[] {
-    return [...this.signer.getAddresses()];
+    return [...this.signer.getAddresses()]
   }
 
   // C4: name/version now come from server's parsePrice() via AssetAmount.extra.
   // The facilitator should not hardcode token-specific metadata.
   getExtra(_network: string): Record<string, unknown> | undefined {
-    return undefined;
+    return undefined
   }
 
   async verify(
@@ -60,67 +54,67 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     if (!isEscrowPayload(payload.payload)) {
       return {
         isValid: false,
-        invalidReason: "invalid_payload_format",
-      };
+        invalidReason: 'invalid_payload_format',
+      }
     }
-    const escrowPayload = payload.payload as EscrowPayload;
-    const payer = escrowPayload.authorization.from;
+    const escrowPayload = payload.payload as EscrowPayload
+    const payer = escrowPayload.authorization.from
 
     // Validate scheme
-    if (requirements.scheme !== "escrow") {
+    if (requirements.scheme !== 'escrow') {
       return {
         isValid: false,
-        invalidReason: "unsupported_scheme",
+        invalidReason: 'unsupported_scheme',
         payer,
-      };
+      }
     }
 
     // Validate network format
-    const networkParts = requirements.network.split(":");
-    if (networkParts.length !== 2 || networkParts[0] !== "eip155") {
+    const networkParts = requirements.network.split(':')
+    if (networkParts.length !== 2 || networkParts[0] !== 'eip155') {
       return {
         isValid: false,
-        invalidReason: "invalid_network",
+        invalidReason: 'invalid_network',
         payer,
-      };
+      }
     }
 
     // M5: Type guard for extra
     if (!isEscrowExtra(requirements.extra)) {
       return {
         isValid: false,
-        invalidReason: "invalid_escrow_extra",
+        invalidReason: 'invalid_escrow_extra',
         payer,
-      };
+      }
     }
-    const extra = requirements.extra as EscrowExtra;
-    const chainId = parseChainId(requirements.network);
+    const extra = requirements.extra as EscrowExtra
+    const chainId = parseChainId(requirements.network)
 
     // Time window validation
-    const now = Math.floor(Date.now() / 1000);
-    const validBefore = Number(escrowPayload.authorization.validBefore);
-    const validAfter = Number(escrowPayload.authorization.validAfter);
+    const now = Math.floor(Date.now() / 1000)
+    const validBefore = Number(escrowPayload.authorization.validBefore)
+    const validAfter = Number(escrowPayload.authorization.validAfter)
 
     if (validBefore <= now + 6) {
       return {
         isValid: false,
-        invalidReason: "authorization_expired",
+        invalidReason: 'authorization_expired',
         payer,
-      };
+      }
     }
 
     if (validAfter > now) {
       return {
         isValid: false,
-        invalidReason: "authorization_not_yet_valid",
+        invalidReason: 'authorization_not_yet_valid',
         payer,
-      };
+      }
     }
 
     // Extract inner signature for verification if EIP-6492 wrapped.
     // The contract's ERC6492SignatureHandler handles deployment; the facilitator
     // only needs the inner ECDSA signature for ecrecover verification.
-    const { signature: signatureForVerify } = parseErc6492Signature(escrowPayload.signature);
+    const { signature: signatureForVerify } = parseErc6492Signature(escrowPayload.signature)
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
@@ -129,50 +123,41 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       signatureForVerify,
       { ...extra, chainId },
       requirements.asset as `0x${string}`,
-    );
+    )
 
     if (!isValidSignature) {
       return {
         isValid: false,
-        invalidReason: "invalid_escrow_signature",
+        invalidReason: 'invalid_escrow_signature',
         payer,
-      };
+      }
     }
 
     // Verify amount meets requirements
-    if (
-      BigInt(escrowPayload.authorization.value) <
-      BigInt(requirements.amount)
-    ) {
+    if (BigInt(escrowPayload.authorization.value) < BigInt(requirements.amount)) {
       return {
         isValid: false,
-        invalidReason: "insufficient_amount",
+        invalidReason: 'insufficient_amount',
         payer,
-      };
+      }
     }
 
     // Verify token matches
-    if (
-      escrowPayload.paymentInfo.token.toLowerCase() !==
-      requirements.asset.toLowerCase()
-    ) {
+    if (escrowPayload.paymentInfo.token.toLowerCase() !== requirements.asset.toLowerCase()) {
       return {
         isValid: false,
-        invalidReason: "token_mismatch",
+        invalidReason: 'token_mismatch',
         payer,
-      };
+      }
     }
 
     // Verify receiver matches
-    if (
-      escrowPayload.paymentInfo.receiver.toLowerCase() !==
-      requirements.payTo.toLowerCase()
-    ) {
+    if (escrowPayload.paymentInfo.receiver.toLowerCase() !== requirements.payTo.toLowerCase()) {
       return {
         isValid: false,
-        invalidReason: "receiver_mismatch",
+        invalidReason: 'receiver_mismatch',
         payer,
-      };
+      }
     }
 
     // H4: Balance check — verify payer has sufficient token balance
@@ -180,16 +165,16 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       const balance = await this.signer.readContract({
         address: requirements.asset as `0x${string}`,
         abi: ERC20_BALANCE_OF_ABI,
-        functionName: "balanceOf",
+        functionName: 'balanceOf',
         args: [payer],
-      });
+      })
 
       if (BigInt(balance as string) < BigInt(requirements.amount)) {
         return {
           isValid: false,
-          invalidReason: "insufficient_balance",
+          invalidReason: 'insufficient_balance',
           payer,
-        };
+        }
       }
     } catch {
       // If balance check fails (e.g., non-standard token), skip it.
@@ -199,7 +184,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     return {
       isValid: true,
       payer,
-    };
+    }
   }
 
   async settle(
@@ -208,20 +193,20 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     _context?: FacilitatorContext,
   ): Promise<SettleResponse> {
     // H2: Re-verify before settling to catch expired/invalid payloads
-    const verification = await this.verify(payload, requirements);
+    const verification = await this.verify(payload, requirements)
     if (!verification.isValid) {
       return {
         success: false,
-        errorReason: verification.invalidReason ?? "verification_failed",
-        transaction: "",
+        errorReason: verification.invalidReason ?? 'verification_failed',
+        transaction: '',
         network: requirements.network,
         payer: verification.payer,
-      };
+      }
     }
 
-    const escrowPayload = payload.payload as unknown as EscrowPayload;
-    const extra = requirements.extra as unknown as EscrowExtra;
-    const { authorizeAddress, operatorAddress, tokenCollector } = extra;
+    const escrowPayload = payload.payload as unknown as EscrowPayload
+    const extra = requirements.extra as unknown as EscrowExtra
+    const { authorizeAddress, operatorAddress, tokenCollector } = extra
 
     const paymentInfo = {
       operator: escrowPayload.paymentInfo.operator,
@@ -236,47 +221,44 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       maxFeeBps: escrowPayload.paymentInfo.maxFeeBps,
       feeReceiver: escrowPayload.paymentInfo.feeReceiver,
       salt: BigInt(escrowPayload.paymentInfo.salt),
-    };
+    }
 
     // Pass raw signature — ERC3009PaymentCollector/ERC6492SignatureHandler
     // handles EIP-6492 unwrapping and wallet deployment on-chain
-    const collectorData = escrowPayload.signature;
+    const collectorData = escrowPayload.signature
 
-    const target = authorizeAddress ?? operatorAddress;
+    const target = authorizeAddress ?? operatorAddress
 
     try {
       const txHash = await this.signer.writeContract({
         address: target,
         abi: OPERATOR_ABI,
-        functionName: "authorize",
+        functionName: 'authorize',
         args: [
           paymentInfo,
           BigInt(escrowPayload.authorization.value),
           tokenCollector,
           collectorData,
         ],
-      });
+      })
 
       // Wait for transaction confirmation with 60s timeout to avoid hanging on stuck txs
       const receiptPromise = this.signer.waitForTransactionReceipt({
         hash: txHash,
-      });
+      })
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Transaction receipt timeout after 60s")),
-          60_000,
-        ),
-      );
-      const receipt = await Promise.race([receiptPromise, timeoutPromise]);
+        setTimeout(() => reject(new Error('Transaction receipt timeout after 60s')), 60_000),
+      )
+      const receipt = await Promise.race([receiptPromise, timeoutPromise])
 
-      if (receipt.status !== "success") {
+      if (receipt.status !== 'success') {
         return {
           success: false,
-          errorReason: "transaction_reverted",
+          errorReason: 'transaction_reverted',
           transaction: txHash,
           network: requirements.network,
           payer: escrowPayload.authorization.from,
-        };
+        }
       }
 
       return {
@@ -284,16 +266,15 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
         transaction: txHash,
         network: requirements.network,
         payer: escrowPayload.authorization.from,
-      };
+      }
     } catch (error) {
       return {
         success: false,
-        errorReason:
-          error instanceof Error ? error.message : "Settlement failed",
-        transaction: "",
+        errorReason: error instanceof Error ? error.message : 'Settlement failed',
+        transaction: '',
         network: requirements.network,
         payer: escrowPayload.authorization.from,
-      };
+      }
     }
   }
 }

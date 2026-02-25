@@ -1,11 +1,11 @@
-import type { Network } from "@x402/core/types";
-import type { ClientEvmSigner } from "@x402/evm";
-import { x402Client } from "@x402/core/client";
-import { EscrowEvmScheme } from "./scheme";
+import type { Network } from '@x402/core/types'
+import type { ClientEvmSigner } from '@x402/evm'
+import { x402Client } from '@x402/core/client'
+import { EscrowEvmScheme } from './scheme'
 
 export interface EvmClientConfig {
-  signer: ClientEvmSigner;
-  networks?: Network | Network[];
+  signer: ClientEvmSigner
+  networks?: Network | Network[]
 }
 
 /**
@@ -19,18 +19,15 @@ export interface EvmClientConfig {
  * registerEscrowEvmScheme(client, { signer, networks: "eip155:84532" });
  * ```
  */
-export function registerEscrowEvmScheme(
-  client: x402Client,
-  config: EvmClientConfig,
-): x402Client {
-  const scheme = new EscrowEvmScheme(config.signer);
+export function registerEscrowEvmScheme(client: x402Client, config: EvmClientConfig): x402Client {
+  const scheme = new EscrowEvmScheme(config.signer)
   const networks = config.networks
     ? Array.isArray(config.networks)
       ? config.networks
       : [config.networks]
-    : ["eip155:*" as Network];
+    : ['eip155:*' as Network]
   for (const network of networks) {
-    client.register(network, scheme);
+    client.register(network, scheme)
   }
-  return client;
+  return client
 }

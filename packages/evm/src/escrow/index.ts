@@ -1,1 +1,1 @@
-export { EscrowEvmScheme } from "./client/scheme";
+export { EscrowEvmScheme } from './client/scheme'

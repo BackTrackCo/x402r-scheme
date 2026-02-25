@@ -1,3 +1,3 @@
-export { EscrowServerScheme } from "./scheme";
-export { registerEscrowEvmScheme } from "./register";
-export type { EvmResourceServerConfig } from "./register";
+export { EscrowServerScheme } from './scheme'
+export { registerEscrowEvmScheme } from './register'
+export type { EvmResourceServerConfig } from './register'
