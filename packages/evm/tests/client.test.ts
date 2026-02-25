@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EscrowEvmScheme } from "../src/escrow/client/index.js";
 import { x402Client } from "@x402/core/client";
-import { registerEscrowScheme } from "../src/escrow/client/index.js";
+import { registerEscrowEvmScheme } from "../src/escrow/client/index.js";
 
 describe("EscrowEvmScheme", () => {
   const createMockSigner = () => ({
@@ -157,11 +157,11 @@ describe("EscrowEvmScheme", () => {
     });
   });
 
-  describe("registerEscrowScheme", () => {
+  describe("registerEscrowEvmScheme", () => {
     it("should register scheme without throwing", () => {
       const client = new x402Client();
       expect(() =>
-        registerEscrowScheme(client, {
+        registerEscrowEvmScheme(client, {
           signer: mockSigner,
           networks: "eip155:84532",
         }),
@@ -171,7 +171,7 @@ describe("EscrowEvmScheme", () => {
     it("should register scheme for multiple networks without throwing", () => {
       const client = new x402Client();
       expect(() =>
-        registerEscrowScheme(client, {
+        registerEscrowEvmScheme(client, {
           signer: mockSigner,
           networks: ["eip155:84532", "eip155:8453"],
         }),
@@ -180,7 +180,7 @@ describe("EscrowEvmScheme", () => {
 
     it("should return the client for chaining", () => {
       const client = new x402Client();
-      const result = registerEscrowScheme(client, {
+      const result = registerEscrowEvmScheme(client, {
         signer: mockSigner,
         networks: "eip155:84532",
       });

@@ -3,9 +3,9 @@
  * Adapted from @agentokratia/x402-escrow (MIT)
  */
 
-import { encodeAbiParameters, keccak256 } from "viem";
+import { encodeAbiParameters, getAddress, keccak256, toHex } from "viem";
 import type { ClientEvmSigner } from "@x402/evm";
-import { ZERO_ADDRESS, PAYMENT_INFO_COMPONENTS } from "./constants.js";
+import { ZERO_ADDRESS, PAYMENT_INFO_COMPONENTS, RECEIVE_AUTHORIZATION_TYPES } from "./constants.js";
 import type { EscrowExtra, EscrowPayload } from "./types.js";
 
 /**
@@ -89,26 +89,14 @@ export async function signERC3009(
   // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
     name: extra.name,
-    version: extra.version ?? "2",
+    version: extra.version,
     chainId,
-    verifyingContract: tokenAddress,
-  };
-
-  // ERC-3009 uses ReceiveWithAuthorization for receiveWithAuthorization()
-  const types = {
-    ReceiveWithAuthorization: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "validAfter", type: "uint256" },
-      { name: "validBefore", type: "uint256" },
-      { name: "nonce", type: "bytes32" },
-    ],
+    verifyingContract: getAddress(tokenAddress),
   };
 
   const message = {
-    from: authorization.from,
-    to: authorization.to,
+    from: getAddress(authorization.from),
+    to: getAddress(authorization.to),
     value: BigInt(authorization.value),
     validAfter: BigInt(authorization.validAfter),
     validBefore: BigInt(authorization.validBefore),
@@ -117,7 +105,7 @@ export async function signERC3009(
 
   return signer.signTypedData({
     domain,
-    types,
+    types: RECEIVE_AUTHORIZATION_TYPES,
     primaryType: "ReceiveWithAuthorization",
     message,
   });
@@ -147,30 +135,16 @@ export async function verifyERC3009Signature(
   extra: EscrowExtra & { chainId: number },
   tokenAddress: `0x${string}`,
 ): Promise<boolean> {
-  // EIP-712 domain - name must match the token's EIP-712 domain
-  // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
     name: extra.name,
-    version: extra.version ?? "2",
+    version: extra.version,
     chainId: extra.chainId,
-    verifyingContract: tokenAddress,
-  };
-
-  // Must use ReceiveWithAuthorization to match what was signed
-  const types = {
-    ReceiveWithAuthorization: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "validAfter", type: "uint256" },
-      { name: "validBefore", type: "uint256" },
-      { name: "nonce", type: "bytes32" },
-    ],
+    verifyingContract: getAddress(tokenAddress),
   };
 
   const message = {
-    from: authorization.from,
-    to: authorization.to,
+    from: getAddress(authorization.from),
+    to: getAddress(authorization.to),
     value: BigInt(authorization.value),
     validAfter: BigInt(authorization.validAfter),
     validBefore: BigInt(authorization.validBefore),
@@ -179,9 +153,9 @@ export async function verifyERC3009Signature(
 
   try {
     return await signer.verifyTypedData({
-      address: authorization.from,
+      address: getAddress(authorization.from),
       domain,
-      types,
+      types: RECEIVE_AUTHORIZATION_TYPES,
       primaryType: "ReceiveWithAuthorization",
       message,
       signature,
@@ -197,7 +171,5 @@ export async function verifyERC3009Signature(
 export function generateSalt(): `0x${string}` {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return `0x${Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")}` as `0x${string}`;
+  return toHex(bytes);
 }

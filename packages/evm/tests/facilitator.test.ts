@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EscrowFacilitatorScheme } from "../src/escrow/facilitator/index.js";
 import { x402Facilitator } from "@x402/core/facilitator";
-import { registerEscrowScheme } from "../src/escrow/facilitator/index.js";
+import { registerEscrowEvmScheme } from "../src/escrow/facilitator/index.js";
 
 describe("EscrowFacilitatorScheme", () => {
   // Mock signer matching x402's FacilitatorEvmSigner interface
@@ -59,10 +59,10 @@ describe("EscrowFacilitatorScheme", () => {
     });
   });
 
-  describe("registerEscrowScheme", () => {
+  describe("registerEscrowEvmScheme", () => {
     it("should register escrow scheme with undefined extra", () => {
       const facilitator = new x402Facilitator();
-      registerEscrowScheme(facilitator, {
+      registerEscrowEvmScheme(facilitator, {
         signer: mockSigner,
         networks: "eip155:84532",
       });
