@@ -1,3 +1,3 @@
-export { EscrowFacilitatorScheme } from "./scheme.js";
-export { registerEscrowEvmScheme } from "./register.js";
-export type { EvmFacilitatorConfig } from "./register.js";
+export { EscrowFacilitatorScheme } from "./scheme";
+export { registerEscrowEvmScheme } from "./register";
+export type { EvmFacilitatorConfig } from "./register";

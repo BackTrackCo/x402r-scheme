@@ -7,7 +7,7 @@
  */
 
 import type {
-  Network,
+  FacilitatorContext,
   PaymentPayload,
   PaymentRequirements,
   SchemeNetworkFacilitator,
@@ -19,14 +19,14 @@ import { parseErc6492Signature } from "viem";
 import {
   OPERATOR_ABI,
   ERC20_BALANCE_OF_ABI,
-} from "../shared/constants.js";
-import { verifyERC3009Signature } from "../shared/nonce.js";
+} from "../shared/constants";
+import { verifyERC3009Signature } from "../shared/nonce";
 import {
   isEscrowPayload,
   isEscrowExtra,
-} from "../shared/types.js";
-import type { EscrowExtra, EscrowPayload } from "../shared/types.js";
-import { parseChainId } from "../shared/utils.js";
+} from "../shared/types";
+import type { EscrowExtra, EscrowPayload } from "../shared/types";
+import { parseChainId } from "../shared/utils";
 
 /**
  * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
@@ -54,6 +54,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
   async verify(
     payload: PaymentPayload,
     requirements: PaymentRequirements,
+    _context?: FacilitatorContext,
   ): Promise<VerifyResponse> {
     // M5: Type guard instead of double cast
     if (!isEscrowPayload(payload.payload)) {
@@ -204,6 +205,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
   async settle(
     payload: PaymentPayload,
     requirements: PaymentRequirements,
+    _context?: FacilitatorContext,
   ): Promise<SettleResponse> {
     // H2: Re-verify before settling to catch expired/invalid payloads
     const verification = await this.verify(payload, requirements);

@@ -9,7 +9,7 @@ const baseConfig = {
   },
   dts: { resolve: true },
   sourcemap: true,
-  target: "es2020" as const,
+  target: "es2020",
 };
 
 export default defineConfig([

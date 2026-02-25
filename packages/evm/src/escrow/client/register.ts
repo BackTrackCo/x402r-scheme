@@ -1,7 +1,7 @@
 import type { Network } from "@x402/core/types";
 import type { ClientEvmSigner } from "@x402/evm";
 import { x402Client } from "@x402/core/client";
-import { EscrowEvmScheme } from "./scheme.js";
+import { EscrowEvmScheme } from "./scheme";
 
 export interface EvmClientConfig {
   signer: ClientEvmSigner;

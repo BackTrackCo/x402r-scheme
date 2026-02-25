@@ -1,6 +1,6 @@
 import type { Network } from "@x402/core/types";
 import { x402ResourceServer } from "@x402/core/server";
-import { EscrowServerScheme } from "./scheme.js";
+import { EscrowServerScheme } from "./scheme";
 
 export interface EvmResourceServerConfig {
   networks?: Network | Network[];

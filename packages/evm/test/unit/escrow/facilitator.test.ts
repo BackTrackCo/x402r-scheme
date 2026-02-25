@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EscrowFacilitatorScheme } from "../../../src/escrow/facilitator/index.js";
+import { EscrowFacilitatorScheme } from "../../../src/escrow/facilitator/index";
 import { x402Facilitator } from "@x402/core/facilitator";
-import { registerEscrowEvmScheme } from "../../../src/escrow/facilitator/index.js";
+import { registerEscrowEvmScheme } from "../../../src/escrow/facilitator/index";
 
 describe("EscrowFacilitatorScheme", () => {
   // Mock signer matching x402's FacilitatorEvmSigner interface

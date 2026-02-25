@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EscrowEvmScheme } from "../../../src/escrow/client/index.js";
+import { EscrowEvmScheme } from "../../../src/escrow/client/index";
 import { x402Client } from "@x402/core/client";
-import { registerEscrowEvmScheme } from "../../../src/escrow/client/index.js";
+import { registerEscrowEvmScheme } from "../../../src/escrow/client/index";
 
 describe("EscrowEvmScheme", () => {
   const createMockSigner = () => ({

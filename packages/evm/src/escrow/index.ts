@@ -1,1 +1,1 @@
-export { EscrowEvmScheme } from "./client/scheme.js";
+export { EscrowEvmScheme } from "./client/scheme";

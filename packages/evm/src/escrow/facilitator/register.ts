@@ -1,7 +1,7 @@
 import type { Network } from "@x402/core/types";
 import type { FacilitatorEvmSigner } from "@x402/evm";
 import { x402Facilitator } from "@x402/core/facilitator";
-import { EscrowFacilitatorScheme } from "./scheme.js";
+import { EscrowFacilitatorScheme } from "./scheme";
 
 export interface EvmFacilitatorConfig {
   signer: FacilitatorEvmSigner;

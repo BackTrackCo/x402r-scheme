@@ -1,7 +1,6 @@
 {
   "name": "@x402r/evm",
   "version": "0.0.2",
-  "type": "module",
   "description": "Escrow payment scheme for x402 using Base Commerce Payments",
   "license": "MIT",
   "author": "x402r",
@@ -10,48 +9,45 @@
     "url": "https://github.com/BackTrackCo/x402r-scheme.git",
     "directory": "packages/evm"
   },
-  "main": "./dist/cjs/index.cjs",
-  "module": "./dist/esm/index.js",
-  "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/esm/index.d.ts",
-        "default": "./dist/esm/index.js"
+        "types": "./dist/esm/index.d.mts",
+        "default": "./dist/esm/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/index.d.cts",
-        "default": "./dist/cjs/index.cjs"
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
       }
     },
     "./escrow/client": {
       "import": {
-        "types": "./dist/esm/escrow/client/index.d.ts",
-        "default": "./dist/esm/escrow/client/index.js"
+        "types": "./dist/esm/escrow/client/index.d.mts",
+        "default": "./dist/esm/escrow/client/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/client/index.d.cts",
-        "default": "./dist/cjs/escrow/client/index.cjs"
+        "types": "./dist/cjs/escrow/client/index.d.ts",
+        "default": "./dist/cjs/escrow/client/index.js"
       }
     },
     "./escrow/server": {
       "import": {
-        "types": "./dist/esm/escrow/server/index.d.ts",
-        "default": "./dist/esm/escrow/server/index.js"
+        "types": "./dist/esm/escrow/server/index.d.mts",
+        "default": "./dist/esm/escrow/server/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/server/index.d.cts",
-        "default": "./dist/cjs/escrow/server/index.cjs"
+        "types": "./dist/cjs/escrow/server/index.d.ts",
+        "default": "./dist/cjs/escrow/server/index.js"
       }
     },
     "./escrow/facilitator": {
       "import": {
-        "types": "./dist/esm/escrow/facilitator/index.d.ts",
-        "default": "./dist/esm/escrow/facilitator/index.js"
+        "types": "./dist/esm/escrow/facilitator/index.d.mts",
+        "default": "./dist/esm/escrow/facilitator/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/facilitator/index.d.cts",
-        "default": "./dist/cjs/escrow/facilitator/index.cjs"
+        "types": "./dist/cjs/escrow/facilitator/index.d.ts",
+        "default": "./dist/cjs/escrow/facilitator/index.js"
       }
     }
   },

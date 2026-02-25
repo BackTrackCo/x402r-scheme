@@ -7,6 +7,7 @@
  */
 
 import type {
+  PaymentPayloadContext,
   PaymentPayloadResult,
   PaymentRequirements,
   SchemeNetworkClient,
@@ -16,10 +17,10 @@ import {
   computeEscrowNonce,
   signERC3009,
   generateSalt,
-} from "../shared/nonce.js";
-import { MAX_UINT48 } from "../shared/constants.js";
-import type { EscrowExtra } from "../shared/types.js";
-import { parseChainId } from "../shared/utils.js";
+} from "../shared/nonce";
+import { MAX_UINT48 } from "../shared/constants";
+import type { EscrowExtra } from "../shared/types";
+import { parseChainId } from "../shared/utils";
 
 /**
  * Escrow Client Scheme - implements x402's SchemeNetworkClient
@@ -32,6 +33,7 @@ export class EscrowEvmScheme implements SchemeNetworkClient {
   async createPaymentPayload(
     x402Version: number,
     requirements: PaymentRequirements,
+    _context?: PaymentPayloadContext,
   ): Promise<PaymentPayloadResult> {
     if (x402Version !== 2) {
       throw new Error(

@@ -5,8 +5,8 @@
 
 import { encodeAbiParameters, getAddress, keccak256, toHex } from "viem";
 import type { ClientEvmSigner } from "@x402/evm";
-import { ZERO_ADDRESS, PAYMENT_INFO_COMPONENTS, RECEIVE_AUTHORIZATION_TYPES } from "./constants.js";
-import type { EscrowExtra, EscrowPayload } from "./types.js";
+import { ZERO_ADDRESS, PAYMENT_INFO_COMPONENTS, RECEIVE_AUTHORIZATION_TYPES } from "./constants";
+import type { EscrowExtra, EscrowPayload } from "./types";
 
 /**
  * PaymentInfo typehash - must match AuthCaptureEscrow.PAYMENT_INFO_TYPEHASH
