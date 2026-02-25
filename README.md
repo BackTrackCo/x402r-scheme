@@ -51,14 +51,6 @@ const facilitator = new x402Facilitator();
 registerEscrowScheme(facilitator, { signer: evmSigner, networks: "eip155:84532" });
 ```
 
-## Examples
-
-See the [examples](./examples) directory for complete working examples:
-
-- **[client](./examples/client)** - Client making escrow payments
-- **[server](./examples/server)** - Resource server accepting escrow payments
-- **[facilitator](./examples/facilitator)** - Facilitator verifying and settling payments
-
 ## Development
 
 ```bash
@@ -70,11 +62,6 @@ pnpm build
 
 # Run tests
 pnpm test
-
-# Run examples
-cd examples/server && pnpm dev
-cd examples/facilitator && pnpm dev
-cd examples/client && pnpm dev
 ```
 
 ## License
