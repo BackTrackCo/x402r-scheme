@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeEscrowNonce, generateSalt } from "../src/escrow/shared/nonce.js";
+import { computeEscrowNonce, generateSalt } from "../../../src/escrow/shared/nonce.js";
 
 describe("nonce utilities", () => {
   describe("computeEscrowNonce", () => {

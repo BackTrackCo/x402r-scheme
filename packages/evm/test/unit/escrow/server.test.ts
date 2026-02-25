@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EscrowServerScheme } from "../src/escrow/server/index.js";
+import { EscrowServerScheme } from "../../../src/escrow/server/index.js";
 
 const BASE_SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
