@@ -18,26 +18,10 @@ import {
   computeEscrowNonce,
   signERC3009,
   generateSalt,
-} from "../../shared/nonce.js";
-import { MAX_UINT48 } from "../../shared/constants.js";
-import type { EscrowExtra } from "../../shared/types.js";
-
-/**
- * Parse chainId from CAIP-2 network identifier
- */
-function parseChainId(network: string): number {
-  const parts = network.split(":");
-  if (parts.length !== 2 || parts[0] !== "eip155") {
-    throw new Error(
-      `Invalid network format: ${network}. Expected 'eip155:<chainId>'`,
-    );
-  }
-  const chainId = parseInt(parts[1], 10);
-  if (isNaN(chainId)) {
-    throw new Error(`Invalid chainId in network: ${network}`);
-  }
-  return chainId;
-}
+} from "../shared/nonce.js";
+import { MAX_UINT48 } from "../shared/constants.js";
+import type { EscrowExtra } from "../shared/types.js";
+import { parseChainId } from "../shared/utils.js";
 
 /**
  * Escrow Client Scheme - implements x402's SchemeNetworkClient
@@ -134,10 +118,10 @@ export class EscrowEvmScheme implements SchemeNetworkClient {
  * @example
  * ```typescript
  * const client = new x402Client();
- * registerEscrowScheme(client, { signer, networks: "eip155:84532" });
+ * registerEscrowEvmScheme(client, { signer, networks: "eip155:84532" });
  * ```
  */
-export function registerEscrowScheme(
+export function registerEscrowEvmScheme(
   client: x402Client,
   config: { signer: ClientEvmSigner; networks: Network | Network[] },
 ): x402Client {
@@ -150,12 +134,3 @@ export function registerEscrowScheme(
   }
   return client;
 }
-
-/**
- * @deprecated Use `new EscrowEvmScheme(signer)` directly
- */
-export const EscrowScheme = {
-  scheme: "escrow" as const,
-};
-
-export type { EscrowExtra, EscrowPayload } from "../../shared/types.js";

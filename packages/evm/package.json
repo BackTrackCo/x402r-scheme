@@ -11,6 +11,10 @@
     "directory": "packages/evm"
   },
   "exports": {
+    ".": {
+      "types": "./dist/escrow/index.d.ts",
+      "import": "./dist/escrow/index.js"
+    },
     "./escrow/client": {
       "types": "./dist/escrow/client/index.d.ts",
       "import": "./dist/escrow/client/index.js"
@@ -24,8 +28,8 @@
       "import": "./dist/escrow/facilitator/index.js"
     },
     "./escrow/types": {
-      "types": "./dist/shared/types.d.ts",
-      "import": "./dist/shared/types.js"
+      "types": "./dist/escrow/shared/types.d.ts",
+      "import": "./dist/escrow/shared/types.js"
     }
   },
   "publishConfig": {

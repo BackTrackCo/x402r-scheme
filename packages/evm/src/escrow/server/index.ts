@@ -241,10 +241,10 @@ export class EscrowServerScheme implements SchemeNetworkServer {
  * @example
  * ```typescript
  * const server = new x402ResourceServer(facilitatorConfig);
- * registerEscrowServerScheme(server, { networks: "eip155:84532" });
+ * registerEscrowEvmScheme(server, { networks: "eip155:84532" });
  * ```
  */
-export function registerEscrowServerScheme(
+export function registerEscrowEvmScheme(
   server: x402ResourceServer,
   config: { networks: Network | Network[] },
 ): x402ResourceServer {
@@ -257,5 +257,3 @@ export function registerEscrowServerScheme(
   }
   return server;
 }
-
-export type { EscrowExtra, EscrowPayload } from "../../shared/types.js";

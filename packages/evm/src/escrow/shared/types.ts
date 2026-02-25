@@ -39,7 +39,7 @@ export interface EscrowExtra {
   maxFeeBps?: number;
   feeReceiver?: `0x${string}`;
   name: string; // EIP-712 domain name (e.g., "USDC" for Base USDC)
-  version?: string;
+  version: string; // EIP-712 domain version (e.g., "2" for USDC)
 }
 
 // EscrowPayload - the payload field in PaymentPayload

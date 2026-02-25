@@ -16,76 +16,18 @@ import type {
 } from "@x402/core/types";
 import type { FacilitatorEvmSigner } from "@x402/evm";
 import { x402Facilitator } from "@x402/core/facilitator";
+import { parseErc6492Signature } from "viem";
 import {
   OPERATOR_ABI,
   ERC20_BALANCE_OF_ABI,
-  ERC6492_MAGIC_VALUE,
-} from "../../shared/constants.js";
-import { verifyERC3009Signature } from "../../shared/nonce.js";
+} from "../shared/constants.js";
+import { verifyERC3009Signature } from "../shared/nonce.js";
 import {
   isEscrowPayload,
   isEscrowExtra,
-} from "../../shared/types.js";
-import type { EscrowExtra, EscrowPayload } from "../../shared/types.js";
-
-/**
- * Parse chainId from CAIP-2 network identifier
- * @param network - CAIP-2 network identifier (e.g., 'eip155:84532')
- * @returns The chain ID as a number
- */
-function parseChainId(network: string): number {
-  const parts = network.split(":");
-  if (parts.length !== 2 || parts[0] !== "eip155") {
-    throw new Error(
-      `Invalid network format: ${network}. Expected 'eip155:<chainId>'`,
-    );
-  }
-  const chainId = parseInt(parts[1], 10);
-  if (isNaN(chainId)) {
-    throw new Error(`Invalid chainId in network: ${network}`);
-  }
-  return chainId;
-}
-
-/**
- * Extract inner signature from an EIP-6492 wrapped signature.
- * If the signature is not EIP-6492 wrapped, returns it unchanged.
- *
- * EIP-6492 format: abi.encode(address, bytes, bytes) ++ MAGIC_VALUE
- * The inner signature is the third ABI-encoded bytes field.
- */
-function unwrapERC6492Signature(signature: `0x${string}`): `0x${string}` {
-  // EIP-6492 magic is 32 bytes (64 hex chars) at the end
-  if (signature.length <= 66) return signature; // Too short to be wrapped
-
-  const magicSuffix = `0x${signature.slice(-64)}`;
-  if (magicSuffix !== ERC6492_MAGIC_VALUE) return signature; // Not wrapped
-
-  // Strip the magic suffix and ABI-decode: (address prepareTarget, bytes prepareData, bytes innerSignature)
-  // The wrapped data (without magic) is: 0x + ABI-encoded (address, bytes, bytes)
-  const wrappedHex = signature.slice(2, -64); // hex without 0x prefix and magic
-
-  // ABI layout for (address, bytes, bytes):
-  // word 0 (0-64): address (padded to 32 bytes)
-  // word 1 (64-128): offset to prepareData bytes
-  // word 2 (128-192): offset to innerSignature bytes
-  // Then the dynamic data follows
-
-  if (wrappedHex.length < 192) return signature; // Malformed
-
-  const innerSigOffset = parseInt(wrappedHex.slice(128, 192), 16) * 2; // byte offset → hex offset
-  if (innerSigOffset + 64 > wrappedHex.length) return signature; // Malformed
-
-  const innerSigLength = parseInt(
-    wrappedHex.slice(innerSigOffset, innerSigOffset + 64),
-    16,
-  ) * 2; // bytes → hex chars
-  const innerSigStart = innerSigOffset + 64;
-
-  if (innerSigStart + innerSigLength > wrappedHex.length) return signature; // Malformed
-
-  return `0x${wrappedHex.slice(innerSigStart, innerSigStart + innerSigLength)}` as `0x${string}`;
-}
+} from "../shared/types.js";
+import type { EscrowExtra, EscrowPayload } from "../shared/types.js";
+import { parseChainId } from "../shared/utils.js";
 
 /**
  * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
@@ -175,10 +117,10 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       };
     }
 
-    // M4: Extract inner signature for verification if EIP-6492 wrapped.
+    // Extract inner signature for verification if EIP-6492 wrapped.
     // The contract's ERC6492SignatureHandler handles deployment; the facilitator
     // only needs the inner ECDSA signature for ecrecover verification.
-    const signatureForVerify = unwrapERC6492Signature(escrowPayload.signature);
+    const { signature: signatureForVerify } = parseErc6492Signature(escrowPayload.signature);
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
@@ -365,13 +307,13 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
  * @example
  * ```typescript
  * const facilitator = new x402Facilitator();
- * registerEscrowScheme(facilitator, {
+ * registerEscrowEvmScheme(facilitator, {
  *   signer: evmSigner,
  *   networks: "eip155:84532",
  * });
  * ```
  */
-export function registerEscrowScheme(
+export function registerEscrowEvmScheme(
   facilitator: x402Facilitator,
   config: {
     signer: FacilitatorEvmSigner;
@@ -384,5 +326,3 @@ export function registerEscrowScheme(
   );
   return facilitator;
 }
-
-export type { EscrowExtra, EscrowPayload } from "../../shared/types.js";
