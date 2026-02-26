@@ -60,11 +60,20 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     const escrowPayload = payload.payload as EscrowPayload
     const payer = escrowPayload.authorization.from
 
-    // Validate scheme
-    if (requirements.scheme !== 'escrow') {
+    // Validate scheme on both payload and requirements
+    if (payload.accepted.scheme !== 'escrow' || requirements.scheme !== 'escrow') {
       return {
         isValid: false,
         invalidReason: 'unsupported_scheme',
+        payer,
+      }
+    }
+
+    // Validate network matches between payload and requirements
+    if (payload.accepted.network !== requirements.network) {
+      return {
+        isValid: false,
+        invalidReason: 'network_mismatch',
         payer,
       }
     }
