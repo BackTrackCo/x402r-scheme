@@ -19,21 +19,21 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 ### Client
 
 ```typescript
-import { EscrowEvmScheme, registerEscrowEvmScheme } from "@x402r/evm/escrow/client";
-import { x402Client } from "@x402/core/client";
+import { EscrowEvmScheme, registerEscrowEvmScheme } from '@x402r/evm/escrow/client'
+import { x402Client } from '@x402/core/client'
 
-const client = new x402Client();
-registerEscrowEvmScheme(client, { signer, networks: "eip155:84532" });
+const client = new x402Client()
+registerEscrowEvmScheme(client, { signer, networks: 'eip155:84532' })
 ```
 
 ### Server
 
 ```typescript
-import { EscrowServerScheme, registerEscrowEvmScheme } from "@x402r/evm/escrow/server";
-import { x402ResourceServer } from "@x402/core/server";
+import { EscrowServerScheme, registerEscrowEvmScheme } from '@x402r/evm/escrow/server'
+import { x402ResourceServer } from '@x402/core/server'
 
-const server = new x402ResourceServer(facilitatorConfig);
-registerEscrowEvmScheme(server, { networks: "eip155:84532" });
+const server = new x402ResourceServer(facilitatorConfig)
+registerEscrowEvmScheme(server, { networks: 'eip155:84532' })
 ```
 
 ### Facilitator
@@ -41,14 +41,14 @@ registerEscrowEvmScheme(server, { networks: "eip155:84532" });
 The escrow scheme integrates with x402's facilitator via `registerEscrowEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
 
 ```typescript
-import { x402Facilitator } from "@x402/core/facilitator";
-import { toFacilitatorEvmSigner } from "@x402/evm";
-import { registerEscrowEvmScheme } from "@x402r/evm/escrow/facilitator";
+import { x402Facilitator } from '@x402/core/facilitator'
+import { toFacilitatorEvmSigner } from '@x402/evm'
+import { registerEscrowEvmScheme } from '@x402r/evm/escrow/facilitator'
 
-const evmSigner = toFacilitatorEvmSigner({ address, ...clients });
+const evmSigner = toFacilitatorEvmSigner({ address, ...clients })
 
-const facilitator = new x402Facilitator();
-registerEscrowEvmScheme(facilitator, { signer: evmSigner, networks: "eip155:84532" });
+const facilitator = new x402Facilitator()
+registerEscrowEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
 ```
 
 ## Development

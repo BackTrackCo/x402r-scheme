@@ -1,6 +1,7 @@
 {
   "name": "x402r-scheme",
   "private": true,
+  "type": "module",
   "workspaces": [
     "packages/*",
     "examples/*"
@@ -11,11 +12,17 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "format": "prettier --write \"**/*.{ts,js,json,md}\""
+    "lint:check": "pnpm -r lint:check",
+    "format": "prettier -c .prettierrc --write \"**/*.{ts,js,cjs,json,md}\"",
+    "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\""
   },
   "devDependencies": {
+    "@eslint/js": "^9.24.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.24.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@10.7.0"
 }
