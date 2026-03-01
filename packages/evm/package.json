@@ -1,6 +1,6 @@
 {
   "name": "@x402r/evm",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Escrow payment scheme for x402 using Base Commerce Payments",
   "license": "MIT",
   "author": "x402r",
