@@ -20,6 +20,16 @@
         "default": "./dist/cjs/index.js"
       }
     },
+    "./escrow/types": {
+      "import": {
+        "types": "./dist/esm/escrow/types/index.d.mts",
+        "default": "./dist/esm/escrow/types/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/escrow/types/index.d.ts",
+        "default": "./dist/cjs/escrow/types/index.js"
+      }
+    },
     "./escrow/client": {
       "import": {
         "types": "./dist/esm/escrow/client/index.d.mts",
