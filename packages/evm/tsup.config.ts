@@ -3,7 +3,6 @@ import { defineConfig } from 'tsup'
 const baseConfig = {
   entry: {
     index: 'src/escrow/index.ts',
-    'escrow/types/index': 'src/escrow/types/index.ts',
     'escrow/client/index': 'src/escrow/client/index.ts',
     'escrow/server/index': 'src/escrow/server/index.ts',
     'escrow/facilitator/index': 'src/escrow/facilitator/index.ts',
