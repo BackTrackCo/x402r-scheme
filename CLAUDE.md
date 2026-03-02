@@ -20,6 +20,6 @@ escrow/facilitator → Settlement and verification
 
 ## Dependencies
 
-- Types and addresses from `@x402r/core` (x402r-sdk)
-- Calls on-chain AuthCaptureEscrow and PaymentOperator (x402r-contracts)
+- Types from `@x402/core` and `@x402/evm` (base x402 protocol)
+- Calls on-chain AuthCaptureEscrow and PaymentOperator (commerce-payments)
 - Extends base x402 scheme pattern (x402/)

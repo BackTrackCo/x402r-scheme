@@ -14,7 +14,7 @@ import type {
 } from '@x402/core/types'
 import type { ClientEvmSigner } from '@x402/evm'
 import { computeEscrowNonce, signERC3009, generateSalt } from '../shared/nonce'
-import { MAX_UINT48 } from '../shared/constants'
+import { MAX_UINT48, ZERO_ADDRESS } from '../shared/constants'
 import type { EscrowExtra } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
@@ -74,7 +74,7 @@ export class EscrowEvmScheme implements SchemeNetworkClient {
       refundExpiry: refundExpirySeconds ?? MAX_UINT48,
       minFeeBps,
       maxFeeBps,
-      feeReceiver: feeReceiver ?? operatorAddress,
+      feeReceiver: feeReceiver ?? ZERO_ADDRESS,
       salt: generateSalt(),
     }
 

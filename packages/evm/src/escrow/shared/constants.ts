@@ -35,6 +35,22 @@ export const OPERATOR_ABI = [
     ],
     outputs: [],
   },
+  {
+    name: 'charge',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'paymentInfo',
+        type: 'tuple',
+        components: PAYMENT_INFO_COMPONENTS,
+      },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenCollector', type: 'address' },
+      { name: 'collectorData', type: 'bytes' },
+    ],
+    outputs: [],
+  },
 ] as const
 
 // ERC-3009 TransferWithAuthorization type hash
