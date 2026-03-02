@@ -20,7 +20,7 @@ describe('EscrowFacilitatorScheme', () => {
   })
 
   describe('settle — settlementMethod routing', () => {
-    const futureTimestamp = String(Math.floor(Date.now() / 1000) + 3600)
+    const futureTimestamp = '2000000000'
 
     const mockPayload = {
       x402Version: 2,
