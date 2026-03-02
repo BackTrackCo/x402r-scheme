@@ -10,55 +10,6 @@ The `escrow` scheme on EVM uses the [Commerce Payments Protocol](https://github.
 
 The client signs a single ERC-3009 authorization. The facilitator submits it to the operator, which handles token collection, escrow locking, and fee distribution — all in one transaction.
 
-## Architecture
-
-The operator can be either a smart contract or an EOA. The two cases have different on-chain flows:
-
-### Contract Operator
-
-When the operator is a contract (e.g. a `PaymentOperator`), it routes payments through escrow with fee management. The facilitator calls the operator contract, which coordinates escrow and token collection internally.
-
-```
-Client (ERC-3009 signature)
-        │
-        ▼
-┌──────────────────────────┐
-│  Operator (contract)     │  ← Facilitator calls authorize() or charge()
-│  - authorize()           │
-│  - charge()              │
-│  - capture() / refund()  │
-│  - void()                │
-└──────────┬───────────────┘
-           │
-     ┌─────┴─────┐
-     ▼           ▼
-┌─────────┐ ┌──────────────┐
-│ Escrow  │ │   Token      │
-│         │ │  Collector   │
-└─────────┘ └──────────────┘
-```
-
-### EOA Operator
-
-When the operator is an EOA, the facilitator interacts with escrow and token collection directly. The operator EOA signs post-settlement actions (capture, refund, void) as transactions.
-
-```
-Client (ERC-3009 signature)
-        │
-        ▼
-   Facilitator
-     ┌─────┴─────┐
-     ▼           ▼
-┌─────────┐ ┌──────────────┐
-│ Escrow  │ │   Token      │
-│         │ │  Collector   │
-└─────────┘ └──────────────┘
-        ▲
-        │
-   Operator (EOA)
-   - capture() / refund() / void()
-```
-
 ## PaymentRequirements
 
 Escrow-accepting servers advertise with scheme `escrow`:
