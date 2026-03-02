@@ -1,4 +1,3 @@
-export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
 export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
@@ -21,6 +20,22 @@ export const PAYMENT_INFO_COMPONENTS = [
 export const OPERATOR_ABI = [
   {
     name: 'authorize',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'paymentInfo',
+        type: 'tuple',
+        components: PAYMENT_INFO_COMPONENTS,
+      },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenCollector', type: 'address' },
+      { name: 'collectorData', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'charge',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [

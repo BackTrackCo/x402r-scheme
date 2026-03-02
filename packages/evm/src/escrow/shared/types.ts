@@ -29,15 +29,13 @@ export interface EscrowExtra {
   escrowAddress: `0x${string}`
   operatorAddress: `0x${string}`
   tokenCollector: `0x${string}`
-  authorizeAddress?: `0x${string}`
-  minDeposit?: string
-  maxDeposit?: string
   preApprovalExpirySeconds?: number
   authorizationExpirySeconds?: number
   refundExpirySeconds?: number
   minFeeBps?: number
   maxFeeBps?: number
   feeReceiver?: `0x${string}`
+  settlementMethod?: 'authorize' | 'charge' // default: "authorize"
   name: string // EIP-712 domain name (e.g., "USDC" for Base USDC)
   version: string // EIP-712 domain version (e.g., "2" for USDC)
 }

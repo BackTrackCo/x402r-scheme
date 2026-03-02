@@ -215,7 +215,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
 
     const escrowPayload = payload.payload as unknown as EscrowPayload
     const extra = requirements.extra as unknown as EscrowExtra
-    const { authorizeAddress, operatorAddress, tokenCollector } = extra
+    const { operatorAddress, tokenCollector } = extra
 
     const paymentInfo = {
       operator: escrowPayload.paymentInfo.operator,
@@ -236,13 +236,15 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     // handles EIP-6492 unwrapping and wallet deployment on-chain
     const collectorData = escrowPayload.signature
 
-    const target = authorizeAddress ?? operatorAddress
+    const target = operatorAddress
+    const settlementMethod = extra.settlementMethod ?? 'authorize'
+    const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
 
     try {
       const txHash = await this.signer.writeContract({
         address: target,
         abi: OPERATOR_ABI,
-        functionName: 'authorize',
+        functionName,
         args: [
           paymentInfo,
           BigInt(escrowPayload.authorization.value),

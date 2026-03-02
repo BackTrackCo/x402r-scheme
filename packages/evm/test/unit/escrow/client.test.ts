@@ -128,6 +128,31 @@ describe('EscrowEvmScheme', () => {
       expect(result.payload.paymentInfo.token).toBe(mockRequirements.asset)
     })
 
+    it('should default feeReceiver to zeroAddress when not specified', async () => {
+      const scheme = new EscrowEvmScheme(mockSigner)
+      const result = await scheme.createPaymentPayload(2, mockRequirements)
+
+      expect(result.payload.paymentInfo.feeReceiver).toBe(
+        '0x0000000000000000000000000000000000000000',
+      )
+    })
+
+    it('should use provided feeReceiver when specified', async () => {
+      const scheme = new EscrowEvmScheme(mockSigner)
+      const requirementsWithFeeReceiver = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          feeReceiver: '0x1111111111111111111111111111111111111111' as const,
+        },
+      }
+      const result = await scheme.createPaymentPayload(2, requirementsWithFeeReceiver)
+
+      expect(result.payload.paymentInfo.feeReceiver).toBe(
+        '0x1111111111111111111111111111111111111111',
+      )
+    })
+
     it('should throw for invalid network format', async () => {
       const scheme = new EscrowEvmScheme(mockSigner)
       const badNetworkRequirements = {

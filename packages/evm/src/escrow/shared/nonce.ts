@@ -3,9 +3,9 @@
  * Adapted from @agentokratia/x402-escrow (MIT)
  */
 
-import { encodeAbiParameters, getAddress, keccak256, toHex } from 'viem'
+import { encodeAbiParameters, getAddress, keccak256, toHex, zeroAddress } from 'viem'
 import type { ClientEvmSigner } from '@x402/evm'
-import { ZERO_ADDRESS, RECEIVE_AUTHORIZATION_TYPES } from './constants'
+import { RECEIVE_AUTHORIZATION_TYPES } from './constants'
 import type { EscrowExtra, EscrowPayload } from './types'
 
 /**
@@ -46,7 +46,7 @@ export function computeEscrowNonce(
     [
       PAYMENT_INFO_TYPEHASH,
       paymentInfo.operator,
-      ZERO_ADDRESS, // payer-agnostic
+      zeroAddress, // payer-agnostic
       paymentInfo.receiver,
       paymentInfo.token,
       BigInt(paymentInfo.maxAmount),
