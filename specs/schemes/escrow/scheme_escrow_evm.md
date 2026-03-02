@@ -10,36 +10,53 @@ The `escrow` scheme on EVM uses the [Commerce Payments Protocol](https://github.
 
 The client signs a single ERC-3009 authorization. The facilitator submits it to the operator, which handles token collection, escrow locking, and fee distribution — all in one transaction.
 
-## Contract Architecture
+## Architecture
+
+The operator can be either a smart contract or an EOA. The two cases have different on-chain flows:
+
+### Contract Operator
+
+When the operator is a contract (e.g. a `PaymentOperator`), it routes payments through escrow with fee management. The facilitator calls the operator contract, which coordinates escrow and token collection internally.
 
 ```
 Client (ERC-3009 signature)
         │
         ▼
 ┌──────────────────────────┐
-│    Operator              │  ← Facilitator calls authorize() or charge()
-│  - authorize(paymentInfo, amount, collector, sig)
-│  - charge(paymentInfo, amount, collector, sig)
-│  - capture(paymentInfo, amount, feeBps, feeReceiver)
-│  - refund(paymentInfo, amount, feeBps, feeReceiver)
-│  - void(paymentInfo)
+│  Operator (contract)     │  ← Facilitator calls authorize() or charge()
+│  - authorize()           │
+│  - charge()              │
+│  - capture() / refund()  │
+│  - void()                │
 └──────────┬───────────────┘
            │
-           ▼
-┌──────────────────────────┐
-│  Escrow                  │  ← Singleton, manages all escrow state
-│  - PaymentInfo hashing   │
-│  - Fund locking          │
-│  - Expiry enforcement    │
-│  - Fee distribution      │
-└──────────┬───────────────┘
-           │
-           ▼
-┌──────────────────────────┐
-│  Token Collector         │  ← Calls receiveWithAuthorization on token
-│  - Collects funds from   │
-│    client's ERC-3009 sig │
-└──────────────────────────┘
+     ┌─────┴─────┐
+     ▼           ▼
+┌─────────┐ ┌──────────────┐
+│ Escrow  │ │   Token      │
+│         │ │  Collector   │
+└─────────┘ └──────────────┘
+```
+
+### EOA Operator
+
+When the operator is an EOA, the facilitator interacts with escrow and token collection directly. The operator EOA signs post-settlement actions (capture, refund, void) as transactions.
+
+```
+Client (ERC-3009 signature)
+        │
+        ▼
+   Facilitator
+     ┌─────┴─────┐
+     ▼           ▼
+┌─────────┐ ┌──────────────┐
+│ Escrow  │ │   Token      │
+│         │ │  Collector   │
+└─────────┘ └──────────────┘
+        ▲
+        │
+   Operator (EOA)
+   - capture() / refund() / void()
 ```
 
 ## PaymentRequirements
