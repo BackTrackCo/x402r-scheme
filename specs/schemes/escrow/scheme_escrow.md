@@ -2,7 +2,7 @@
 
 ## Summary
 
-The `escrow` scheme transfers funds through an on-chain escrow contract, decoupling authorization from settlement. The client signs once to authorize a maximum amount, and the facilitator settles through the [Commerce Payments Protocol](https://github.com/base/commerce-payments) — routing funds into escrow (refundable) or directly to the receiver (non-refundable).
+The `escrow` scheme transfers funds through an on-chain escrow contract, decoupling authorization from settlement. The client signs once to authorize a maximum amount, and the facilitator settles through the [Commerce Payments Protocol](https://github.com/base/commerce-payments) — routing funds into escrow (pre-settlement hold) or directly to the receiver (post-settlement refundable).
 
 This scheme reuses audited commerce-payments contracts deployed on Base and other EVM chains.
 
@@ -11,16 +11,16 @@ This scheme reuses audited commerce-payments contracts deployed on Base and othe
 - Refundable API access with dispute resolution
 - Metered services where final cost is determined after consumption
 - Marketplace payments with fee management
-- Non-refundable instant settlements using the same contract infrastructure
+- Direct settlements with post-escrow refund capability
 
 ## Settlement Methods
 
 The scheme supports two settlement paths through the commerce-payments operator:
 
-| Method      | Function      | Behavior                                                    |
-| :---------- | :------------ | :---------------------------------------------------------- |
-| `authorize` | `authorize()` | Funds held in escrow. Can be captured, refunded, or voided. |
-| `charge`    | `charge()`    | Funds sent directly to receiver. No escrow hold.            |
+| Method      | Function      | Behavior                                                     |
+| :---------- | :------------ | :----------------------------------------------------------- |
+| `authorize` | `authorize()` | Funds held in escrow. Can be captured, refunded, or voided.  |
+| `charge`    | `charge()`    | Funds sent directly to receiver. Refundable post-settlement. |
 
 Both methods share identical function signatures and use the same operator, fee system, and token collector infrastructure.
 
@@ -40,25 +40,26 @@ SIGN → AUTHORIZE → [USE] → CAPTURE / REFUND / VOID
 ### Charge
 
 ```
-SIGN → CHARGE → DONE
+SIGN → CHARGE → [USE] → REFUND (optional)
 ```
 
 1. **Sign**: Client signs an ERC-3009 authorization (same as above)
 2. **Charge**: Facilitator calls `charge()` on the operator — funds go directly to receiver
-3. **Done**: Settlement is final, no refund window
+3. **Use**: Client consumes the resource (off-chain, no gas)
+4. **Refund**: Operator can refund within `refundExpiry` if needed
 
 ## Relationship to `exact`
 
 | Aspect             | `exact`            | `escrow`                                           |
 | :----------------- | :----------------- | :------------------------------------------------- |
 | Settlement         | Immediate transfer | Via escrow contract (authorize) or direct (charge) |
-| Refundable         | No                 | Yes (authorize path)                               |
+| Refundable         | No                 | Yes (both paths)                                   |
 | Fee system         | None               | Commerce-payments managed (min/max bps)            |
 | Gas payer          | Facilitator        | Facilitator                                        |
 | Signature          | ERC-3009 / Permit2 | ERC-3009                                           |
 | On-chain contracts | Token only         | Token + Escrow + Operator + Collector              |
 
-The `charge` settlement method gives `escrow` parity with `exact` for non-refundable payments, while using the commerce-payments fee infrastructure.
+The `charge` settlement method gives `escrow` a direct-settlement path (like `exact`) while retaining post-settlement refund capability through the commerce-payments infrastructure.
 
 ## Security Considerations
 
