@@ -154,10 +154,11 @@ Escrow-accepting servers advertise with scheme `escrow`:
 
 ### Nonce Derivation
 
-The ERC-3009 nonce is deterministically derived from the payment parameters:
+The ERC-3009 nonce is deterministically derived from the payment parameters. The inner hash uses the `PaymentInfo` typehash and sets `payer=address(0)` so the nonce is payer-agnostic (computed before the payer is known):
 
 ```
-nonce = keccak256(abi.encode(chainId, escrowAddress, keccak256(abi.encode(paymentInfo))))
+paymentInfoHash = keccak256(abi.encode(PAYMENT_INFO_TYPEHASH, operator, address(0), receiver, ...))
+nonce = keccak256(abi.encode(chainId, escrowAddress, paymentInfoHash))
 ```
 
 This ties the off-chain signature to the specific escrow contract and payment terms, preventing cross-chain or cross-contract replay.
@@ -187,7 +188,7 @@ Settlement is performed by the facilitator calling the operator:
 
 1. **Re-verify** the payload (catch expired/invalid payloads before spending gas)
 2. **Determine function**: `settlementMethod === "charge" ? "charge" : "authorize"`
-3. **Call operator**: `operator.<functionName>(paymentInfo, amount, tokenCollector, signature)`
+3. **Call operator**: `operator.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`
 4. **Wait for receipt**: Confirm transaction success with 60s timeout
 5. **Return result**: Transaction hash, network, and payer address
 
@@ -232,10 +233,10 @@ The contract enforces: `preApprovalExpiry <= authorizationExpiry <= refundExpiry
 
 ### Fee System
 
-Fees are enforced on-chain by the operator:
+Fees are enforced on-chain by the escrow contract:
 
 - `minFeeBps` and `maxFeeBps` set by the client in `PaymentInfo` (0–10,000 bps)
-- Operator's protocol fee + operator fee must fall within `[minFeeBps, maxFeeBps]`
+- `feeBps` at capture/charge must fall within `[minFeeBps, maxFeeBps]`
 - If `feeReceiver` is set in `PaymentInfo`, actual `feeReceiver` at capture/charge must match
-- If `feeReceiver` is `address(0)`, operator can specify any non-zero address
+- If `feeReceiver` is `address(0)`, the caller can specify any non-zero address
 - Fee distribution: `feeAmount = amount * feeBps / 10000`, remainder goes to receiver
