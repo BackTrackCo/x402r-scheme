@@ -8,10 +8,9 @@ This scheme reuses audited commerce-payments contracts deployed on Base and othe
 
 ## Example Use Cases
 
-- Refundable API access with dispute resolution
-- Metered services where final cost is determined after consumption
-- Marketplace payments with fee management
-- Direct settlements with post-escrow refund capability
+- Refundable payments with buyer protection and dispute resolution
+- Payments with on-chain fee management (min/max bps)
+- Marketplace payments routed through operator contracts
 
 ## Settlement Methods
 
@@ -29,24 +28,26 @@ Both methods share identical function signatures and use the same operator, fee 
 ### Authorize (default)
 
 ```
-SIGN → AUTHORIZE → [USE] → CAPTURE / REFUND / VOID
+SIGN → AUTHORIZE → RESOURCE DELIVERED
 ```
 
 1. **Sign**: Client signs an ERC-3009 `receiveWithAuthorization` for the maximum amount
 2. **Authorize**: Facilitator calls `authorize()` on the operator — funds locked in escrow
-3. **Use**: Client consumes the resource (off-chain, no gas)
-4. **Settle**: Operator captures earned amount, refunds remainder, or voids if unused
+3. **Resource delivered**: Server returns the resource (HTTP 200)
+
+Post-settlement, the commerce-payments contracts enable capture, refund, void, or reclaim — see [Commerce Payments Protocol](#commerce-payments-protocol).
 
 ### Charge
 
 ```
-SIGN → CHARGE → [USE] → REFUND (optional)
+SIGN → CHARGE → RESOURCE DELIVERED
 ```
 
 1. **Sign**: Client signs an ERC-3009 authorization (same as above)
 2. **Charge**: Facilitator calls `charge()` on the operator — funds go directly to receiver
-3. **Use**: Client consumes the resource (off-chain, no gas)
-4. **Refund**: Operator can refund within `refundExpiry` if needed (note: unlike the authorize path, the payer cannot `reclaim()` — funds are already with the receiver)
+3. **Resource delivered**: Server returns the resource (HTTP 200)
+
+Post-settlement, the operator can refund within `refundExpiry` if needed. Unlike the authorize path, the payer cannot `reclaim()` — funds are already with the receiver.
 
 ## Relationship to `exact`
 
