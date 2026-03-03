@@ -8,9 +8,9 @@ This scheme reuses audited commerce-payments contracts deployed on Base and othe
 
 ## Example Use Cases
 
-- Refundable payments with buyer protection and dispute resolution
-- Payments with on-chain fee management (min/max bps)
-- Marketplace payments routed through operator contracts
+- Refundable payments with buyer protection
+- Post-settlement refunds via the charge path
+- Subscription / session billing with periodic captures
 
 ## Settlement Methods
 
