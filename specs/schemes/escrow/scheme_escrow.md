@@ -46,7 +46,7 @@ SIGN → CHARGE → [USE] → REFUND (optional)
 1. **Sign**: Client signs an ERC-3009 authorization (same as above)
 2. **Charge**: Facilitator calls `charge()` on the operator — funds go directly to receiver
 3. **Use**: Client consumes the resource (off-chain, no gas)
-4. **Refund**: Operator can refund within `refundExpiry` if needed
+4. **Refund**: Operator can refund within `refundExpiry` if needed (note: unlike the authorize path, the payer cannot `reclaim()` — funds are already with the receiver)
 
 ## Relationship to `exact`
 

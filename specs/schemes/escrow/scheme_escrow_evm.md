@@ -74,7 +74,17 @@ Escrow-accepting servers advertise with scheme `escrow`:
     "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     "payTo": "0xReceiverAddress",
     "maxTimeoutSeconds": 60,
-    "extra": {}
+    "extra": {
+      "name": "USDC",
+      "version": "2",
+      "escrowAddress": "0xEscrowAddress",
+      "operatorAddress": "0xOperatorAddress",
+      "tokenCollector": "0xCollectorAddress",
+      "settlementMethod": "authorize",
+      "minFeeBps": 0,
+      "maxFeeBps": 1000,
+      "feeReceiver": "0xOperatorAddress"
+    }
   },
   "payload": {
     "authorization": {
@@ -123,7 +133,7 @@ The facilitator performs these checks in order:
 3. **Network match**: Verify `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`
 4. **Extra validation**: Verify `requirements.extra` contains required escrow fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
 5. **Time window**: Verify `validBefore > now + 6s` (not expired) and `validAfter <= now` (active)
-6. **ERC-3009 signature**: Recover signer from EIP-712 typed data and verify matches `authorization.from`
+6. **ERC-3009 signature**: Recover signer from EIP-712 typed data (`ReceiveWithAuthorization` primary type) and verify matches `authorization.from`
 7. **Amount**: Verify `authorization.value >= requirements.amount`
 8. **Token match**: Verify `paymentInfo.token === requirements.asset`
 9. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
@@ -145,7 +155,7 @@ Settlement is performed by the facilitator calling the operator:
 
 The operator handles:
 
-- Calling the token collector to execute `receiveWithAuthorization` with the client's signature
+- Calling the token collector to execute `receiveWithAuthorization` with the client's signature (EIP-712 primary type: `ReceiveWithAuthorization`, not `TransferWithAuthorization`)
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
 
