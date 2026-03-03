@@ -99,4 +99,5 @@ The escrow scheme is built on Base's [Commerce Payments Protocol](https://blog.b
 
 - [Commerce Payments Protocol](https://github.com/base/commerce-payments)
 - [EIP-3009: Transfer With Authorization](https://eips.ethereum.org/EIPS/eip-3009)
-- [x402 Escrow Scheme Proposal (Issue #834)](https://github.com/coinbase/x402/issues/834)
+- [Escrow Scheme Proposal — Agentokratia (Issue #834)](https://github.com/coinbase/x402/issues/834)
+- [Escrow Scheme Proposal — x402r (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
