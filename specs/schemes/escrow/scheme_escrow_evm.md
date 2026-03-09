@@ -160,6 +160,16 @@ The operator handles:
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
 
+## Payment Tracking
+
+The standard `SettleResponse` (transaction hash, network, payer) is returned on success. The client retains the following from its original request for post-settlement tracking:
+
+- **`nonce`** (`authorization.nonce`): Unique payment identifier — derived from `PaymentInfo`, consumed on-chain
+- **`escrowAddress`** (`requirements.extra.escrowAddress`): Contract to query for payment state
+- **`settlementMethod`** (`requirements.extra.settlementMethod`): Determines available post-settlement actions
+
+To query payment status, the client uses the escrow address and nonce from its original `PaymentPayload`. The settlement transaction hash confirms the initial authorize/charge succeeded.
+
 ## Appendix
 
 ### PaymentInfo Struct

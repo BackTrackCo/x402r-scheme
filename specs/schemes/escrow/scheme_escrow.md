@@ -62,6 +62,10 @@ Three ordered deadlines govern the payment lifecycle:
 - **Capture deadline**: Last moment to capture escrowed funds (authorize path); after this, the client can reclaim
 - **Refund deadline**: Last moment to issue a refund on captured or charged payments
 
+## Payment Tracking
+
+The settlement response follows the standard x402 `SettleResponse` format (transaction hash, network, payer). The client retains the payment nonce and escrow contract address from its original request to query payment status and track post-settlement actions (capture, refund, void, reclaim).
+
 ## Relationship to `exact`
 
 | Aspect     | `exact`            | `escrow`                                        |
