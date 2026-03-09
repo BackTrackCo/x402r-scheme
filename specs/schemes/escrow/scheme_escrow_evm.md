@@ -134,10 +134,11 @@ The facilitator performs these checks in order:
 4. **Extra validation**: Verify `requirements.extra` contains required escrow fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
 5. **Time window**: Verify `validBefore > now + 6s` (not expired) and `validAfter <= now` (active)
 6. **ERC-3009 signature**: Recover signer from EIP-712 typed data (`ReceiveWithAuthorization` primary type) and verify matches `authorization.from`
-7. **Amount**: Verify `authorization.value >= requirements.amount`
-8. **Token match**: Verify `paymentInfo.token === requirements.asset`
-9. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
-10. **Balance check**: Verify payer has sufficient token balance (soft check — skip on RPC failure)
+7. **Amount**: Verify `authorization.value === requirements.amount`
+8. **Recipient match**: Verify `authorization.to === requirements.extra.tokenCollector`
+9. **Token match**: Verify `paymentInfo.token === requirements.asset`
+10. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
+11. **Balance check**: Verify payer has sufficient token balance (soft check — skip on RPC failure)
 
 ### EIP-6492 Support
 

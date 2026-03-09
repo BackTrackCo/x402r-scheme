@@ -142,11 +142,20 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    // Verify amount meets requirements
-    if (BigInt(escrowPayload.authorization.value) < BigInt(requirements.amount)) {
+    // Verify amount exactly matches requirements
+    if (BigInt(escrowPayload.authorization.value) !== BigInt(requirements.amount)) {
       return {
         isValid: false,
-        invalidReason: 'insufficient_amount',
+        invalidReason: 'amount_mismatch',
+        payer,
+      }
+    }
+
+    // Verify authorization recipient is the token collector
+    if (escrowPayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
+      return {
+        isValid: false,
+        invalidReason: 'token_collector_mismatch',
         payer,
       }
     }
