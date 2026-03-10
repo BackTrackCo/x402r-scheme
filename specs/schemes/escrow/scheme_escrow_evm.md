@@ -138,7 +138,7 @@ The facilitator performs these checks in order:
 8. **Recipient match**: Verify `authorization.to === requirements.extra.tokenCollector`
 9. **Token match**: Verify `paymentInfo.token === requirements.asset`
 10. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
-11. **Balance check**: Verify payer has sufficient token balance (soft check — skip on RPC failure)
+11. **Simulate** `operator.authorize(...)` or `operator.charge(...)` to ensure success
 
 ### EIP-6492 Support
 
