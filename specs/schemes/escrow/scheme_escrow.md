@@ -2,9 +2,9 @@
 
 ## Summary
 
-`escrow` is a scheme that routes funds through escrow, decoupling authorization from final settlement. The client authorizes a maximum amount, and the facilitator settles — either holding funds in escrow or sending them directly to the receiver with post-settlement refund capability.
+`escrow` is a scheme that decouples authorization from final settlement. The client authorizes a maximum amount, and the facilitator settles — either holding funds in escrow (pre-settlement) or sending them directly to the receiver with post-settlement refund capability.
 
-Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supports refundable payments across both settlement paths.
+Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supports refundable payments.
 
 ## Example Use Cases
 
@@ -16,10 +16,10 @@ Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supp
 
 The scheme supports two settlement paths:
 
-| Method      | Behavior                                                                     |
-| :---------- | :--------------------------------------------------------------------------- |
-| `authorize` | Funds held in escrow. Can be captured, refunded, voided, or reclaimed.       |
-| `charge`    | Funds sent directly to receiver. Refundable post-settlement by the operator. |
+| Method      | Behavior                                                               |
+| :---------- | :--------------------------------------------------------------------- |
+| `authorize` | Funds held in escrow. Can be captured, refunded, voided, or reclaimed. |
+| `charge`    | Funds sent directly to receiver. Refundable post-settlement.           |
 
 ### Authorize (default)
 
@@ -29,7 +29,7 @@ AUTHORIZE → RESOURCE DELIVERED → CAPTURE / REFUND / VOID
 
 1. **Authorize**: Client authorization is submitted — funds locked in escrow
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Post-settlement**: Operator can capture, refund, or void. Client can reclaim after the capture deadline if the operator disappears.
+3. **Post-settlement**: Escrowed funds can be captured (finalized to the receiver), refunded (returned to client), or voided (released before capture). If the capture deadline passes without action, the client can reclaim funds directly.
 
 ### Charge
 
@@ -37,22 +37,22 @@ AUTHORIZE → RESOURCE DELIVERED → CAPTURE / REFUND / VOID
 CHARGE → RESOURCE DELIVERED → (REFUND)
 ```
 
-1. **Charge**: Client authorization is submitted — funds go directly to receiver
+1. **Charge**: Client authorization is submitted — funds sent directly to receiver
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Post-settlement**: Operator can issue a refund within the refund window if the client is dissatisfied. Unlike authorize, the client cannot reclaim — funds are already with the receiver, so refunds require operator action.
+3. **Post-settlement**: A refund can be issued within the refund window. Since funds are already with the receiver, refunds require action by a trusted party (e.g., the escrow manager) — the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
 
 ## Core Properties
 
 ### Fund Safety
 
 - Cannot overcharge — settlement amount is capped by the client-signed maximum
-- Client can reclaim escrowed funds after the capture deadline if the operator disappears (authorize path)
+- Authorize path: client can reclaim escrowed funds after the capture deadline if no action is taken
 - Fee bounds are client-signed and enforced at settlement
 
 ### Replay Prevention
 
 - Each payment has a unique nonce derived from the payment parameters
-- Nonce is consumed on-chain at settlement, preventing double-spend
+- Nonce is consumed at settlement, preventing double-spend
 
 ### Expiry Enforcement
 
@@ -64,9 +64,9 @@ Three ordered deadlines govern the payment lifecycle:
 
 ## Settlement Response
 
-On success, the `PAYMENT-RESPONSE` header contains a `SettleResponse` with the settlement transaction hash, network, payer address, and the full payment information from the client's original payload. Including payment information makes the response self-contained — the client can derive the payment nonce, query escrow state, and initiate post-settlement actions (capture, refund, void, reclaim) without retaining client-side state from the original request.
+On success, the `PAYMENT-RESPONSE` header contains a `SettleResponse` with the settlement transaction hash, network, payer address, and the full payment information from the client's original payload. Including payment information makes the response self-contained — the client can derive the payment nonce, query escrow state, and initiate post-settlement actions without retaining client-side state from the original request.
 
-The exact structure of the payment information is network-specific — see per-network documents for details.
+The structure of the payment information is network-specific — see per-network documents for details.
 
 ## Relationship to `exact`
 
