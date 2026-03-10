@@ -152,7 +152,7 @@ Settlement is performed by the facilitator calling the operator:
 2. **Determine function**: `settlementMethod === "charge" ? "charge" : "authorize"`
 3. **Call operator**: `operator.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`
 4. **Wait for receipt**: Confirm transaction success with 60s timeout
-5. **Return result**: Transaction hash, network, and payer address
+5. **Return result**: Transaction hash, network, payer address, and `paymentInfo`
 
 The operator handles:
 

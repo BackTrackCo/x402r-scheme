@@ -236,9 +236,11 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
           }
         }
       } catch {
-        // Balance check failed too
+        // Balance check also failed (e.g., RPC outage)
       }
 
+      // Hard reject on simulation failure — matches exact scheme behavior.
+      // Safer to reject than accept a payment that may revert on-chain.
       return {
         isValid: false,
         invalidReason: 'simulation_failed',
