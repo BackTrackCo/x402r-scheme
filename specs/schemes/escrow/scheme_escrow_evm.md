@@ -115,7 +115,7 @@ Escrow-accepting servers advertise with scheme `escrow`:
 
 ### Nonce Derivation
 
-The ERC-3009 nonce is deterministically derived from the payment parameters. The inner hash uses the `PaymentInfo` typehash and sets `payer=address(0)` so the nonce is payer-agnostic (computed before the payer is known):
+The ERC-3009 nonce is deterministically derived from the payment parameters. The inner hash uses the `PaymentInfo` typehash and sets `payer=address(0)` to match the contract's `getHash()` — the payer is already tracked separately by the token contract's per-address nonce mapping:
 
 ```
 paymentInfoHash = keccak256(abi.encode(PAYMENT_INFO_TYPEHASH, operator, address(0), receiver, ...))
