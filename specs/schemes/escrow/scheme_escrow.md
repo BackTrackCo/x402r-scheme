@@ -16,9 +16,9 @@ Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supp
 
 The scheme supports two settlement paths:
 
-| Method      | Behavior                                                                   |
-| :---------- | :------------------------------------------------------------------------- |
-| `authorize` | Funds held in escrow. Can be captured, refunded, voided, or reclaimed.     |
+| Method      | Behavior                                                                     |
+| :---------- | :--------------------------------------------------------------------------- |
+| `authorize` | Funds held in escrow. Can be captured, refunded, voided, or reclaimed.       |
 | `charge`    | Funds sent directly to receiver. Refundable post-settlement by the operator. |
 
 ### Authorize (default)
@@ -68,11 +68,11 @@ The settlement response follows the standard x402 `SettleResponse` format (trans
 
 ## Relationship to `exact`
 
-| Aspect     | `exact`            | `escrow`                                        |
-| :--------- | :----------------- | :---------------------------------------------- |
+| Aspect     | `exact`            | `escrow`                                                         |
+| :--------- | :----------------- | :--------------------------------------------------------------- |
 | Settlement | Immediate transfer | Via escrow (authorize) or direct with refund capability (charge) |
-| Refundable | No                 | Yes (both paths)                                |
-| Fee system | None               | Configurable (min/max bounds, client-signed)    |
+| Refundable | No                 | Yes (both paths)                                                 |
+| Fee system | None               | Configurable (min/max bounds, client-signed)                     |
 
 ## Appendix
 
