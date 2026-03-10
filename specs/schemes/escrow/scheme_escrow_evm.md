@@ -160,15 +160,37 @@ The operator handles:
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
 
-## Payment Tracking
+## Settlement Response
 
-The standard `SettleResponse` (transaction hash, network, payer) is returned on success. The client retains the following from its original request for post-settlement tracking:
+On success, the `PAYMENT-RESPONSE` header contains a `SettleResponse` with the full `paymentInfo` from the client's original payload:
 
-- **`nonce`** (`authorization.nonce`): Unique payment identifier — derived from `PaymentInfo`, consumed on-chain
-- **`escrowAddress`** (`requirements.extra.escrowAddress`): Contract to query for payment state
-- **`settlementMethod`** (`requirements.extra.settlementMethod`): Determines available post-settlement actions
+```json
+{
+  "success": true,
+  "transaction": "0xabc...def",
+  "network": "eip155:8453",
+  "payer": "0xPayerAddress",
+  "paymentInfo": {
+    "operator": "0xOperatorAddress",
+    "receiver": "0xReceiverAddress",
+    "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "maxAmount": "1000000",
+    "preApprovalExpiry": 1740672154,
+    "authorizationExpiry": 4294967295,
+    "refundExpiry": 281474976710655,
+    "minFeeBps": 0,
+    "maxFeeBps": 1000,
+    "feeReceiver": "0xOperatorAddress",
+    "salt": "0x0000...0001"
+  }
+}
+```
 
-To query payment status, the client uses the escrow address and nonce from its original `PaymentPayload`. The settlement transaction hash confirms the initial authorize/charge succeeded.
+The client uses `paymentInfo` for post-settlement tracking:
+
+- **Payment nonce**: Derived from `paymentInfo` — unique on-chain identifier for querying escrow state
+- **Escrow address**: From `requirements.extra.escrowAddress` in the original request
+- **Settlement method**: From `requirements.extra.settlementMethod` — determines available actions (capture/refund/void/reclaim vs refund only)
 
 ## Appendix
 
