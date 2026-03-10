@@ -39,7 +39,7 @@ CHARGE → RESOURCE DELIVERED → (REFUND)
 
 1. **Charge**: Client authorization is submitted — funds sent directly to receiver
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Post-settlement**: A refund can be issued within the refund window. Since funds are already with the receiver, refunds require action by a trusted party (e.g., the escrow manager) — the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
+3. **Post-settlement**: A refund can be issued within the refund window by the escrow manager (which may be a smart contract or an authorized account). Since funds are already with the receiver, the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
 
 ## Core Properties
 
