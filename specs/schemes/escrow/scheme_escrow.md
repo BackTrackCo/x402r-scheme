@@ -62,12 +62,6 @@ Three ordered deadlines govern the payment lifecycle:
 - **Capture deadline**: Last moment to capture escrowed funds (authorize path); after this, the client can reclaim
 - **Refund deadline**: Last moment to issue a refund on captured or charged payments
 
-## Settlement Response
-
-On success, the `PAYMENT-RESPONSE` header contains a `SettleResponse` with the settlement transaction hash, network, payer address, and the full payment information from the client's original payload. Including payment information makes the response self-contained — the client can derive the payment nonce, query escrow state, and initiate post-settlement actions without retaining client-side state from the original request.
-
-The structure of the payment information is network-specific — see per-network documents for details.
-
 ## Relationship to `exact`
 
 | Aspect     | `exact`            | `escrow`                                                         |
