@@ -134,10 +134,11 @@ The facilitator performs these checks in order:
 4. **Extra validation**: Verify `requirements.extra` contains required escrow fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
 5. **Time window**: Verify `validBefore > now + 6s` (not expired) and `validAfter <= now` (active)
 6. **ERC-3009 signature**: Recover signer from EIP-712 typed data (`ReceiveWithAuthorization` primary type) and verify matches `authorization.from`
-7. **Amount**: Verify `authorization.value >= requirements.amount`
-8. **Token match**: Verify `paymentInfo.token === requirements.asset`
-9. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
-10. **Balance check**: Verify payer has sufficient token balance (soft check — skip on RPC failure)
+7. **Amount**: Verify `authorization.value === requirements.amount`
+8. **Recipient match**: Verify `authorization.to === requirements.extra.tokenCollector`
+9. **Token match**: Verify `paymentInfo.token === requirements.asset`
+10. **Receiver match**: Verify `paymentInfo.receiver === requirements.payTo`
+11. **Simulate** `operator.authorize(...)` or `operator.charge(...)` to ensure success
 
 ### EIP-6492 Support
 
@@ -151,13 +152,45 @@ Settlement is performed by the facilitator calling the operator:
 2. **Determine function**: `settlementMethod === "charge" ? "charge" : "authorize"`
 3. **Call operator**: `operator.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`
 4. **Wait for receipt**: Confirm transaction success with 60s timeout
-5. **Return result**: Transaction hash, network, and payer address
+5. **Return result**: Transaction hash, network, payer address, and `paymentInfo`
 
 The operator handles:
 
 - Calling the token collector to execute `receiveWithAuthorization` with the client's signature (EIP-712 primary type: `ReceiveWithAuthorization`, not `TransferWithAuthorization`)
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
+
+## Settlement Response
+
+On success, the `PAYMENT-RESPONSE` header contains a `SettleResponse` with the full `paymentInfo` from the client's original payload:
+
+```json
+{
+  "success": true,
+  "transaction": "0xabc...def",
+  "network": "eip155:8453",
+  "payer": "0xPayerAddress",
+  "paymentInfo": {
+    "operator": "0xOperatorAddress",
+    "receiver": "0xReceiverAddress",
+    "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "maxAmount": "1000000",
+    "preApprovalExpiry": 1740672154,
+    "authorizationExpiry": 4294967295,
+    "refundExpiry": 281474976710655,
+    "minFeeBps": 0,
+    "maxFeeBps": 1000,
+    "feeReceiver": "0xOperatorAddress",
+    "salt": "0x0000...0001"
+  }
+}
+```
+
+The client uses `paymentInfo` for post-settlement tracking:
+
+- **Payment nonce**: Derived from `paymentInfo` — unique on-chain identifier for querying escrow state
+- **Escrow address**: From `requirements.extra.escrowAddress` in the original request
+- **Settlement method**: From `requirements.extra.settlementMethod` — determines available actions (capture/refund/void/reclaim vs refund only)
 
 ## Appendix
 

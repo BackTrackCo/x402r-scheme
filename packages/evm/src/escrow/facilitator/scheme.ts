@@ -23,6 +23,27 @@ import type { EscrowExtra, EscrowPayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /**
+ * Build the on-chain PaymentInfo struct from the client's payload.
+ * Used by both verify (simulation) and settle (transaction).
+ */
+function buildPaymentInfo(escrowPayload: EscrowPayload) {
+  return {
+    operator: escrowPayload.paymentInfo.operator,
+    payer: escrowPayload.authorization.from,
+    receiver: escrowPayload.paymentInfo.receiver,
+    token: escrowPayload.paymentInfo.token,
+    maxAmount: BigInt(escrowPayload.paymentInfo.maxAmount),
+    preApprovalExpiry: escrowPayload.paymentInfo.preApprovalExpiry,
+    authorizationExpiry: escrowPayload.paymentInfo.authorizationExpiry,
+    refundExpiry: escrowPayload.paymentInfo.refundExpiry,
+    minFeeBps: escrowPayload.paymentInfo.minFeeBps,
+    maxFeeBps: escrowPayload.paymentInfo.maxFeeBps,
+    feeReceiver: escrowPayload.paymentInfo.feeReceiver,
+    salt: BigInt(escrowPayload.paymentInfo.salt),
+  }
+}
+
+/**
  * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
  * The facilitator is operator-agnostic: it does not store operator/escrow/tokenCollector
@@ -142,11 +163,20 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    // Verify amount meets requirements
-    if (BigInt(escrowPayload.authorization.value) < BigInt(requirements.amount)) {
+    // Verify amount exactly matches requirements
+    if (BigInt(escrowPayload.authorization.value) !== BigInt(requirements.amount)) {
       return {
         isValid: false,
-        invalidReason: 'insufficient_amount',
+        invalidReason: 'amount_mismatch',
+        payer,
+      }
+    }
+
+    // Verify authorization recipient is the token collector
+    if (escrowPayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
+      return {
+        isValid: false,
+        invalidReason: 'token_collector_mismatch',
         payer,
       }
     }
@@ -169,25 +199,53 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    // H4: Balance check — verify payer has sufficient token balance
-    try {
-      const balance = await this.signer.readContract({
-        address: requirements.asset as `0x${string}`,
-        abi: ERC20_BALANCE_OF_ABI,
-        functionName: 'balanceOf',
-        args: [payer],
-      })
+    // Simulate the settlement transaction via eth_call to catch issues before
+    // spending gas (balance, consumed nonces, domain mismatches, contract errors).
+    const settlementMethod = extra.settlementMethod ?? 'authorize'
+    const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
+    const paymentInfo = buildPaymentInfo(escrowPayload)
+    const settlementArgs = [
+      paymentInfo,
+      BigInt(escrowPayload.authorization.value),
+      extra.tokenCollector,
+      escrowPayload.signature,
+    ] as const
 
-      if (BigInt(balance as string) < BigInt(requirements.amount)) {
-        return {
-          isValid: false,
-          invalidReason: 'insufficient_balance',
-          payer,
-        }
-      }
+    try {
+      await this.signer.readContract({
+        address: extra.operatorAddress,
+        abi: OPERATOR_ABI,
+        functionName,
+        args: settlementArgs,
+      })
     } catch {
-      // If balance check fails (e.g., non-standard token), skip it.
-      // The on-chain transaction will fail anyway if balance is insufficient.
+      // Simulation failed — check balance for a more actionable error
+      try {
+        const balance = (await this.signer.readContract({
+          address: requirements.asset as `0x${string}`,
+          abi: ERC20_BALANCE_OF_ABI,
+          functionName: 'balanceOf',
+          args: [payer],
+        })) as bigint
+
+        if (balance < BigInt(requirements.amount)) {
+          return {
+            isValid: false,
+            invalidReason: 'insufficient_balance',
+            payer,
+          }
+        }
+      } catch {
+        // Balance check also failed (e.g., RPC outage)
+      }
+
+      // Hard reject on simulation failure — matches exact scheme behavior.
+      // Safer to reject than accept a payment that may revert on-chain.
+      return {
+        isValid: false,
+        invalidReason: 'simulation_failed',
+        payer,
+      }
     }
 
     return {
@@ -215,41 +273,21 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
 
     const escrowPayload = payload.payload as unknown as EscrowPayload
     const extra = requirements.extra as unknown as EscrowExtra
-    const { operatorAddress, tokenCollector } = extra
 
-    const paymentInfo = {
-      operator: escrowPayload.paymentInfo.operator,
-      payer: escrowPayload.authorization.from,
-      receiver: escrowPayload.paymentInfo.receiver,
-      token: escrowPayload.paymentInfo.token,
-      maxAmount: BigInt(escrowPayload.paymentInfo.maxAmount),
-      preApprovalExpiry: escrowPayload.paymentInfo.preApprovalExpiry,
-      authorizationExpiry: escrowPayload.paymentInfo.authorizationExpiry,
-      refundExpiry: escrowPayload.paymentInfo.refundExpiry,
-      minFeeBps: escrowPayload.paymentInfo.minFeeBps,
-      maxFeeBps: escrowPayload.paymentInfo.maxFeeBps,
-      feeReceiver: escrowPayload.paymentInfo.feeReceiver,
-      salt: BigInt(escrowPayload.paymentInfo.salt),
-    }
-
-    // Pass raw signature — ERC3009PaymentCollector/ERC6492SignatureHandler
-    // handles EIP-6492 unwrapping and wallet deployment on-chain
-    const collectorData = escrowPayload.signature
-
-    const target = operatorAddress
+    const paymentInfo = buildPaymentInfo(escrowPayload)
     const settlementMethod = extra.settlementMethod ?? 'authorize'
     const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
 
     try {
       const txHash = await this.signer.writeContract({
-        address: target,
+        address: extra.operatorAddress,
         abi: OPERATOR_ABI,
         functionName,
         args: [
           paymentInfo,
           BigInt(escrowPayload.authorization.value),
-          tokenCollector,
-          collectorData,
+          extra.tokenCollector,
+          escrowPayload.signature,
         ],
       })
 
