@@ -52,7 +52,7 @@ CHARGE → RESOURCE DELIVERED → (REFUND)
 ### Replay Prevention
 
 - Each payment has a unique nonce derived from the payment parameters
-- Nonce is consumed at settlement, preventing double-spend
+- Nonce is consumed on-chain at settlement, preventing double-spend
 
 ### Expiry Enforcement
 
