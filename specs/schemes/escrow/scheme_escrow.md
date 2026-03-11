@@ -4,6 +4,8 @@
 
 `escrow` is a scheme that decouples authorization from final settlement. The client authorizes a maximum amount, and the facilitator settles — either holding funds in escrow (pre-settlement) or sending them directly to the receiver with post-settlement refund capability.
 
+The **operator** is the entity that routes funds and manages the payment lifecycle (capture, refund, void). It may be the facilitator itself, a separate authorized account, or a smart contract — depending on the network and implementation.
+
 Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supports refundable payments.
 
 ## Example Use Cases
@@ -29,7 +31,7 @@ AUTHORIZE → RESOURCE DELIVERED → CAPTURE / REFUND / VOID
 
 1. **Authorize**: Client authorization is submitted — funds locked in escrow
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Post-settlement**: Escrowed funds can be captured (finalized to the receiver), refunded (returned to client), or voided (released before capture). If the capture deadline passes without action, the client can reclaim funds directly.
+3. **Post-settlement**: The operator can capture (finalize funds to the receiver), refund (return to client), or void (release before capture). If the capture deadline passes without action, the client can reclaim funds directly.
 
 ### Charge
 
@@ -39,7 +41,7 @@ CHARGE → RESOURCE DELIVERED → (REFUND)
 
 1. **Charge**: Client authorization is submitted — funds sent directly to receiver
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Post-settlement**: A refund can be issued within the refund window by the operator (which may be a smart contract or an authorized account). Since funds are already with the receiver, the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
+3. **Post-settlement**: The operator can issue a refund within the refund window. Since funds are already with the receiver, the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
 
 ## Core Properties
 
