@@ -10,6 +10,8 @@ The `escrow` scheme on EVM uses the [Commerce Payments Protocol](https://github.
 
 The client signs a single ERC-3009 authorization. The facilitator submits it to the operator, which handles token collection, escrow locking, and fee distribution — all in one transaction.
 
+The escrow scheme uses ERC-3009 (`receiveWithAuthorization`) exclusively. The commerce-payments token collector architecture supports pluggable collection methods; future collectors (e.g., Permit2) could be added via `assetTransferMethod` in `extra` without changing the scheme.
+
 ## PaymentRequirements
 
 Escrow-accepting servers advertise with scheme `escrow`:
@@ -158,6 +160,36 @@ The operator handles:
 - Calling the token collector to execute `receiveWithAuthorization` with the client's signature (EIP-712 primary type: `ReceiveWithAuthorization`, not `TransferWithAuthorization`)
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
+
+## Error Codes
+
+The escrow scheme uses the standard x402 error codes plus these scheme-specific codes:
+
+### Verification Errors
+
+| Error Code                    | Description                                                                          |
+| :---------------------------- | :----------------------------------------------------------------------------------- |
+| `invalid_payload_format`      | Payload missing `authorization`, `signature`, or `paymentInfo`                       |
+| `unsupported_scheme`          | Scheme is not `escrow`                                                               |
+| `network_mismatch`            | Payload network does not match requirements                                          |
+| `invalid_network`             | Network format is not `eip155:<chainId>`                                             |
+| `invalid_escrow_extra`        | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
+| `authorization_expired`       | `validBefore <= now + 6s`                                                            |
+| `authorization_not_yet_valid` | `validAfter > now`                                                                   |
+| `invalid_escrow_signature`    | ERC-3009 signature verification failed                                               |
+| `amount_mismatch`             | `authorization.value !== requirements.amount`                                        |
+| `token_collector_mismatch`    | `authorization.to !== extra.tokenCollector`                                          |
+| `token_mismatch`              | `paymentInfo.token !== requirements.asset`                                           |
+| `receiver_mismatch`           | `paymentInfo.receiver !== requirements.payTo`                                        |
+| `insufficient_balance`        | Payer balance is less than required amount                                           |
+| `simulation_failed`           | Settlement simulation via `eth_call` failed                                          |
+
+### Settlement Errors
+
+| Error Code             | Description                                      |
+| :--------------------- | :----------------------------------------------- |
+| `verification_failed`  | Re-verification before settlement failed         |
+| `transaction_reverted` | On-chain transaction reverted after confirmation |
 
 ## Appendix
 
