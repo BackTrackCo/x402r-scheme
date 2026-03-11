@@ -4,7 +4,7 @@
 
 `escrow` is a scheme that decouples authorization from final settlement. The client authorizes a maximum amount, and the facilitator settles — either holding funds in escrow (pre-settlement) or sending them directly to the receiver with post-settlement refund capability.
 
-The **operator** is the entity that routes funds and manages post-settlement actions (capture, refund, void). It may be the facilitator itself, a separate authorized account, or a smart contract — depending on the network and implementation.
+The **operator** is the entity that routes funds and manages the payment lifecycle (capture, refund, void). It may be the facilitator itself, a separate authorized account, or a smart contract — depending on the network and implementation.
 
 Unlike `exact`, which transfers funds immediately and irrevocably, `escrow` supports refundable payments.
 
