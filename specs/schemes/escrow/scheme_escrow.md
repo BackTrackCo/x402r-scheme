@@ -31,8 +31,9 @@ AUTHORIZE → RESOURCE DELIVERED → CAPTURE / VOID → (REFUND)
 
 1. **Authorize**: Client authorization is submitted — funds locked in escrow
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Capture or void**: The operator can capture (finalize funds to the receiver) or void (release escrowed funds back to client). If the capture deadline passes without action, the client can reclaim directly.
-4. **Refund**: After capture, the operator can refund (return funds to client) within the refund window.
+3. **Capture or void**: The operator can capture (finalize funds to the receiver) or void (release escrowed funds back to client).
+4. **Reclaim**: If the capture deadline passes without action, the client can reclaim directly.
+5. **Refund**: After capture, the operator can refund within the refund window.
 
 ### Charge
 
@@ -42,7 +43,9 @@ CHARGE → RESOURCE DELIVERED → (REFUND)
 
 1. **Charge**: Client authorization is submitted — funds sent directly to receiver
 2. **Resource delivered**: Server returns the resource (HTTP 200)
-3. **Refund**: The operator can issue a refund within the refund window. Since funds are already with the receiver, the client cannot unilaterally reclaim. This path trades the safety of pre-settlement escrow for simpler settlement, relying on the refund window as the buyer protection mechanism.
+3. **Refund**: The operator can refund within the refund window.
+
+No capture, void, or reclaim — funds are never held in escrow.
 
 ## Core Properties
 
