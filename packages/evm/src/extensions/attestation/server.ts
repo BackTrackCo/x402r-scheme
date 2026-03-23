@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { keccak256, toBytes } from 'viem'
 import type { ResourceServerExtension } from '@x402/core/types'
 import { ATTESTATION_KEY } from './types.js'
