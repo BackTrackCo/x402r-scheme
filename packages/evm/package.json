@@ -40,6 +40,16 @@
         "default": "./dist/cjs/escrow/server/index.js"
       }
     },
+    "./extensions/attestation": {
+      "import": {
+        "types": "./dist/esm/extensions/attestation/index.d.mts",
+        "default": "./dist/esm/extensions/attestation/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/extensions/attestation/index.d.ts",
+        "default": "./dist/cjs/extensions/attestation/index.js"
+      }
+    },
     "./escrow/facilitator": {
       "import": {
         "types": "./dist/esm/escrow/facilitator/index.d.mts",
