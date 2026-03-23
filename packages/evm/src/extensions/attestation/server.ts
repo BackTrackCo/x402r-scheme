@@ -19,16 +19,11 @@ interface SettleResultContextWithTransport {
  *
  * @param attestorUrl - Base URL of the attestor service
  */
-export function createAttestationExtension(
-  attestorUrl: string,
-): ResourceServerExtension {
+export function createAttestationExtension(attestorUrl: string): ResourceServerExtension {
   return {
     key: ATTESTATION_KEY,
 
-    enrichSettlementResponse: async (
-      _declaration: unknown,
-      rawContext: unknown,
-    ) => {
+    enrichSettlementResponse: async (_declaration: unknown, rawContext: unknown) => {
       const context = rawContext as SettleResultContextWithTransport
       if (!context.result.success) return undefined
 
@@ -63,9 +58,6 @@ export function createAttestationExtension(
  * Declare the attestation extension on a route.
  * Only routes with this declaration will include attestation data.
  */
-export function declareAttestationExtension(): Record<
-  string,
-  Record<string, never>
-> {
+export function declareAttestationExtension(): Record<string, Record<string, never>> {
   return { [ATTESTATION_KEY]: {} }
 }
