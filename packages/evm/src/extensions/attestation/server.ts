@@ -11,30 +11,24 @@ interface SettleResultContextWithTransport {
 /**
  * Create the attestation extension for a resource server.
  *
- * Adds third-party attestation to x402 payment flows:
- * - Pre-payment (402): fetches signed identity from attestor API
- * - Post-payment (200): fetches signed acknowledgment from attestor API
+ * Adds third-party attestation to x402 payment flows. On settlement,
+ * forwards the response body to the attestor and includes the signed
+ * acknowledgment in the 200 response.
  *
- * Works with any scheme (escrow, exact, etc.) — not escrow-specific.
+ * Works with any scheme (escrow, exact, etc.).
  *
  * @param attestorUrl - Base URL of the attestor service
  */
-export function createAttestationExtension(attestorUrl: string): ResourceServerExtension {
+export function createAttestationExtension(
+  attestorUrl: string,
+): ResourceServerExtension {
   return {
     key: ATTESTATION_KEY,
 
-    enrichPaymentRequiredResponse: async () => {
-      try {
-        const res = await fetch(`${attestorUrl}/identity`)
-        if (!res.ok) return undefined
-        const identity = await res.json()
-        return { info: { identity } }
-      } catch {
-        return undefined
-      }
-    },
-
-    enrichSettlementResponse: async (_declaration: unknown, rawContext: unknown) => {
+    enrichSettlementResponse: async (
+      _declaration: unknown,
+      rawContext: unknown,
+    ) => {
       const context = rawContext as SettleResultContextWithTransport
       if (!context.result.success) return undefined
 
@@ -69,6 +63,9 @@ export function createAttestationExtension(attestorUrl: string): ResourceServerE
  * Declare the attestation extension on a route.
  * Only routes with this declaration will include attestation data.
  */
-export function declareAttestationExtension(): Record<string, Record<string, never>> {
+export function declareAttestationExtension(): Record<
+  string,
+  Record<string, never>
+> {
   return { [ATTESTATION_KEY]: {} }
 }
