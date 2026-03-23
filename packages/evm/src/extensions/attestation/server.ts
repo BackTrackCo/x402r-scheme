@@ -11,9 +11,11 @@ interface SettleResultContextWithTransport {
 /**
  * Create the attestation extension for a resource server.
  *
- * Adds third-party attestation to x402 payment flows. On settlement,
- * forwards the response body to the attestor and includes the signed
- * acknowledgment in the 200 response.
+ * Generic pass-through for third-party attestations. The extension
+ * doesn't define what gets signed — the attestor decides.
+ *
+ * - Pre-payment (402): fetches attestor's identity/config from GET endpoint
+ * - Post-payment (200): forwards response body to attestor, includes response
  *
  * Works with any scheme (escrow, exact, etc.).
  *
@@ -23,6 +25,19 @@ export function createAttestationExtension(attestorUrl: string): ResourceServerE
   return {
     key: ATTESTATION_KEY,
 
+    // Pre-payment: include attestor data in 402
+    enrichPaymentRequiredResponse: async () => {
+      try {
+        const res = await fetch(`${attestorUrl}/attest/identity`)
+        if (!res.ok) return undefined
+        const data = await res.json()
+        return { info: { identity: data } }
+      } catch {
+        return undefined
+      }
+    },
+
+    // Post-payment: forward content to attestor, include response in 200
     enrichSettlementResponse: async (_declaration: unknown, rawContext: unknown) => {
       const context = rawContext as SettleResultContextWithTransport
       if (!context.result.success) return undefined
@@ -33,7 +48,7 @@ export function createAttestationExtension(attestorUrl: string): ResourceServerE
       const contentHash = keccak256(toBytes(responseBody.toString('utf-8')))
 
       try {
-        const res = await fetch(`${attestorUrl}/verify`, {
+        const res = await fetch(`${attestorUrl}/attest/settle`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -44,9 +59,8 @@ export function createAttestationExtension(attestorUrl: string): ResourceServerE
           }),
         })
         if (!res.ok) return undefined
-        const data = (await res.json()) as { acknowledgment?: unknown }
-        if (!data.acknowledgment) return undefined
-        return { info: { acknowledgment: data.acknowledgment } }
+        const data = await res.json()
+        return { info: { settlement: data } }
       } catch {
         return undefined
       }
