@@ -4,17 +4,7 @@ import type {
   PaymentRequiredContext,
   SettleResultContext,
 } from '@x402/core/types'
-import { DEFAULT_ATTESTATION_KEY } from './types.js'
-
-// transportContext is set on the settle resultContext at runtime in
-// x402ResourceServer.settlePayment() (line ~788 in x402ResourceServer.ts):
-//   const resultContext: SettleResultContext = { ...context, result, transportContext }
-// The field exists in x402's source SettleResultContext type but the published
-// @x402/core@2.4.0 types haven't caught up. The offer-receipt extension in
-// x402 accesses it the same way via cast (see server.ts enrichSettlementResponse).
-interface TransportContext {
-  responseBody?: Uint8Array | { toString(encoding: string): string }
-}
+import { ATTESTATION_KEY } from './types.js'
 
 /**
  * Create the attestation extension for a resource server.
@@ -22,8 +12,8 @@ interface TransportContext {
  * Generic pass-through for third-party attestations. The extension
  * doesn't define what gets signed — the attestor decides.
  *
- * - Pre-payment (402): fetches attestor's identity/config from GET endpoint
- * - Post-payment (200): forwards response body to attestor, includes response
+ * - Pre-payment (402): POSTs payment context to attestor, includes response
+ * - Post-payment (200): POSTs response body + settlement info to attestor, includes response
  *
  * Works with any scheme (escrow, exact, etc.).
  *
@@ -38,35 +28,48 @@ interface TransportContext {
  */
 export function createAttestationExtension(
   attestorUrl: string,
-  key: string = DEFAULT_ATTESTATION_KEY,
+  key: string = ATTESTATION_KEY,
 ): ResourceServerExtension {
   return {
     key,
 
-    // Pre-payment: include attestor data in 402
+    // Pre-payment: POST payment context to attestor, include response in 402
     enrichPaymentRequiredResponse: async (
-      _declaration: unknown,
-      _context: PaymentRequiredContext,
+      declaration: unknown,
+      context: PaymentRequiredContext,
     ) => {
       try {
         // eslint-disable-next-line no-undef
-        const res = await fetch(`${attestorUrl}/attest/identity`)
-        if (!res.ok) return undefined
-        const data = await res.json()
-        return { info: { identity: data } }
+        const res = await fetch(`${attestorUrl}/attest/identity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requirements: context.requirements,
+            resource: context.resourceInfo,
+            declaration,
+          }),
+        })
+        if (!res.ok) {
+          console.warn(
+            `[attestation:${key}] identity fetch failed: ${res.status} ${res.statusText}`,
+          )
+          return undefined
+        }
+        return { info: { identity: await res.json() } }
       } catch (err) {
         console.warn(`[attestation:${key}] identity fetch failed:`, err)
         return undefined
       }
     },
 
-    // Post-payment: forward content to attestor, include response in 200
+    // Post-payment: POST response body to attestor, include response in 200
+    // Requires @x402/core >=2.8.0 for transportContext on SettleResultContext
     enrichSettlementResponse: async (_declaration: unknown, context: SettleResultContext) => {
       if (!context.result.success) return undefined
 
-      // transportContext is passed at runtime but not on the SettleResultContext type
-      const transportCtx = (context as unknown as { transportContext?: TransportContext })
-        .transportContext
+      const transportCtx = context.transportContext as
+        | { responseBody?: { toString(encoding: string): string } | Uint8Array }
+        | undefined
       const responseBody = transportCtx?.responseBody
       if (!responseBody) return undefined
 
@@ -91,9 +94,11 @@ export function createAttestationExtension(
             responseBody: bodyStr,
           }),
         })
-        if (!res.ok) return undefined
-        const data = await res.json()
-        return { info: { settlement: data } }
+        if (!res.ok) {
+          console.warn(`[attestation:${key}] settle fetch failed: ${res.status} ${res.statusText}`)
+          return undefined
+        }
+        return { info: { settlement: await res.json() } }
       } catch (err) {
         console.warn(`[attestation:${key}] settle fetch failed:`, err)
         return undefined
@@ -109,7 +114,7 @@ export function createAttestationExtension(
  * @param key - Extension key (must match the key passed to createAttestationExtension)
  */
 export function declareAttestationExtension(
-  key: string = DEFAULT_ATTESTATION_KEY,
+  key: string = ATTESTATION_KEY,
 ): Record<string, Record<string, unknown>> {
   return { [key]: {} }
 }
