@@ -70,7 +70,7 @@ Three ordered deadlines govern the payment lifecycle:
 
 ## Relationship to `exact`
 
-| Aspect     | `exact`            | `commerce`                                                         |
+| Aspect     | `exact`            | `commerce`                                                       |
 | :--------- | :----------------- | :--------------------------------------------------------------- |
 | Settlement | Immediate transfer | Via escrow (authorize) or direct with refund capability (charge) |
 | Refundable | No                 | Yes (both paths)                                                 |

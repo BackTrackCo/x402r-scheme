@@ -37,7 +37,10 @@ registerCommerceEvmScheme(server, { networks: 'eip155:84532' })
 ### Facilitator — Verify and settle payments
 
 ```typescript
-import { CommerceFacilitatorScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/facilitator'
+import {
+  CommerceFacilitatorScheme,
+  registerCommerceEvmScheme,
+} from '@x402r/evm/commerce/facilitator'
 import { x402Facilitator } from '@x402/core/facilitator'
 
 const facilitator = new x402Facilitator()

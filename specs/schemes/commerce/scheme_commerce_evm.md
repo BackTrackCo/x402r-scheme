@@ -170,13 +170,13 @@ The commerce scheme uses the standard x402 error codes plus these scheme-specifi
 | Error Code                    | Description                                                                          |
 | :---------------------------- | :----------------------------------------------------------------------------------- |
 | `invalid_payload_format`      | Payload missing `authorization`, `signature`, or `paymentInfo`                       |
-| `unsupported_scheme`          | Scheme is not `commerce`                                                               |
+| `unsupported_scheme`          | Scheme is not `commerce`                                                             |
 | `network_mismatch`            | Payload network does not match requirements                                          |
 | `invalid_network`             | Network format is not `eip155:<chainId>`                                             |
-| `invalid_commerce_extra`        | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
+| `invalid_commerce_extra`      | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
 | `authorization_expired`       | `validBefore <= now + 6s`                                                            |
 | `authorization_not_yet_valid` | `validAfter > now`                                                                   |
-| `invalid_commerce_signature`    | ERC-3009 signature verification failed                                               |
+| `invalid_commerce_signature`  | ERC-3009 signature verification failed                                               |
 | `amount_mismatch`             | `authorization.value !== requirements.amount`                                        |
 | `token_collector_mismatch`    | `authorization.to !== extra.tokenCollector`                                          |
 | `token_mismatch`              | `paymentInfo.token !== requirements.asset`                                           |
