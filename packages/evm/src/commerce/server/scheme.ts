@@ -1,9 +1,9 @@
 /**
- * Escrow Scheme - Server
+ * Commerce Scheme - Server
  * Handles price parsing and requirement enhancement for resource servers.
  *
  * Implements x402's SchemeNetworkServer interface so it can be registered
- * on an x402ResourceServer via server.register('eip155:84532', new EscrowServerScheme()).
+ * on an x402ResourceServer via server.register('eip155:84532', new CommerceServerScheme()).
  */
 
 import type {
@@ -107,8 +107,8 @@ function convertToTokenAmount(decimalAmount: string, decimals: number): string {
  * Server scheme - handles price parsing and requirement enhancement.
  * Implements x402's SchemeNetworkServer interface.
  */
-export class EscrowServerScheme implements SchemeNetworkServer {
-  readonly scheme = 'escrow'
+export class CommerceServerScheme implements SchemeNetworkServer {
+  readonly scheme = 'commerce'
   private moneyParsers: MoneyParser[] = []
 
   /**
@@ -121,7 +121,7 @@ export class EscrowServerScheme implements SchemeNetworkServer {
    * @param parser - Custom function to convert amount to AssetAmount (or null to skip)
    * @returns The server instance for chaining
    */
-  registerMoneyParser(parser: MoneyParser): EscrowServerScheme {
+  registerMoneyParser(parser: MoneyParser): CommerceServerScheme {
     this.moneyParsers.push(parser)
     return this
   }
@@ -202,7 +202,7 @@ export class EscrowServerScheme implements SchemeNetworkServer {
    * Enhance payment requirements with facilitator's extra fields.
    *
    * Merges supportedKind.extra (from facilitator's /supported endpoint) into
-   * the requirements, so escrow addresses flow from facilitator → merchant
+   * the requirements, so commerce addresses flow from facilitator → merchant
    * requirements automatically.
    */
   async enhancePaymentRequirements(

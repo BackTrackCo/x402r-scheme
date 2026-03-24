@@ -1,10 +1,10 @@
 # x402r-scheme
 
-Escrow payment scheme for x402 using Base Commerce Payments.
+Commerce payment scheme for x402 using Base Commerce Payments.
 
 ## Packages
 
-- **[@x402r/evm](./packages/evm)** - Escrow scheme implementation for EVM chains
+- **[@x402r/evm](./packages/evm)** - Commerce scheme implementation for EVM chains
 
 ## Installation
 
@@ -19,36 +19,36 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 ### Client
 
 ```typescript
-import { EscrowEvmScheme, registerEscrowEvmScheme } from '@x402r/evm/escrow/client'
+import { CommerceEvmScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/client'
 import { x402Client } from '@x402/core/client'
 
 const client = new x402Client()
-registerEscrowEvmScheme(client, { signer, networks: 'eip155:84532' })
+registerCommerceEvmScheme(client, { signer, networks: 'eip155:84532' })
 ```
 
 ### Server
 
 ```typescript
-import { EscrowServerScheme, registerEscrowEvmScheme } from '@x402r/evm/escrow/server'
+import { CommerceServerScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/server'
 import { x402ResourceServer } from '@x402/core/server'
 
 const server = new x402ResourceServer(facilitatorConfig)
-registerEscrowEvmScheme(server, { networks: 'eip155:84532' })
+registerCommerceEvmScheme(server, { networks: 'eip155:84532' })
 ```
 
 ### Facilitator
 
-The escrow scheme integrates with x402's facilitator via `registerEscrowEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
+The commerce scheme integrates with x402's facilitator via `registerCommerceEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
 
 ```typescript
 import { x402Facilitator } from '@x402/core/facilitator'
 import { toFacilitatorEvmSigner } from '@x402/evm'
-import { registerEscrowEvmScheme } from '@x402r/evm/escrow/facilitator'
+import { registerCommerceEvmScheme } from '@x402r/evm/commerce/facilitator'
 
 const evmSigner = toFacilitatorEvmSigner({ address, ...clients })
 
 const facilitator = new x402Facilitator()
-registerEscrowEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
+registerCommerceEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
 ```
 
 ## Development

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { computeEscrowNonce, generateSalt } from '../../../src/escrow/shared/nonce'
+import { computeCommerceNonce, generateSalt } from '../../../src/commerce/shared/nonce'
 
 describe('nonce utilities', () => {
-  describe('computeEscrowNonce', () => {
+  describe('computeCommerceNonce', () => {
     const mockPaymentInfo = {
       operator: '0x1111111111111111111111111111111111111111' as const,
       receiver: '0x2222222222222222222222222222222222222222' as const,
@@ -21,7 +21,7 @@ describe('nonce utilities', () => {
       const escrowAddress = '0x5555555555555555555555555555555555555555' as const
       const chainId = 84532
 
-      const nonce = computeEscrowNonce(chainId, escrowAddress, mockPaymentInfo)
+      const nonce = computeCommerceNonce(chainId, escrowAddress, mockPaymentInfo)
 
       expect(nonce).toMatch(/^0x[a-fA-F0-9]{64}$/)
     })
@@ -30,8 +30,8 @@ describe('nonce utilities', () => {
       const escrowAddress = '0x5555555555555555555555555555555555555555' as const
       const chainId = 84532
 
-      const nonce1 = computeEscrowNonce(chainId, escrowAddress, mockPaymentInfo)
-      const nonce2 = computeEscrowNonce(chainId, escrowAddress, mockPaymentInfo)
+      const nonce1 = computeCommerceNonce(chainId, escrowAddress, mockPaymentInfo)
+      const nonce2 = computeCommerceNonce(chainId, escrowAddress, mockPaymentInfo)
 
       expect(nonce1).toBe(nonce2)
     })
@@ -39,8 +39,8 @@ describe('nonce utilities', () => {
     it('should produce different results for different chainIds', () => {
       const escrowAddress = '0x5555555555555555555555555555555555555555' as const
 
-      const nonce1 = computeEscrowNonce(84532, escrowAddress, mockPaymentInfo)
-      const nonce2 = computeEscrowNonce(8453, escrowAddress, mockPaymentInfo)
+      const nonce1 = computeCommerceNonce(84532, escrowAddress, mockPaymentInfo)
+      const nonce2 = computeCommerceNonce(8453, escrowAddress, mockPaymentInfo)
 
       expect(nonce1).not.toBe(nonce2)
     })
@@ -48,12 +48,12 @@ describe('nonce utilities', () => {
     it('should produce different results for different escrow addresses', () => {
       const chainId = 84532
 
-      const nonce1 = computeEscrowNonce(
+      const nonce1 = computeCommerceNonce(
         chainId,
         '0x5555555555555555555555555555555555555555' as const,
         mockPaymentInfo,
       )
-      const nonce2 = computeEscrowNonce(
+      const nonce2 = computeCommerceNonce(
         chainId,
         '0x6666666666666666666666666666666666666666' as const,
         mockPaymentInfo,
@@ -66,8 +66,8 @@ describe('nonce utilities', () => {
       const escrowAddress = '0x5555555555555555555555555555555555555555' as const
       const chainId = 84532
 
-      const nonce1 = computeEscrowNonce(chainId, escrowAddress, mockPaymentInfo)
-      const nonce2 = computeEscrowNonce(chainId, escrowAddress, {
+      const nonce1 = computeCommerceNonce(chainId, escrowAddress, mockPaymentInfo)
+      const nonce2 = computeCommerceNonce(chainId, escrowAddress, {
         ...mockPaymentInfo,
         maxAmount: '2000000',
       })

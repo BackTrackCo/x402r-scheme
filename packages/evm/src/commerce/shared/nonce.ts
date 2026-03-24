@@ -6,7 +6,7 @@
 import { encodeAbiParameters, getAddress, keccak256, toHex, zeroAddress } from 'viem'
 import type { ClientEvmSigner } from '@x402/evm'
 import { RECEIVE_AUTHORIZATION_TYPES } from './constants'
-import type { EscrowExtra, EscrowPayload } from './types'
+import type { CommerceExtra, CommercePayload } from './types'
 
 /**
  * PaymentInfo typehash - must match AuthCaptureEscrow.PAYMENT_INFO_TYPEHASH
@@ -18,13 +18,13 @@ const PAYMENT_INFO_TYPEHASH = keccak256(
 )
 
 /**
- * Compute escrow nonce for ERC-3009 authorization
+ * Compute commerce nonce for ERC-3009 authorization
  * Must match AuthCaptureEscrow.getHash() with payer=address(0)
  */
-export function computeEscrowNonce(
+export function computeCommerceNonce(
   chainId: number,
   escrowAddress: `0x${string}`,
-  paymentInfo: EscrowPayload['paymentInfo'],
+  paymentInfo: CommercePayload['paymentInfo'],
 ): `0x${string}` {
   // Step 1: Encode paymentInfo with payer=0 (payer-agnostic)
   const paymentInfoEncoded = encodeAbiParameters(
@@ -80,8 +80,8 @@ export function computeEscrowNonce(
  */
 export async function signERC3009(
   signer: ClientEvmSigner,
-  authorization: EscrowPayload['authorization'],
-  extra: EscrowExtra,
+  authorization: CommercePayload['authorization'],
+  extra: CommerceExtra,
   tokenAddress: `0x${string}`,
   chainId: number,
 ): Promise<`0x${string}`> {
@@ -130,9 +130,9 @@ export async function verifyERC3009Signature(
       signature: `0x${string}`
     }) => Promise<boolean>
   },
-  authorization: EscrowPayload['authorization'],
+  authorization: CommercePayload['authorization'],
   signature: `0x${string}`,
-  extra: EscrowExtra & { chainId: number },
+  extra: CommerceExtra & { chainId: number },
   tokenAddress: `0x${string}`,
 ): Promise<boolean> {
   const domain = {

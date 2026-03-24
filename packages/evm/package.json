@@ -1,7 +1,7 @@
 {
   "name": "@x402r/evm",
   "version": "0.0.3",
-  "description": "Escrow payment scheme for x402 using Base Commerce Payments",
+  "description": "Commerce payment scheme for x402 using Base Commerce Payments",
   "license": "MIT",
   "author": "x402r",
   "repository": {
@@ -20,34 +20,34 @@
         "default": "./dist/cjs/index.js"
       }
     },
-    "./escrow/client": {
+    "./commerce/client": {
       "import": {
-        "types": "./dist/esm/escrow/client/index.d.mts",
-        "default": "./dist/esm/escrow/client/index.mjs"
+        "types": "./dist/esm/commerce/client/index.d.mts",
+        "default": "./dist/esm/commerce/client/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/client/index.d.ts",
-        "default": "./dist/cjs/escrow/client/index.js"
+        "types": "./dist/cjs/commerce/client/index.d.ts",
+        "default": "./dist/cjs/commerce/client/index.js"
       }
     },
-    "./escrow/server": {
+    "./commerce/server": {
       "import": {
-        "types": "./dist/esm/escrow/server/index.d.mts",
-        "default": "./dist/esm/escrow/server/index.mjs"
+        "types": "./dist/esm/commerce/server/index.d.mts",
+        "default": "./dist/esm/commerce/server/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/server/index.d.ts",
-        "default": "./dist/cjs/escrow/server/index.js"
+        "types": "./dist/cjs/commerce/server/index.d.ts",
+        "default": "./dist/cjs/commerce/server/index.js"
       }
     },
-    "./escrow/facilitator": {
+    "./commerce/facilitator": {
       "import": {
-        "types": "./dist/esm/escrow/facilitator/index.d.mts",
-        "default": "./dist/esm/escrow/facilitator/index.mjs"
+        "types": "./dist/esm/commerce/facilitator/index.d.mts",
+        "default": "./dist/esm/commerce/facilitator/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/escrow/facilitator/index.d.ts",
-        "default": "./dist/cjs/escrow/facilitator/index.js"
+        "types": "./dist/cjs/commerce/facilitator/index.d.ts",
+        "default": "./dist/cjs/commerce/facilitator/index.js"
       }
     }
   },
