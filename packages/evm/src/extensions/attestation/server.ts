@@ -6,9 +6,12 @@ import type {
 } from '@x402/core/types'
 import { DEFAULT_ATTESTATION_KEY } from './types.js'
 
-// transportContext is passed at runtime by x402HTTPResourceServer but not
-// declared on the SettleResultContext type. The offer-receipt extension
-// accesses it the same way via cast.
+// transportContext is set on the settle resultContext at runtime in
+// x402ResourceServer.settlePayment() (line ~788 in x402ResourceServer.ts):
+//   const resultContext: SettleResultContext = { ...context, result, transportContext }
+// The field exists in x402's source SettleResultContext type but the published
+// @x402/core@2.4.0 types haven't caught up. The offer-receipt extension in
+// x402 accesses it the same way via cast (see server.ts enrichSettlementResponse).
 interface TransportContext {
   responseBody?: Uint8Array | { toString(encoding: string): string }
 }
@@ -23,6 +26,11 @@ interface TransportContext {
  * - Post-payment (200): forwards response body to attestor, includes response
  *
  * Works with any scheme (escrow, exact, etc.).
+ *
+ * **Important:** This extension is a pass-through — it does not verify
+ * attestor responses. For client-side verifiability, the attestor must
+ * sign its responses (e.g., EIP-712) and the client must verify those
+ * signatures against a known attestor address.
  *
  * @param attestorUrl - Base URL of the attestor service
  * @param key - Extension key (default: 'attestation'). Use a custom key to
