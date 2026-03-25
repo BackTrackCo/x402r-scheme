@@ -1,6 +1,6 @@
 # x402r-scheme
 
-Escrow scheme bridging x402 protocol with x402r escrow contracts.
+Commerce scheme bridging x402 protocol with x402r commerce contracts.
 
 ## Commands
 
@@ -13,9 +13,9 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/evm/`:
 
 ```
-escrow/client      → createPaymentPayload()
-escrow/server      → EscrowServerScheme
-escrow/facilitator → Settlement and verification
+commerce/client      → createPaymentPayload()
+commerce/server      → CommerceServerScheme
+commerce/facilitator → Settlement and verification
 ```
 
 ## Dependencies

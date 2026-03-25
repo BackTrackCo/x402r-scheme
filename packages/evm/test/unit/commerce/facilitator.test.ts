@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { EscrowFacilitatorScheme } from '../../../src/escrow/facilitator/scheme'
+import { CommerceFacilitatorScheme } from '../../../src/commerce/facilitator/scheme'
 
-describe('EscrowFacilitatorScheme', () => {
+describe('CommerceFacilitatorScheme', () => {
   const createMockSigner = () => ({
     getAddresses: () => ['0x1234567890123456789012345678901234567890'] as readonly `0x${string}`[],
     readContract: vi.fn().mockResolvedValue(BigInt('1000000000')),
@@ -24,10 +24,10 @@ describe('EscrowFacilitatorScheme', () => {
 
     const mockPayload = {
       x402Version: 2,
-      scheme: 'escrow',
+      scheme: 'commerce',
       resource: { url: 'https://example.com/weather', method: 'GET' },
       accepted: {
-        scheme: 'escrow',
+        scheme: 'commerce',
         network: 'eip155:84532',
         amount: '1000000',
         asset: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
@@ -62,7 +62,7 @@ describe('EscrowFacilitatorScheme', () => {
     }
 
     const mockRequirements = {
-      scheme: 'escrow',
+      scheme: 'commerce',
       network: 'eip155:84532',
       amount: '1000000',
       asset: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' as const,
@@ -78,7 +78,7 @@ describe('EscrowFacilitatorScheme', () => {
     }
 
     it('should default to authorize when settlementMethod is absent', async () => {
-      const scheme = new EscrowFacilitatorScheme(mockSigner)
+      const scheme = new CommerceFacilitatorScheme(mockSigner)
       await scheme.settle(mockPayload, mockRequirements)
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('EscrowFacilitatorScheme', () => {
     })
 
     it('should call authorize when settlementMethod is explicitly "authorize"', async () => {
-      const scheme = new EscrowFacilitatorScheme(mockSigner)
+      const scheme = new CommerceFacilitatorScheme(mockSigner)
 
       const requirementsWithAuthorize = {
         ...mockRequirements,
@@ -109,7 +109,7 @@ describe('EscrowFacilitatorScheme', () => {
     })
 
     it('should call charge when settlementMethod is "charge"', async () => {
-      const scheme = new EscrowFacilitatorScheme(mockSigner)
+      const scheme = new CommerceFacilitatorScheme(mockSigner)
 
       const requirementsWithCharge = {
         ...mockRequirements,
@@ -129,7 +129,7 @@ describe('EscrowFacilitatorScheme', () => {
     })
 
     it('should fall back to authorize for unknown settlementMethod', async () => {
-      const scheme = new EscrowFacilitatorScheme(mockSigner)
+      const scheme = new CommerceFacilitatorScheme(mockSigner)
 
       const requirementsWithUnknown = {
         ...mockRequirements,
@@ -149,7 +149,7 @@ describe('EscrowFacilitatorScheme', () => {
     })
 
     it('should always target operatorAddress', async () => {
-      const scheme = new EscrowFacilitatorScheme(mockSigner)
+      const scheme = new CommerceFacilitatorScheme(mockSigner)
       await scheme.settle(mockPayload, mockRequirements)
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(

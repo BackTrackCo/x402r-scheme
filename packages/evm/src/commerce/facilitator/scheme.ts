@@ -1,8 +1,8 @@
 /**
- * Escrow Scheme - Facilitator
- * Handles verification and settlement of escrow payments.
+ * Commerce Scheme - Facilitator
+ * Handles verification and settlement of commerce payments.
  *
- * Implements x402's SchemeNetworkFacilitator interface so the escrow scheme
+ * Implements x402's SchemeNetworkFacilitator interface so the commerce scheme
  * is a drop-in for the x402 facilitator, just like ExactEvmScheme.
  */
 
@@ -18,40 +18,40 @@ import type { FacilitatorEvmSigner } from '@x402/evm'
 import { parseErc6492Signature } from 'viem'
 import { OPERATOR_ABI, ERC20_BALANCE_OF_ABI } from '../shared/constants'
 import { verifyERC3009Signature } from '../shared/nonce'
-import { isEscrowPayload, isEscrowExtra } from '../shared/types'
-import type { EscrowExtra, EscrowPayload } from '../shared/types'
+import { isCommercePayload, isCommerceExtra } from '../shared/types'
+import type { CommerceExtra, CommercePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /**
  * Build the on-chain PaymentInfo struct from the client's payload.
  * Used by both verify (simulation) and settle (transaction).
  */
-function buildPaymentInfo(escrowPayload: EscrowPayload) {
+function buildPaymentInfo(commercePayload: CommercePayload) {
   return {
-    operator: escrowPayload.paymentInfo.operator,
-    payer: escrowPayload.authorization.from,
-    receiver: escrowPayload.paymentInfo.receiver,
-    token: escrowPayload.paymentInfo.token,
-    maxAmount: BigInt(escrowPayload.paymentInfo.maxAmount),
-    preApprovalExpiry: escrowPayload.paymentInfo.preApprovalExpiry,
-    authorizationExpiry: escrowPayload.paymentInfo.authorizationExpiry,
-    refundExpiry: escrowPayload.paymentInfo.refundExpiry,
-    minFeeBps: escrowPayload.paymentInfo.minFeeBps,
-    maxFeeBps: escrowPayload.paymentInfo.maxFeeBps,
-    feeReceiver: escrowPayload.paymentInfo.feeReceiver,
-    salt: BigInt(escrowPayload.paymentInfo.salt),
+    operator: commercePayload.paymentInfo.operator,
+    payer: commercePayload.authorization.from,
+    receiver: commercePayload.paymentInfo.receiver,
+    token: commercePayload.paymentInfo.token,
+    maxAmount: BigInt(commercePayload.paymentInfo.maxAmount),
+    preApprovalExpiry: commercePayload.paymentInfo.preApprovalExpiry,
+    authorizationExpiry: commercePayload.paymentInfo.authorizationExpiry,
+    refundExpiry: commercePayload.paymentInfo.refundExpiry,
+    minFeeBps: commercePayload.paymentInfo.minFeeBps,
+    maxFeeBps: commercePayload.paymentInfo.maxFeeBps,
+    feeReceiver: commercePayload.paymentInfo.feeReceiver,
+    salt: BigInt(commercePayload.paymentInfo.salt),
   }
 }
 
 /**
- * Escrow Facilitator Scheme - implements x402's SchemeNetworkFacilitator
+ * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
  * The facilitator is operator-agnostic: it does not store operator/escrow/tokenCollector
  * config. Those values are set by the merchant via `refundable()` and arrive in
  * `requirements.extra` at verify/settle time.
  */
-export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
-  readonly scheme = 'escrow'
+export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
+  readonly scheme = 'commerce'
   readonly caipFamily = 'eip155:*'
 
   constructor(private signer: FacilitatorEvmSigner) {}
@@ -72,17 +72,17 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     _context?: FacilitatorContext,
   ): Promise<VerifyResponse> {
     // M5: Type guard instead of double cast
-    if (!isEscrowPayload(payload.payload)) {
+    if (!isCommercePayload(payload.payload)) {
       return {
         isValid: false,
         invalidReason: 'invalid_payload_format',
       }
     }
-    const escrowPayload = payload.payload as EscrowPayload
-    const payer = escrowPayload.authorization.from
+    const commercePayload = payload.payload as CommercePayload
+    const payer = commercePayload.authorization.from
 
     // Validate scheme on both payload and requirements
-    if (payload.accepted.scheme !== 'escrow' || requirements.scheme !== 'escrow') {
+    if (payload.accepted.scheme !== 'commerce' || requirements.scheme !== 'commerce') {
       return {
         isValid: false,
         invalidReason: 'unsupported_scheme',
@@ -110,20 +110,20 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // M5: Type guard for extra
-    if (!isEscrowExtra(requirements.extra)) {
+    if (!isCommerceExtra(requirements.extra)) {
       return {
         isValid: false,
-        invalidReason: 'invalid_escrow_extra',
+        invalidReason: 'invalid_commerce_extra',
         payer,
       }
     }
-    const extra = requirements.extra as EscrowExtra
+    const extra = requirements.extra as CommerceExtra
     const chainId = parseChainId(requirements.network)
 
     // Time window validation
     const now = Math.floor(Date.now() / 1000)
-    const validBefore = Number(escrowPayload.authorization.validBefore)
-    const validAfter = Number(escrowPayload.authorization.validAfter)
+    const validBefore = Number(commercePayload.authorization.validBefore)
+    const validAfter = Number(commercePayload.authorization.validAfter)
 
     if (validBefore <= now + 6) {
       return {
@@ -144,12 +144,12 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     // Extract inner signature for verification if EIP-6492 wrapped.
     // The contract's ERC6492SignatureHandler handles deployment; the facilitator
     // only needs the inner ECDSA signature for ecrecover verification.
-    const { signature: signatureForVerify } = parseErc6492Signature(escrowPayload.signature)
+    const { signature: signatureForVerify } = parseErc6492Signature(commercePayload.signature)
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
       this.signer,
-      escrowPayload.authorization,
+      commercePayload.authorization,
       signatureForVerify,
       { ...extra, chainId },
       requirements.asset as `0x${string}`,
@@ -158,13 +158,13 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     if (!isValidSignature) {
       return {
         isValid: false,
-        invalidReason: 'invalid_escrow_signature',
+        invalidReason: 'invalid_commerce_signature',
         payer,
       }
     }
 
     // Verify amount exactly matches requirements
-    if (BigInt(escrowPayload.authorization.value) !== BigInt(requirements.amount)) {
+    if (BigInt(commercePayload.authorization.value) !== BigInt(requirements.amount)) {
       return {
         isValid: false,
         invalidReason: 'amount_mismatch',
@@ -173,7 +173,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify authorization recipient is the token collector
-    if (escrowPayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
+    if (commercePayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
       return {
         isValid: false,
         invalidReason: 'token_collector_mismatch',
@@ -182,7 +182,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify token matches
-    if (escrowPayload.paymentInfo.token.toLowerCase() !== requirements.asset.toLowerCase()) {
+    if (commercePayload.paymentInfo.token.toLowerCase() !== requirements.asset.toLowerCase()) {
       return {
         isValid: false,
         invalidReason: 'token_mismatch',
@@ -191,7 +191,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify receiver matches
-    if (escrowPayload.paymentInfo.receiver.toLowerCase() !== requirements.payTo.toLowerCase()) {
+    if (commercePayload.paymentInfo.receiver.toLowerCase() !== requirements.payTo.toLowerCase()) {
       return {
         isValid: false,
         invalidReason: 'receiver_mismatch',
@@ -203,12 +203,12 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
     // spending gas (balance, consumed nonces, domain mismatches, contract errors).
     const settlementMethod = extra.settlementMethod ?? 'authorize'
     const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
-    const paymentInfo = buildPaymentInfo(escrowPayload)
+    const paymentInfo = buildPaymentInfo(commercePayload)
     const settlementArgs = [
       paymentInfo,
-      BigInt(escrowPayload.authorization.value),
+      BigInt(commercePayload.authorization.value),
       extra.tokenCollector,
-      escrowPayload.signature,
+      commercePayload.signature,
     ] as const
 
     try {
@@ -271,10 +271,10 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    const escrowPayload = payload.payload as unknown as EscrowPayload
-    const extra = requirements.extra as unknown as EscrowExtra
+    const commercePayload = payload.payload as unknown as CommercePayload
+    const extra = requirements.extra as unknown as CommerceExtra
 
-    const paymentInfo = buildPaymentInfo(escrowPayload)
+    const paymentInfo = buildPaymentInfo(commercePayload)
     const settlementMethod = extra.settlementMethod ?? 'authorize'
     const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
 
@@ -285,9 +285,9 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
         functionName,
         args: [
           paymentInfo,
-          BigInt(escrowPayload.authorization.value),
+          BigInt(commercePayload.authorization.value),
           extra.tokenCollector,
-          escrowPayload.signature,
+          commercePayload.signature,
         ],
       })
 
@@ -306,7 +306,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
           errorReason: 'transaction_reverted',
           transaction: txHash,
           network: requirements.network,
-          payer: escrowPayload.authorization.from,
+          payer: commercePayload.authorization.from,
         }
       }
 
@@ -314,7 +314,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
         success: true,
         transaction: txHash,
         network: requirements.network,
-        payer: escrowPayload.authorization.from,
+        payer: commercePayload.authorization.from,
       }
     } catch (error) {
       return {
@@ -322,7 +322,7 @@ export class EscrowFacilitatorScheme implements SchemeNetworkFacilitator {
         errorReason: error instanceof Error ? error.message : 'Settlement failed',
         transaction: '',
         network: requirements.network,
-        payer: escrowPayload.authorization.from,
+        payer: commercePayload.authorization.from,
       }
     }
   }

@@ -1,7 +1,7 @@
 import type { Network } from '@x402/core/types'
 import type { FacilitatorEvmSigner } from '@x402/evm'
 import { x402Facilitator } from '@x402/core/facilitator'
-import { EscrowFacilitatorScheme } from './scheme'
+import { CommerceFacilitatorScheme } from './scheme'
 
 export interface EvmFacilitatorConfig {
   signer: FacilitatorEvmSigner
@@ -9,7 +9,7 @@ export interface EvmFacilitatorConfig {
 }
 
 /**
- * Register escrow scheme with x402Facilitator
+ * Register commerce scheme with x402Facilitator
  *
  * The facilitator is operator-agnostic — it supports any operator. Operator,
  * escrow, and tokenCollector addresses are provided per-request by the merchant
@@ -18,16 +18,16 @@ export interface EvmFacilitatorConfig {
  * @example
  * ```typescript
  * const facilitator = new x402Facilitator();
- * registerEscrowEvmScheme(facilitator, {
+ * registerCommerceEvmScheme(facilitator, {
  *   signer: evmSigner,
  *   networks: "eip155:84532",
  * });
  * ```
  */
-export function registerEscrowEvmScheme(
+export function registerCommerceEvmScheme(
   facilitator: x402Facilitator,
   config: EvmFacilitatorConfig,
 ): x402Facilitator {
-  facilitator.register(config.networks, new EscrowFacilitatorScheme(config.signer))
+  facilitator.register(config.networks, new CommerceFacilitatorScheme(config.signer))
   return facilitator
 }
