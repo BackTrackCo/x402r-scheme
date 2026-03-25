@@ -6,6 +6,7 @@ const baseConfig = {
     'commerce/client/index': 'src/commerce/client/index.ts',
     'commerce/server/index': 'src/commerce/server/index.ts',
     'commerce/facilitator/index': 'src/commerce/facilitator/index.ts',
+    'extensions/attestation/index': 'src/extensions/attestation/index.ts',
   },
   dts: { resolve: true },
   sourcemap: true,

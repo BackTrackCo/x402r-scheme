@@ -40,6 +40,16 @@
         "default": "./dist/cjs/commerce/server/index.js"
       }
     },
+    "./extensions/attestation": {
+      "import": {
+        "types": "./dist/esm/extensions/attestation/index.d.mts",
+        "default": "./dist/esm/extensions/attestation/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/extensions/attestation/index.d.ts",
+        "default": "./dist/cjs/extensions/attestation/index.js"
+      }
+    },
     "./commerce/facilitator": {
       "import": {
         "types": "./dist/esm/commerce/facilitator/index.d.mts",
