@@ -1,6 +1,13 @@
 import type { ResourceServerExtension, PaymentRequiredContext } from '@x402/core/types'
 import { ATTESTATION_KEY } from './types.js'
 
+type ErrorHandler = (error: unknown) => void
+
+export interface AttestationExtension extends ResourceServerExtension {
+  /** Set a custom error handler. Defaults to `console.warn`. */
+  onError: (handler: ErrorHandler) => AttestationExtension
+}
+
 /**
  * Create the attestation extension for a resource server.
  *
@@ -20,12 +27,21 @@ import { ATTESTATION_KEY } from './types.js'
  * @param attestorUrl - Base URL of the attestor service
  * @param key - Extension key (default: 'attestation'). Use a custom key to
  *              support multiple attestors on the same server.
+ *
+ * @example
+ * ```ts
+ * createAttestationExtension('http://arbiter:3001')
+ *   .onError((err) => sentry.captureException(err))
+ * ```
  */
 export function createAttestationExtension(
   attestorUrl: string,
   key: string = ATTESTATION_KEY,
-): ResourceServerExtension {
-  return {
+): AttestationExtension {
+  let errorHandler: ErrorHandler = (err) =>
+    console.warn(`[attestation:${key}] identity fetch failed:`, err)
+
+  const ext: AttestationExtension = {
     key,
 
     enrichPaymentRequiredResponse: async (
@@ -44,18 +60,23 @@ export function createAttestationExtension(
           }),
         })
         if (!res.ok) {
-          console.warn(
-            `[attestation:${key}] identity fetch failed: ${res.status} ${res.statusText}`,
-          )
+          errorHandler(new Error(`${res.status} ${res.statusText}`))
           return undefined
         }
         return { info: { identity: await res.json() } }
       } catch (err) {
-        console.warn(`[attestation:${key}] identity fetch failed:`, err)
+        errorHandler(err)
         return undefined
       }
     },
+
+    onError(handler: ErrorHandler) {
+      errorHandler = handler
+      return ext
+    },
   }
+
+  return ext
 }
 
 /**
