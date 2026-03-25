@@ -1,27 +1,27 @@
 import type { Network } from '@x402/core/types'
 import { x402ResourceServer } from '@x402/core/server'
-import { EscrowServerScheme } from './scheme'
+import { CommerceServerScheme } from './scheme'
 
 export interface EvmResourceServerConfig {
   networks?: Network | Network[]
 }
 
 /**
- * Register escrow server scheme with x402ResourceServer
+ * Register commerce server scheme with x402ResourceServer
  *
  * @example
  * ```typescript
  * const server = new x402ResourceServer(facilitatorConfig);
- * registerEscrowEvmScheme(server);
+ * registerCommerceEvmScheme(server);
  * // or with specific networks:
- * registerEscrowEvmScheme(server, { networks: "eip155:84532" });
+ * registerCommerceEvmScheme(server, { networks: "eip155:84532" });
  * ```
  */
-export function registerEscrowEvmScheme(
+export function registerCommerceEvmScheme(
   server: x402ResourceServer,
   config: EvmResourceServerConfig = {},
 ): x402ResourceServer {
-  const scheme = new EscrowServerScheme()
+  const scheme = new CommerceServerScheme()
   const networks = config.networks
     ? Array.isArray(config.networks)
       ? config.networks

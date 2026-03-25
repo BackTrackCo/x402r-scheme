@@ -1,7 +1,7 @@
 /**
- * Type guard for EscrowPayload
+ * Type guard for CommercePayload
  */
-export function isEscrowPayload(value: unknown): value is EscrowPayload {
+export function isCommercePayload(value: unknown): value is CommercePayload {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -12,9 +12,9 @@ export function isEscrowPayload(value: unknown): value is EscrowPayload {
 }
 
 /**
- * Type guard for EscrowExtra
+ * Type guard for CommerceExtra
  */
-export function isEscrowExtra(value: unknown): value is EscrowExtra {
+export function isCommerceExtra(value: unknown): value is CommerceExtra {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -24,8 +24,8 @@ export function isEscrowExtra(value: unknown): value is EscrowExtra {
   )
 }
 
-// EscrowExtra - fields in PaymentRequirements.extra
-export interface EscrowExtra {
+// CommerceExtra - fields in PaymentRequirements.extra
+export interface CommerceExtra {
   escrowAddress: `0x${string}`
   operatorAddress: `0x${string}`
   tokenCollector: `0x${string}`
@@ -40,8 +40,8 @@ export interface EscrowExtra {
   version: string // EIP-712 domain version (e.g., "2" for USDC)
 }
 
-// EscrowPayload - the payload field in PaymentPayload
-export interface EscrowPayload {
+// CommercePayload - the payload field in PaymentPayload
+export interface CommercePayload {
   authorization: {
     from: `0x${string}`
     to: `0x${string}`
