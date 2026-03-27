@@ -144,7 +144,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     // Extract inner signature for verification if EIP-6492 wrapped.
     // The contract's ERC6492SignatureHandler handles deployment; the facilitator
     // only needs the inner ECDSA signature for ecrecover verification.
-    const { signature: signatureForVerify } = parseErc6492Signature(commercePayload.signature)
+    const { signature: signatureForVerify } = parseErc6492Signature(commercePayload.collectorData)
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
@@ -208,7 +208,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
       paymentInfo,
       BigInt(commercePayload.authorization.value),
       extra.tokenCollector,
-      commercePayload.signature,
+      commercePayload.collectorData,
     ] as const
 
     try {
@@ -287,7 +287,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
           paymentInfo,
           BigInt(commercePayload.authorization.value),
           extra.tokenCollector,
-          commercePayload.signature,
+          commercePayload.collectorData,
         ],
       })
 

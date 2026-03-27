@@ -46,7 +46,7 @@ describe('CommerceEvmScheme', () => {
       expect(result.x402Version).toBe(2)
       expect(result.payload).toBeDefined()
       expect(result.payload.authorization).toBeDefined()
-      expect(result.payload.signature).toBe('0xdeadbeef')
+      expect(result.payload.collectorData).toBe('0xdeadbeef')
       expect(result.payload.paymentInfo).toBeDefined()
     })
 

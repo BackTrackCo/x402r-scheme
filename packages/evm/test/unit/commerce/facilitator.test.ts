@@ -44,7 +44,7 @@ describe('CommerceFacilitatorScheme', () => {
           validBefore: futureTimestamp,
           nonce: '0x1234567890123456789012345678901234567890123456789012345678901234' as const,
         },
-        signature: '0xabcd' as const,
+        collectorData: '0xabcd' as const,
         paymentInfo: {
           operator: '0xcccccccccccccccccccccccccccccccccccccccc' as const,
           receiver: '0xdddddddddddddddddddddddddddddddddddddddd' as const,

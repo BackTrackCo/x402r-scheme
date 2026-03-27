@@ -6,7 +6,7 @@ export function isCommercePayload(value: unknown): value is CommercePayload {
     typeof value === 'object' &&
     value !== null &&
     'authorization' in value &&
-    'signature' in value &&
+    'collectorData' in value &&
     'paymentInfo' in value
   )
 }
@@ -50,7 +50,7 @@ export interface CommercePayload {
     validBefore: string
     nonce: `0x${string}`
   }
-  signature: `0x${string}`
+  collectorData: `0x${string}`
   paymentInfo: {
     operator: `0x${string}`
     receiver: `0x${string}`

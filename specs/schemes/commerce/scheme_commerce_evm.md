@@ -97,7 +97,7 @@ Commerce-accepting servers advertise with scheme `commerce`:
       "validBefore": "1740672154",
       "nonce": "0xf374...3480"
     },
-    "signature": "0x2d6a...571c",
+    "collectorData": "0x2d6a...571c",
     "paymentInfo": {
       "operator": "0xOperatorAddress",
       "receiver": "0xReceiverAddress",
@@ -129,7 +129,7 @@ This ties the off-chain signature to the specific escrow contract and payment te
 
 The facilitator performs these checks in order:
 
-1. **Type guard**: Verify `payload` contains `authorization`, `signature`, and `paymentInfo` fields
+1. **Type guard**: Verify `payload` contains `authorization`, `collectorData`, and `paymentInfo` fields
 2. **Scheme match**: Verify `requirements.scheme === "commerce"` and `payload.accepted.scheme === "commerce"`
 3. **Network match**: Verify `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`
 4. **Extra validation**: Verify `requirements.extra` contains required commerce fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
@@ -143,7 +143,7 @@ The facilitator performs these checks in order:
 
 ### EIP-6492 Support
 
-For smart wallet clients, the signature may be EIP-6492 wrapped (containing deployment bytecode). The facilitator extracts the inner ECDSA signature for verification. The on-chain `ERC6492SignatureHandler` in the token collector handles wallet deployment during settlement.
+For smart wallet clients, `collectorData` may be EIP-6492 wrapped (containing deployment bytecode). The facilitator extracts the inner ECDSA signature for verification. The on-chain `ERC6492SignatureHandler` in the token collector handles wallet deployment during settlement.
 
 ## Settlement Logic
 
@@ -157,7 +157,7 @@ Settlement is performed by the facilitator calling the operator:
 
 The operator handles:
 
-- Calling the token collector to execute `receiveWithAuthorization` with the client's signature (EIP-712 primary type: `ReceiveWithAuthorization`, not `TransferWithAuthorization`)
+- Calling the token collector with the client's `collectorData` (default: ERC-3009 `ReceiveWithAuthorization` signature; may contain additional data for operator conditions/recorders)
 - Routing funds to escrow (authorize) or directly to receiver (charge)
 - Validating fee bounds against the client-signed `PaymentInfo`
 
@@ -169,7 +169,7 @@ The commerce scheme uses the standard x402 error codes plus these scheme-specifi
 
 | Error Code                    | Description                                                                          |
 | :---------------------------- | :----------------------------------------------------------------------------------- |
-| `invalid_payload_format`      | Payload missing `authorization`, `signature`, or `paymentInfo`                       |
+| `invalid_payload_format`      | Payload missing `authorization`, `collectorData`, or `paymentInfo`                   |
 | `unsupported_scheme`          | Scheme is not `commerce`                                                             |
 | `network_mismatch`            | Payload network does not match requirements                                          |
 | `invalid_network`             | Network format is not `eip155:<chainId>`                                             |

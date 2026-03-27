@@ -102,7 +102,7 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
 
     return {
       x402Version,
-      payload: { authorization, signature, paymentInfo },
+      payload: { authorization, collectorData: signature, paymentInfo },
     }
   }
 }
