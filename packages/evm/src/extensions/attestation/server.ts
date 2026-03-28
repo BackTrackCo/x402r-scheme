@@ -42,8 +42,7 @@ export function createAttestationExtension(
 ): ResourceServerExtension {
   const key = options?.key ?? ATTESTATION_KEY
   const errorHandler: ErrorHandler =
-    options?.onError ??
-    ((err) => console.warn(`[attestation:${key}] identity fetch failed:`, err))
+    options?.onError ?? ((err) => console.warn(`[attestation:${key}] identity fetch failed:`, err))
 
   return {
     key,
