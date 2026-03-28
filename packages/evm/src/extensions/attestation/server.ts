@@ -63,12 +63,18 @@ export function createAttestationExtension(
           }),
         })
         if (!res.ok) {
-          errorHandler(new Error(`${res.status} ${res.statusText}`))
+          errorHandler(
+            new Error(`[attestation:${key}] ${attestorUrl}: ${res.status} ${res.statusText}`),
+          )
           return undefined
         }
         return { info: { identity: await res.json() } }
       } catch (err) {
-        errorHandler(err)
+        errorHandler(
+          err instanceof Error
+            ? Object.assign(err, { message: `[attestation:${key}] ${attestorUrl}: ${err.message}` })
+            : new Error(`[attestation:${key}] ${attestorUrl}: ${err}`),
+        )
         return undefined
       }
     },

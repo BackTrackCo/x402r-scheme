@@ -77,7 +77,9 @@ describe('createAttestationExtension', () => {
       expect(result).toBeUndefined()
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('[attestation:attestation]'),
-        expect.objectContaining({ message: '500 Internal Server Error' }),
+        expect.objectContaining({
+          message: expect.stringContaining('500 Internal Server Error'),
+        }),
       )
     })
 
@@ -105,7 +107,7 @@ describe('createAttestationExtension', () => {
       )
     })
 
-    it('calls onError on network error', async () => {
+    it('calls onError with context on network error', async () => {
       const onError = vi.fn()
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('ECONNREFUSED'))
 
@@ -114,9 +116,13 @@ describe('createAttestationExtension', () => {
 
       expect(result).toBeUndefined()
       expect(onError).toHaveBeenCalledWith(expect.any(Error))
+      const msg = (onError.mock.calls[0][0] as Error).message
+      expect(msg).toContain('[attestation:attestation]')
+      expect(msg).toContain('http://arbiter:3001')
+      expect(msg).toContain('ECONNREFUSED')
     })
 
-    it('calls onError on non-2xx response', async () => {
+    it('calls onError with context on non-2xx response', async () => {
       const onError = vi.fn()
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
         new Response('error', { status: 503, statusText: 'Service Unavailable' }),
@@ -127,7 +133,10 @@ describe('createAttestationExtension', () => {
 
       expect(result).toBeUndefined()
       expect(onError).toHaveBeenCalledWith(expect.any(Error))
-      expect((onError.mock.calls[0][0] as Error).message).toBe('503 Service Unavailable')
+      const msg = (onError.mock.calls[0][0] as Error).message
+      expect(msg).toContain('[attestation:attestation]')
+      expect(msg).toContain('http://arbiter:3001')
+      expect(msg).toContain('503 Service Unavailable')
     })
   })
 })
