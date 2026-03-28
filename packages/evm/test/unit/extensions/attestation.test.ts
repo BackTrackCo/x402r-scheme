@@ -30,7 +30,7 @@ describe('createAttestationExtension', () => {
   })
 
   it('accepts custom key', () => {
-    const ext = createAttestationExtension('http://arbiter:3001', 'compliance')
+    const ext = createAttestationExtension('http://arbiter:3001', { key: 'compliance' })
     expect(ext.key).toBe('compliance')
   })
 
@@ -75,7 +75,12 @@ describe('createAttestationExtension', () => {
       const result = await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
       expect(result).toBeUndefined()
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('500 Internal Server Error'))
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[attestation] identity fetch failed:',
+        expect.objectContaining({
+          message: expect.stringContaining('500 Internal Server Error'),
+        }),
+      )
     })
 
     it('returns undefined on network error', async () => {
@@ -89,17 +94,48 @@ describe('createAttestationExtension', () => {
       expect(warnSpy).toHaveBeenCalled()
     })
 
-    it('uses custom key in warn messages', async () => {
+    it('includes key and url in error message', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('fail'))
 
-      const ext = createAttestationExtension('http://arbiter:3001', 'my-arbiter')
+      const ext = createAttestationExtension('http://arbiter:3001', { key: 'my-arbiter' })
       await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[attestation:my-arbiter]'),
-        expect.anything(),
+      const err = warnSpy.mock.calls[0][1] as Error
+      expect(err.message).toContain('[attestation:my-arbiter]')
+      expect(err.message).toContain('http://arbiter:3001')
+    })
+
+    it('calls onError with context on network error', async () => {
+      const onError = vi.fn()
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('ECONNREFUSED'))
+
+      const ext = createAttestationExtension('http://arbiter:3001', { onError })
+      const result = await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
+
+      expect(result).toBeUndefined()
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+      const msg = (onError.mock.calls[0][0] as Error).message
+      expect(msg).toContain('[attestation:attestation]')
+      expect(msg).toContain('http://arbiter:3001')
+      expect(msg).toContain('ECONNREFUSED')
+    })
+
+    it('calls onError with context on non-2xx response', async () => {
+      const onError = vi.fn()
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response('error', { status: 503, statusText: 'Service Unavailable' }),
       )
+
+      const ext = createAttestationExtension('http://arbiter:3001', { onError })
+      const result = await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
+
+      expect(result).toBeUndefined()
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+      const msg = (onError.mock.calls[0][0] as Error).message
+      expect(msg).toContain('[attestation:attestation]')
+      expect(msg).toContain('http://arbiter:3001')
+      expect(msg).toContain('503 Service Unavailable')
     })
   })
 })
