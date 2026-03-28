@@ -76,7 +76,7 @@ describe('createAttestationExtension', () => {
 
       expect(result).toBeUndefined()
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[attestation:attestation]'),
+        '[attestation] identity fetch failed:',
         expect.objectContaining({
           message: expect.stringContaining('500 Internal Server Error'),
         }),
@@ -94,17 +94,16 @@ describe('createAttestationExtension', () => {
       expect(warnSpy).toHaveBeenCalled()
     })
 
-    it('uses custom key in warn messages', async () => {
+    it('includes key and url in error message', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('fail'))
 
       const ext = createAttestationExtension('http://arbiter:3001', { key: 'my-arbiter' })
       await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[attestation:my-arbiter]'),
-        expect.anything(),
-      )
+      const err = warnSpy.mock.calls[0][1] as Error
+      expect(err.message).toContain('[attestation:my-arbiter]')
+      expect(err.message).toContain('http://arbiter:3001')
     })
 
     it('calls onError with context on network error', async () => {

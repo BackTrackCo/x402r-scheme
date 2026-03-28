@@ -42,7 +42,7 @@ export function createAttestationExtension(
 ): ResourceServerExtension {
   const key = options?.key ?? ATTESTATION_KEY
   const errorHandler: ErrorHandler =
-    options?.onError ?? ((err) => console.warn(`[attestation:${key}] identity fetch failed:`, err))
+    options?.onError ?? ((err) => console.warn('[attestation] identity fetch failed:', err))
 
   return {
     key,
@@ -71,9 +71,12 @@ export function createAttestationExtension(
         return { info: { identity: await res.json() } }
       } catch (err) {
         errorHandler(
-          err instanceof Error
-            ? Object.assign(err, { message: `[attestation:${key}] ${attestorUrl}: ${err.message}` })
-            : new Error(`[attestation:${key}] ${attestorUrl}: ${err}`),
+          new Error(
+            `[attestation:${key}] ${attestorUrl}: ${err instanceof Error ? err.message : err}`,
+            {
+              cause: err,
+            },
+          ),
         )
         return undefined
       }
