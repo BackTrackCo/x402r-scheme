@@ -30,7 +30,7 @@ describe('createAttestationExtension', () => {
   })
 
   it('accepts custom key', () => {
-    const ext = createAttestationExtension('http://arbiter:3001', 'compliance')
+    const ext = createAttestationExtension('http://arbiter:3001', { key: 'compliance' })
     expect(ext.key).toBe('compliance')
   })
 
@@ -96,7 +96,7 @@ describe('createAttestationExtension', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('fail'))
 
-      const ext = createAttestationExtension('http://arbiter:3001', 'my-arbiter')
+      const ext = createAttestationExtension('http://arbiter:3001', { key: 'my-arbiter' })
       await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
       expect(warnSpy).toHaveBeenCalledWith(
@@ -105,24 +105,24 @@ describe('createAttestationExtension', () => {
       )
     })
 
-    it('calls chained .onError() on network error', async () => {
+    it('calls onError on network error', async () => {
       const onError = vi.fn()
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('ECONNREFUSED'))
 
-      const ext = createAttestationExtension('http://arbiter:3001').onError(onError)
+      const ext = createAttestationExtension('http://arbiter:3001', { onError })
       const result = await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
       expect(result).toBeUndefined()
       expect(onError).toHaveBeenCalledWith(expect.any(Error))
     })
 
-    it('calls chained .onError() on non-2xx response', async () => {
+    it('calls onError on non-2xx response', async () => {
       const onError = vi.fn()
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
         new Response('error', { status: 503, statusText: 'Service Unavailable' }),
       )
 
-      const ext = createAttestationExtension('http://arbiter:3001').onError(onError)
+      const ext = createAttestationExtension('http://arbiter:3001', { onError })
       const result = await ext.enrichPaymentRequiredResponse!({}, mockContext as any)
 
       expect(result).toBeUndefined()

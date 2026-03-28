@@ -1,11 +1,13 @@
 import type { ResourceServerExtension, PaymentRequiredContext } from '@x402/core/types'
 import { ATTESTATION_KEY } from './types.js'
 
-type ErrorHandler = (error: unknown) => void
+export type ErrorHandler = (error: unknown) => void
 
-export interface AttestationExtension extends ResourceServerExtension {
-  /** Set a custom error handler. Defaults to `console.warn`. */
-  onError: (handler: ErrorHandler) => AttestationExtension
+export interface AttestationExtensionOptions {
+  /** Extension key (default: 'attestation'). Use a custom key to support multiple attestors. */
+  key?: string
+  /** Custom error handler. Defaults to `console.warn`. */
+  onError?: ErrorHandler
 }
 
 /**
@@ -25,23 +27,25 @@ export interface AttestationExtension extends ResourceServerExtension {
  * signatures against a known attestor address.
  *
  * @param attestorUrl - Base URL of the attestor service
- * @param key - Extension key (default: 'attestation'). Use a custom key to
- *              support multiple attestors on the same server.
+ * @param options - Optional configuration
  *
  * @example
  * ```ts
- * createAttestationExtension('http://arbiter:3001')
- *   .onError((err) => sentry.captureException(err))
+ * createAttestationExtension('http://arbiter:3001', {
+ *   onError: (err) => sentry.captureException(err),
+ * })
  * ```
  */
 export function createAttestationExtension(
   attestorUrl: string,
-  key: string = ATTESTATION_KEY,
-): AttestationExtension {
-  let errorHandler: ErrorHandler = (err) =>
-    console.warn(`[attestation:${key}] identity fetch failed:`, err)
+  options?: AttestationExtensionOptions,
+): ResourceServerExtension {
+  const key = options?.key ?? ATTESTATION_KEY
+  const errorHandler: ErrorHandler =
+    options?.onError ??
+    ((err) => console.warn(`[attestation:${key}] identity fetch failed:`, err))
 
-  const ext: AttestationExtension = {
+  return {
     key,
 
     enrichPaymentRequiredResponse: async (
@@ -69,14 +73,7 @@ export function createAttestationExtension(
         return undefined
       }
     },
-
-    onError(handler: ErrorHandler) {
-      errorHandler = handler
-      return ext
-    },
   }
-
-  return ext
 }
 
 /**
