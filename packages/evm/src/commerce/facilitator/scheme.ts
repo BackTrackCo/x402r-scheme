@@ -131,7 +131,8 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     // Default tokenCollector to commerce-payments ERC3009PaymentCollector if not set
     const extra = {
       ...rawExtra,
-      tokenCollector: rawExtra.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`,
+      tokenCollector:
+        rawExtra.tokenCollector ?? (COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`),
     }
     const chainId = parseChainId(requirements.network)
 
@@ -290,7 +291,8 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     const rawExtra = requirements.extra as unknown as CommerceExtra
     const extra = {
       ...rawExtra,
-      tokenCollector: rawExtra.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`,
+      tokenCollector:
+        rawExtra.tokenCollector ?? (COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`),
     }
 
     const paymentInfo = buildPaymentInfo(commercePayload)
