@@ -15,17 +15,12 @@ export function isCommercePayload(value: unknown): value is CommercePayload {
  * Type guard for CommerceExtra
  */
 export function isCommerceExtra(value: unknown): value is CommerceExtra {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'escrowAddress' in value &&
-    'operatorAddress' in value
-  )
+  return typeof value === 'object' && value !== null && 'operatorAddress' in value
 }
 
 // CommerceExtra - fields in PaymentRequirements.extra
 export interface CommerceExtra {
-  escrowAddress: `0x${string}`
+  escrowAddress?: `0x${string}` // defaults to commerce-payments AuthCaptureEscrow
   operatorAddress: `0x${string}`
   tokenCollector?: `0x${string}` // defaults to commerce-payments ERC3009PaymentCollector
   preApprovalExpirySeconds?: number

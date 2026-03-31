@@ -28,9 +28,12 @@ import type { CommerceExtra, CommercePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /** Resolve CommerceExtra with commerce-payments defaults for optional fields. */
-function resolveExtra(raw: CommerceExtra): CommerceExtra & { tokenCollector: `0x${string}` } {
+function resolveExtra(
+  raw: CommerceExtra,
+): CommerceExtra & { escrowAddress: `0x${string}`; tokenCollector: `0x${string}` } {
   return {
     ...raw,
+    escrowAddress: raw.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW,
     tokenCollector: raw.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
   }
 }

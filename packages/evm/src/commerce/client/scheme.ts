@@ -15,7 +15,11 @@ import type {
 import type { ClientEvmSigner } from '@x402/evm'
 import { computeCommerceNonce, signERC3009, generateSalt } from '../shared/nonce'
 import { zeroAddress } from 'viem'
-import { MAX_UINT48, COMMERCE_PAYMENTS_TOKEN_COLLECTOR } from '../shared/constants'
+import {
+  MAX_UINT48,
+  COMMERCE_PAYMENTS_ESCROW,
+  COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+} from '../shared/constants'
 import type { CommerceExtra } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
@@ -51,7 +55,7 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
     }
 
     const {
-      escrowAddress,
+      escrowAddress = COMMERCE_PAYMENTS_ESCROW,
       operatorAddress,
       tokenCollector = COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
       minFeeBps = 0,
