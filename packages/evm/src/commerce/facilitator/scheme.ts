@@ -16,16 +16,24 @@ import type {
 } from '@x402/core/types'
 import type { FacilitatorEvmSigner } from '@x402/evm'
 import { parseErc6492Signature } from 'viem'
-import { OPERATOR_ABI, ERC20_BALANCE_OF_ABI } from '../shared/constants'
+import {
+  OPERATOR_ABI,
+  ERC20_BALANCE_OF_ABI,
+  COMMERCE_PAYMENTS_ESCROW,
+  COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+} from '../shared/constants'
 import { verifyERC3009Signature } from '../shared/nonce'
 import { isCommercePayload, isCommerceExtra } from '../shared/types'
 import type { CommerceExtra, CommercePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
-// Base commerce-payments canonical addresses.
-// https://github.com/base/commerce-payments
-const COMMERCE_PAYMENTS_ESCROW = '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff'
-const COMMERCE_PAYMENTS_TOKEN_COLLECTOR = '0x0E3dF9510de65469C4518D7843919c0b8C7A7757'
+/** Resolve CommerceExtra with commerce-payments defaults for optional fields. */
+function resolveExtra(raw: CommerceExtra): CommerceExtra & { tokenCollector: `0x${string}` } {
+  return {
+    ...raw,
+    tokenCollector: raw.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+  }
+}
 
 /**
  * Build the on-chain PaymentInfo struct from the client's payload.
@@ -127,13 +135,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         payer,
       }
     }
-    const rawExtra = requirements.extra as CommerceExtra
-    // Default tokenCollector to commerce-payments ERC3009PaymentCollector if not set
-    const extra = {
-      ...rawExtra,
-      tokenCollector:
-        rawExtra.tokenCollector ?? (COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`),
-    }
+    const extra = resolveExtra(requirements.extra as CommerceExtra)
     const chainId = parseChainId(requirements.network)
 
     // Time window validation

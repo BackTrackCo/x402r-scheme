@@ -1,6 +1,13 @@
 export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
+// Base commerce-payments canonical addresses.
+// https://github.com/base/commerce-payments
+export const COMMERCE_PAYMENTS_ESCROW =
+  '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff' as const satisfies `0x${string}`
+export const COMMERCE_PAYMENTS_TOKEN_COLLECTOR =
+  '0x0E3dF9510de65469C4518D7843919c0b8C7A7757' as const satisfies `0x${string}`
+
 // PaymentInfo struct for AuthCaptureEscrow (matches commerce-payments contract)
 export const PAYMENT_INFO_COMPONENTS = [
   { name: 'operator', type: 'address' },

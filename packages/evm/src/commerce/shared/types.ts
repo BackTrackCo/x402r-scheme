@@ -27,7 +27,7 @@ export function isCommerceExtra(value: unknown): value is CommerceExtra {
 export interface CommerceExtra {
   escrowAddress: `0x${string}`
   operatorAddress: `0x${string}`
-  tokenCollector?: `0x${string}` // defaults to commerce-payments ERC3009TokenCollector
+  tokenCollector?: `0x${string}` // defaults to commerce-payments ERC3009PaymentCollector
   preApprovalExpirySeconds?: number
   authorizationExpirySeconds?: number
   refundExpirySeconds?: number

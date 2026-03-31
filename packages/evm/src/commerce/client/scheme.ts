@@ -15,14 +15,9 @@ import type {
 import type { ClientEvmSigner } from '@x402/evm'
 import { computeCommerceNonce, signERC3009, generateSalt } from '../shared/nonce'
 import { zeroAddress } from 'viem'
-import { MAX_UINT48 } from '../shared/constants'
+import { MAX_UINT48, COMMERCE_PAYMENTS_TOKEN_COLLECTOR } from '../shared/constants'
 import type { CommerceExtra } from '../shared/types'
 import { parseChainId } from '../shared/utils'
-
-// Base commerce-payments canonical ERC3009PaymentCollector address.
-// Used as default when tokenCollector is not in requirements.extra.
-// https://github.com/base/commerce-payments
-const DEFAULT_TOKEN_COLLECTOR = '0x0E3dF9510de65469C4518D7843919c0b8C7A7757' as const
 
 /**
  * Commerce Client Scheme - implements x402's SchemeNetworkClient
@@ -58,7 +53,7 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
     const {
       escrowAddress,
       operatorAddress,
-      tokenCollector = DEFAULT_TOKEN_COLLECTOR,
+      tokenCollector = COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
       minFeeBps = 0,
       maxFeeBps = 0,
       feeReceiver,
