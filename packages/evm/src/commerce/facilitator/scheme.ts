@@ -59,31 +59,45 @@ function buildPaymentInfo(commercePayload: CommercePayload) {
   }
 }
 
+export interface CommerceFacilitatorOptions {
+  /** Override default escrowAddress in /supported (default: commerce-payments AuthCaptureEscrow) */
+  escrowAddress?: `0x${string}`
+  /** Override default tokenCollector in /supported (default: commerce-payments ERC3009PaymentCollector) */
+  tokenCollector?: `0x${string}`
+}
+
 /**
  * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
  * The facilitator is operator-agnostic: operator addresses are set by the merchant
  * and arrive in `requirements.extra` at verify/settle time. Base commerce-payments
  * addresses (escrow, tokenCollector) are provided as defaults via `getExtra()` and
- * can be overridden by the merchant's `extra` config.
+ * can be overridden by the merchant's `extra` config or via constructor options.
  */
 export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly scheme = 'commerce'
   readonly caipFamily = 'eip155:*'
+  private defaultEscrow: `0x${string}`
+  private defaultTokenCollector: `0x${string}`
 
-  constructor(private signer: FacilitatorEvmSigner) {}
+  constructor(
+    private signer: FacilitatorEvmSigner,
+    options?: CommerceFacilitatorOptions,
+  ) {
+    this.defaultEscrow = options?.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW
+    this.defaultTokenCollector = options?.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR
+  }
 
   getSigners(_network: string): string[] {
     return [...this.signer.getAddresses()]
   }
 
-  // Provide default commerce-payments addresses from Base's commerce-payments.
-  // Merchant's extra overrides these (enhancePaymentRequirements merges facilitator
-  // extras under merchant extras), so merchants with custom escrow addresses win.
+  // Provide default addresses in /supported. Merchant's extra overrides these
+  // (enhancePaymentRequirements merges facilitator extras under merchant extras).
   getExtra(_network: string): Record<string, unknown> {
     return {
-      escrowAddress: COMMERCE_PAYMENTS_ESCROW,
-      tokenCollector: COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+      escrowAddress: this.defaultEscrow,
+      tokenCollector: this.defaultTokenCollector,
     }
   }
 
