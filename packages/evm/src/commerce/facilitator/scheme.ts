@@ -22,6 +22,11 @@ import { isCommercePayload, isCommerceExtra } from '../shared/types'
 import type { CommerceExtra, CommercePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
+// Base commerce-payments canonical addresses.
+// https://github.com/base/commerce-payments
+const COMMERCE_PAYMENTS_ESCROW = '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff'
+const COMMERCE_PAYMENTS_TOKEN_COLLECTOR = '0x0E3dF9510de65469C4518D7843919c0b8C7A7757'
+
 /**
  * Build the on-chain PaymentInfo struct from the client's payload.
  * Used by both verify (simulation) and settle (transaction).
@@ -46,9 +51,10 @@ function buildPaymentInfo(commercePayload: CommercePayload) {
 /**
  * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
- * The facilitator is operator-agnostic: it does not store operator/escrow/tokenCollector
- * config. Those values are set by the merchant via `refundable()` and arrive in
- * `requirements.extra` at verify/settle time.
+ * The facilitator is operator-agnostic: operator addresses are set by the merchant
+ * and arrive in `requirements.extra` at verify/settle time. Base commerce-payments
+ * addresses (escrow, tokenCollector) are provided as defaults via `getExtra()` and
+ * can be overridden by the merchant's `extra` config.
  */
 export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly scheme = 'commerce'
@@ -60,10 +66,14 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     return [...this.signer.getAddresses()]
   }
 
-  // C4: name/version now come from server's parsePrice() via AssetAmount.extra.
-  // The facilitator should not hardcode token-specific metadata.
-  getExtra(_network: string): Record<string, unknown> | undefined {
-    return undefined
+  // Provide default commerce-payments addresses from Base's commerce-payments.
+  // Merchant's extra overrides these (enhancePaymentRequirements merges facilitator
+  // extras under merchant extras), so merchants with custom escrow addresses win.
+  getExtra(_network: string): Record<string, unknown> {
+    return {
+      escrowAddress: COMMERCE_PAYMENTS_ESCROW,
+      tokenCollector: COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+    }
   }
 
   async verify(
@@ -117,7 +127,12 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         payer,
       }
     }
-    const extra = requirements.extra as CommerceExtra
+    const rawExtra = requirements.extra as CommerceExtra
+    // Default tokenCollector to commerce-payments ERC3009PaymentCollector if not set
+    const extra = {
+      ...rawExtra,
+      tokenCollector: rawExtra.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`,
+    }
     const chainId = parseChainId(requirements.network)
 
     // Time window validation
@@ -272,7 +287,11 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     const commercePayload = payload.payload as unknown as CommercePayload
-    const extra = requirements.extra as unknown as CommerceExtra
+    const rawExtra = requirements.extra as unknown as CommerceExtra
+    const extra = {
+      ...rawExtra,
+      tokenCollector: rawExtra.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`,
+    }
 
     const paymentInfo = buildPaymentInfo(commercePayload)
     const settlementMethod = extra.settlementMethod ?? 'authorize'

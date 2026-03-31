@@ -11,9 +11,10 @@ export interface EvmFacilitatorConfig {
 /**
  * Register commerce scheme with x402Facilitator
  *
- * The facilitator is operator-agnostic — it supports any operator. Operator,
- * escrow, and tokenCollector addresses are provided per-request by the merchant
- * via `refundable()` and arrive in `requirements.extra`.
+ * The facilitator is operator-agnostic — it supports any operator. Operator
+ * addresses are provided per-request by the merchant in `requirements.extra`.
+ * Base commerce-payments addresses (escrow, tokenCollector) are provided as
+ * defaults via `/supported` and can be overridden by the merchant.
  *
  * @example
  * ```typescript
