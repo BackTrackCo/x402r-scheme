@@ -21,6 +21,7 @@ import {
   ERC20_BALANCE_OF_ABI,
   COMMERCE_PAYMENTS_ESCROW,
   COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+  BASE_CHAIN_IDS,
 } from '../shared/constants'
 import { verifyERC3009Signature } from '../shared/nonce'
 import { isCommercePayload, isCommerceExtra } from '../shared/types'
@@ -71,6 +72,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly caipFamily = 'eip155:*'
   private defaultEscrow: `0x${string}`
   private defaultTokenCollector: `0x${string}`
+  private hasCustomDefaults: boolean
 
   constructor(
     private signer: FacilitatorEvmSigner,
@@ -78,6 +80,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   ) {
     this.defaultEscrow = options?.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW
     this.defaultTokenCollector = options?.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR
+    this.hasCustomDefaults = !!(options?.escrowAddress || options?.tokenCollector)
   }
 
   getSigners(_network: string): string[] {
@@ -86,7 +89,12 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
 
   // Default addresses for /supported — enhancePaymentRequirements merges these
   // under the merchant's extra, so merchants override but don't have to specify.
-  getExtra(_network: string): Record<string, unknown> {
+  // Only returns defaults for Base chains where commerce-payments is deployed.
+  // On other networks the merchant must provide escrowAddress + tokenCollector.
+  getExtra(network: string): Record<string, unknown> | undefined {
+    if (!BASE_CHAIN_IDS.has(network) && !this.hasCustomDefaults) {
+      return undefined
+    }
     return {
       escrowAddress: this.defaultEscrow,
       tokenCollector: this.defaultTokenCollector,
