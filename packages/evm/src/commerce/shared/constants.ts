@@ -2,6 +2,9 @@ export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
 // Base commerce-payments canonical addresses (Base mainnet + Base Sepolia only).
+// Same addresses on both chains — not deterministically deployed cross-chain yet,
+// so addresses may differ on future chains. If Coinbase deploys commerce-payments
+// everywhere x402 supports, BASE_CHAIN_IDS gating can be removed.
 // https://github.com/base/commerce-payments
 export const COMMERCE_PAYMENTS_ESCROW =
   '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff' as const satisfies `0x${string}`
