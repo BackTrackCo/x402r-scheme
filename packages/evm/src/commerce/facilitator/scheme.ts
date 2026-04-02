@@ -16,7 +16,13 @@ import type {
 } from '@x402/core/types'
 import type { FacilitatorEvmSigner } from '@x402/evm'
 import { parseErc6492Signature } from 'viem'
-import { OPERATOR_ABI, ERC20_BALANCE_OF_ABI } from '../shared/constants'
+import {
+  OPERATOR_ABI,
+  ERC20_BALANCE_OF_ABI,
+  COMMERCE_PAYMENTS_ESCROW,
+  COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
+  BASE_CHAIN_IDS,
+} from '../shared/constants'
 import { verifyERC3009Signature } from '../shared/nonce'
 import { isCommercePayload, isCommerceExtra } from '../shared/types'
 import type { CommerceExtra, CommercePayload } from '../shared/types'
@@ -43,27 +49,56 @@ function buildPaymentInfo(commercePayload: CommercePayload) {
   }
 }
 
+export interface CommerceFacilitatorOptions {
+  /** Override default escrowAddress in /supported (default: commerce-payments AuthCaptureEscrow) */
+  escrowAddress?: `0x${string}`
+  /** Override default tokenCollector in /supported (default: commerce-payments ERC3009PaymentCollector) */
+  tokenCollector?: `0x${string}`
+}
+
 /**
  * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
- * The facilitator is operator-agnostic: it does not store operator/escrow/tokenCollector
- * config. Those values are set by the merchant via `refundable()` and arrive in
- * `requirements.extra` at verify/settle time.
+ * The facilitator is operator-agnostic: operator addresses are set by the merchant
+ * and arrive in `requirements.extra` at verify/settle time.
+ *
+ * `getExtra()` provides default escrow/tokenCollector addresses (commerce-payments
+ * canonical addresses, or custom ones via constructor options). These flow into
+ * `enhancePaymentRequirements` which merges them under the merchant's extra —
+ * so the merchant can override, but doesn't have to set them if the defaults are fine.
  */
 export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly scheme = 'commerce'
   readonly caipFamily = 'eip155:*'
+  private defaultEscrow: `0x${string}`
+  private defaultTokenCollector: `0x${string}`
+  private hasCustomDefaults: boolean
 
-  constructor(private signer: FacilitatorEvmSigner) {}
+  constructor(
+    private signer: FacilitatorEvmSigner,
+    options?: CommerceFacilitatorOptions,
+  ) {
+    this.defaultEscrow = options?.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW
+    this.defaultTokenCollector = options?.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR
+    this.hasCustomDefaults = !!(options?.escrowAddress || options?.tokenCollector)
+  }
 
   getSigners(_network: string): string[] {
     return [...this.signer.getAddresses()]
   }
 
-  // C4: name/version now come from server's parsePrice() via AssetAmount.extra.
-  // The facilitator should not hardcode token-specific metadata.
-  getExtra(_network: string): Record<string, unknown> | undefined {
-    return undefined
+  // Default addresses for /supported — enhancePaymentRequirements merges these
+  // under the merchant's extra, so merchants override but don't have to specify.
+  // Only returns defaults for Base chains where commerce-payments is deployed.
+  // On other networks the merchant must provide escrowAddress + tokenCollector.
+  getExtra(network: string): Record<string, unknown> | undefined {
+    if (!BASE_CHAIN_IDS.has(network) && !this.hasCustomDefaults) {
+      return undefined
+    }
+    return {
+      escrowAddress: this.defaultEscrow,
+      tokenCollector: this.defaultTokenCollector,
+    }
   }
 
   async verify(
