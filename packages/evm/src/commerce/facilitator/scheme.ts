@@ -27,17 +27,6 @@ import { isCommercePayload, isCommerceExtra } from '../shared/types'
 import type { CommerceExtra, CommercePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
-/** Resolve CommerceExtra with commerce-payments defaults for optional fields. */
-function resolveExtra(
-  raw: CommerceExtra,
-): CommerceExtra & { escrowAddress: `0x${string}`; tokenCollector: `0x${string}` } {
-  return {
-    ...raw,
-    escrowAddress: raw.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW,
-    tokenCollector: raw.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR,
-  }
-}
-
 /**
  * Build the on-chain PaymentInfo struct from the client's payload.
  * Used by both verify (simulation) and settle (transaction).
@@ -70,9 +59,12 @@ export interface CommerceFacilitatorOptions {
  * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
  * The facilitator is operator-agnostic: operator addresses are set by the merchant
- * and arrive in `requirements.extra` at verify/settle time. Base commerce-payments
- * addresses (escrow, tokenCollector) are provided as defaults via `getExtra()` and
- * can be overridden by the merchant's `extra` config or via constructor options.
+ * and arrive in `requirements.extra` at verify/settle time.
+ *
+ * `getExtra()` provides default escrow/tokenCollector addresses (commerce-payments
+ * canonical addresses, or custom ones via constructor options). These flow into
+ * `enhancePaymentRequirements` which merges them under the merchant's extra —
+ * so the merchant can override, but doesn't have to set them if the defaults are fine.
  */
 export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
   readonly scheme = 'commerce'
@@ -92,8 +84,8 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     return [...this.signer.getAddresses()]
   }
 
-  // Provide default addresses in /supported. Merchant's extra overrides these
-  // (enhancePaymentRequirements merges facilitator extras under merchant extras).
+  // Default addresses for /supported — enhancePaymentRequirements merges these
+  // under the merchant's extra, so merchants override but don't have to specify.
   getExtra(_network: string): Record<string, unknown> {
     return {
       escrowAddress: this.defaultEscrow,
@@ -152,7 +144,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         payer,
       }
     }
-    const extra = resolveExtra(requirements.extra as CommerceExtra)
+    const extra = requirements.extra as CommerceExtra
     const chainId = parseChainId(requirements.network)
 
     // Time window validation
@@ -307,12 +299,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     const commercePayload = payload.payload as unknown as CommercePayload
-    const rawExtra = requirements.extra as unknown as CommerceExtra
-    const extra = {
-      ...rawExtra,
-      tokenCollector:
-        rawExtra.tokenCollector ?? (COMMERCE_PAYMENTS_TOKEN_COLLECTOR as `0x${string}`),
-    }
+    const extra = requirements.extra as unknown as CommerceExtra
 
     const paymentInfo = buildPaymentInfo(commercePayload)
     const settlementMethod = extra.settlementMethod ?? 'authorize'
