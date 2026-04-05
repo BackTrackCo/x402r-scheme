@@ -64,15 +64,16 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
 
     const chainId = parseChainId(requirements.network)
     const maxAmount = requirements.amount
+    const nowSeconds = Math.floor(Date.now() / 1000)
 
     const paymentInfo = {
       operator: operatorAddress,
       receiver: requirements.payTo as `0x${string}`,
       token: requirements.asset as `0x${string}`,
       maxAmount,
-      preApprovalExpiry: preApprovalExpirySeconds ?? MAX_UINT48,
-      authorizationExpiry: authorizationExpirySeconds ?? MAX_UINT48,
-      refundExpiry: refundExpirySeconds ?? MAX_UINT48,
+      preApprovalExpiry: preApprovalExpirySeconds ? nowSeconds + preApprovalExpirySeconds : MAX_UINT48,
+      authorizationExpiry: authorizationExpirySeconds ? nowSeconds + authorizationExpirySeconds : MAX_UINT48,
+      refundExpiry: refundExpirySeconds ? nowSeconds + refundExpirySeconds : MAX_UINT48,
       minFeeBps,
       maxFeeBps,
       feeReceiver: feeReceiver ?? zeroAddress,
