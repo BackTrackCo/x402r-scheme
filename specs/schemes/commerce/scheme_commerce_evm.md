@@ -36,7 +36,10 @@ Commerce-accepting servers advertise with scheme `commerce`:
         "settlementMethod": "authorize",
         "minFeeBps": 0,
         "maxFeeBps": 1000,
-        "feeReceiver": "0xOperatorAddress"
+        "feeReceiver": "0xOperatorAddress",
+        "preApprovalExpirySeconds": 3600,
+        "authorizationExpirySeconds": 86400,
+        "refundExpirySeconds": 604800
       }
     }
   ]
