@@ -168,11 +168,21 @@ describe('CommerceEvmScheme', () => {
       const result = await scheme.createPaymentPayload(2, requirementsWithExpiries)
 
       // Allow 5s tolerance for test execution time
-      expect(result.payload.paymentInfo.preApprovalExpiry).toBeGreaterThanOrEqual(nowSeconds + 3600 - 5)
-      expect(result.payload.paymentInfo.preApprovalExpiry).toBeLessThanOrEqual(nowSeconds + 3600 + 5)
-      expect(result.payload.paymentInfo.authorizationExpiry).toBeGreaterThanOrEqual(nowSeconds + 86400 - 5)
-      expect(result.payload.paymentInfo.authorizationExpiry).toBeLessThanOrEqual(nowSeconds + 86400 + 5)
-      expect(result.payload.paymentInfo.refundExpiry).toBeGreaterThanOrEqual(nowSeconds + 604800 - 5)
+      expect(result.payload.paymentInfo.preApprovalExpiry).toBeGreaterThanOrEqual(
+        nowSeconds + 3600 - 5,
+      )
+      expect(result.payload.paymentInfo.preApprovalExpiry).toBeLessThanOrEqual(
+        nowSeconds + 3600 + 5,
+      )
+      expect(result.payload.paymentInfo.authorizationExpiry).toBeGreaterThanOrEqual(
+        nowSeconds + 86400 - 5,
+      )
+      expect(result.payload.paymentInfo.authorizationExpiry).toBeLessThanOrEqual(
+        nowSeconds + 86400 + 5,
+      )
+      expect(result.payload.paymentInfo.refundExpiry).toBeGreaterThanOrEqual(
+        nowSeconds + 604800 - 5,
+      )
       expect(result.payload.paymentInfo.refundExpiry).toBeLessThanOrEqual(nowSeconds + 604800 + 5)
     })
 
