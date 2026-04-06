@@ -71,13 +71,11 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
       receiver: requirements.payTo as `0x${string}`,
       token: requirements.asset as `0x${string}`,
       maxAmount,
-      preApprovalExpiry: preApprovalExpirySeconds
-        ? nowSeconds + preApprovalExpirySeconds
-        : MAX_UINT48,
-      authorizationExpiry: authorizationExpirySeconds
-        ? nowSeconds + authorizationExpirySeconds
-        : MAX_UINT48,
-      refundExpiry: refundExpirySeconds ? nowSeconds + refundExpirySeconds : MAX_UINT48,
+      preApprovalExpiry:
+        preApprovalExpirySeconds != null ? nowSeconds + preApprovalExpirySeconds : MAX_UINT48,
+      authorizationExpiry:
+        authorizationExpirySeconds != null ? nowSeconds + authorizationExpirySeconds : MAX_UINT48,
+      refundExpiry: refundExpirySeconds != null ? nowSeconds + refundExpirySeconds : MAX_UINT48,
       minFeeBps,
       maxFeeBps,
       feeReceiver: feeReceiver ?? zeroAddress,
