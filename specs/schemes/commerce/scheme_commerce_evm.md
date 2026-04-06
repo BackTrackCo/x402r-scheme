@@ -36,7 +36,10 @@ Commerce-accepting servers advertise with scheme `commerce`:
         "settlementMethod": "authorize",
         "minFeeBps": 0,
         "maxFeeBps": 1000,
-        "feeReceiver": "0xOperatorAddress"
+        "feeReceiver": "0xOperatorAddress",
+        "preApprovalExpirySeconds": 3600,
+        "authorizationExpirySeconds": 86400,
+        "refundExpirySeconds": 604800
       }
     }
   ]
@@ -56,9 +59,9 @@ Commerce-accepting servers advertise with scheme `commerce`:
 | `minFeeBps`                  | No       | `uint16`                  | Minimum fee in basis points. Default: `0`          |
 | `maxFeeBps`                  | No       | `uint16`                  | Maximum fee in basis points. Default: `0`          |
 | `feeReceiver`                | No       | `address`                 | Fee recipient. Default: `address(0)` (no fees)     |
-| `preApprovalExpirySeconds`   | No       | `uint48`                  | ERC-3009 signature validity / pre-approval expiry  |
-| `authorizationExpirySeconds` | No       | `uint48`                  | Deadline for capturing escrowed funds              |
-| `refundExpirySeconds`        | No       | `uint48`                  | Deadline for refund requests                       |
+| `preApprovalExpirySeconds`   | No       | `uint48`                  | Seconds until pre-approval / ERC-3009 sig expires  |
+| `authorizationExpirySeconds` | No       | `uint48`                  | Seconds until capture deadline for escrowed funds  |
+| `refundExpirySeconds`        | No       | `uint48`                  | Seconds until refund request deadline              |
 
 ## PaymentPayload
 
@@ -94,7 +97,7 @@ Commerce-accepting servers advertise with scheme `commerce`:
       "to": "0xCollectorAddress",
       "value": "1000000",
       "validAfter": "0",
-      "validBefore": "1740672154",
+      "validBefore": "1740675754",
       "nonce": "0xf374...3480"
     },
     "signature": "0x2d6a...571c",
@@ -103,9 +106,9 @@ Commerce-accepting servers advertise with scheme `commerce`:
       "receiver": "0xReceiverAddress",
       "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "maxAmount": "1000000",
-      "preApprovalExpiry": 1740672154,
-      "authorizationExpiry": 4294967295,
-      "refundExpiry": 281474976710655,
+      "preApprovalExpiry": 1740675754,
+      "authorizationExpiry": 1740758554,
+      "refundExpiry": 1741276954,
       "minFeeBps": 0,
       "maxFeeBps": 1000,
       "feeReceiver": "0xOperatorAddress",

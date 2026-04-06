@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { CommerceEvmScheme } from '../../../src/commerce/client/index'
 import { x402Client } from '@x402/core/client'
 import { registerCommerceEvmScheme } from '../../../src/commerce/client/index'
+import { MAX_UINT48 } from '../../../src/commerce/shared/constants'
 
 describe('CommerceEvmScheme', () => {
   const createMockSigner = () => ({
@@ -13,6 +14,10 @@ describe('CommerceEvmScheme', () => {
 
   beforeEach(() => {
     mockSigner = createMockSigner()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   const mockRequirements = {
@@ -151,6 +156,37 @@ describe('CommerceEvmScheme', () => {
       expect(result.payload.paymentInfo.feeReceiver).toBe(
         '0x1111111111111111111111111111111111111111',
       )
+    })
+
+    it('should convert expirySeconds to absolute timestamps', async () => {
+      const fakeNow = 1700000000000 // fixed ms
+      vi.spyOn(Date, 'now').mockReturnValue(fakeNow)
+      const nowSeconds = 1700000000
+
+      const scheme = new CommerceEvmScheme(mockSigner)
+      const requirementsWithExpiries = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          preApprovalExpirySeconds: 3600,
+          authorizationExpirySeconds: 86400,
+          refundExpirySeconds: 604800,
+        },
+      }
+      const result = await scheme.createPaymentPayload(2, requirementsWithExpiries)
+
+      expect(result.payload.paymentInfo.preApprovalExpiry).toBe(nowSeconds + 3600)
+      expect(result.payload.paymentInfo.authorizationExpiry).toBe(nowSeconds + 86400)
+      expect(result.payload.paymentInfo.refundExpiry).toBe(nowSeconds + 604800)
+    })
+
+    it('should default expiries to MAX_UINT48 when not specified', async () => {
+      const scheme = new CommerceEvmScheme(mockSigner)
+      const result = await scheme.createPaymentPayload(2, mockRequirements)
+
+      expect(result.payload.paymentInfo.preApprovalExpiry).toBe(MAX_UINT48)
+      expect(result.payload.paymentInfo.authorizationExpiry).toBe(MAX_UINT48)
+      expect(result.payload.paymentInfo.refundExpiry).toBe(MAX_UINT48)
     })
 
     it('should throw for invalid network format', async () => {
