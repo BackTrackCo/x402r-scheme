@@ -7,6 +7,7 @@ const baseConfig = {
     'commerce/server/index': 'src/commerce/server/index.ts',
     'commerce/facilitator/index': 'src/commerce/facilitator/index.ts',
     'extensions/attestation/index': 'src/extensions/attestation/index.ts',
+    'extensions/erc8004/index': 'src/extensions/erc8004/index.ts',
   },
   dts: { resolve: true },
   sourcemap: true,

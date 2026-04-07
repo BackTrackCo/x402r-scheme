@@ -50,6 +50,16 @@
         "default": "./dist/cjs/extensions/attestation/index.js"
       }
     },
+    "./extensions/erc8004": {
+      "import": {
+        "types": "./dist/esm/extensions/erc8004/index.d.mts",
+        "default": "./dist/esm/extensions/erc8004/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/extensions/erc8004/index.d.ts",
+        "default": "./dist/cjs/extensions/erc8004/index.js"
+      }
+    },
     "./commerce/facilitator": {
       "import": {
         "types": "./dist/esm/commerce/facilitator/index.d.mts",
