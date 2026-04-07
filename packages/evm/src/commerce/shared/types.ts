@@ -38,6 +38,8 @@ export interface CommerceExtra {
   settlementMethod?: 'authorize' | 'charge' // default: "authorize"
   name: string // EIP-712 domain name (e.g., "USDC" for Base USDC)
   version: string // EIP-712 domain version (e.g., "2" for USDC)
+  /** Optional ERC-8004 agent ID of the merchant (stringified bigint for JSON compatibility) */
+  merchantAgentId?: string
 }
 
 // CommercePayload - the payload field in PaymentPayload
@@ -63,5 +65,7 @@ export interface CommercePayload {
     maxFeeBps: number
     feeReceiver: `0x${string}`
     salt: `0x${string}`
+    /** Optional ERC-8004 agent ID of the payer (stringified bigint for JSON compatibility) */
+    payerAgentId?: string
   }
 }
