@@ -82,5 +82,5 @@ Network-specific implementation details (contracts, signature formats, verificat
 
 ### References
 
-- [Commerce Scheme Proposal — Agentokratia (Issue #834)](https://github.com/coinbase/x402/issues/834)
-- [Commerce Scheme Proposal — x402r (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
+- [Escrow Scheme Proposal — Agentokratia (Issue #834)](https://github.com/coinbase/x402/issues/834)
+- [Escrow Scheme Proposal — x402r (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
