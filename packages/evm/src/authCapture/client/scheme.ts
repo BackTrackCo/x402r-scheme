@@ -1,9 +1,9 @@
 /**
- * Commerce Scheme - Client
- * Creates payment payloads for commerce payments.
+ * AuthCapture Scheme - Client
+ * Creates payment payloads for authCapture payments.
  *
  * Implements x402's SchemeNetworkClient interface so it can be registered
- * on an x402Client via client.register('eip155:84532', new CommerceEvmScheme(signer)).
+ * on an x402Client via client.register('eip155:84532', new AuthCaptureEvmScheme(signer)).
  */
 
 import type {
@@ -13,17 +13,17 @@ import type {
   SchemeNetworkClient,
 } from '@x402/core/types'
 import type { ClientEvmSigner } from '@x402/evm'
-import { computeCommerceNonce, signERC3009, generateSalt } from '../shared/nonce'
+import { computeAuthCaptureNonce, signERC3009, generateSalt } from '../shared/nonce'
 import { zeroAddress } from 'viem'
 import { MAX_UINT48 } from '../shared/constants'
-import type { CommerceExtra } from '../shared/types'
+import type { AuthCaptureExtra } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /**
- * Commerce Client Scheme - implements x402's SchemeNetworkClient
+ * AuthCapture Client Scheme - implements x402's SchemeNetworkClient
  */
-export class CommerceEvmScheme implements SchemeNetworkClient {
-  readonly scheme = 'commerce'
+export class AuthCaptureEvmScheme implements SchemeNetworkClient {
+  readonly scheme = 'authCapture'
 
   constructor(private readonly signer: ClientEvmSigner) {}
 
@@ -36,7 +36,7 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
       throw new Error(`Unsupported x402Version: ${x402Version}. Only version 2 is supported.`)
     }
 
-    const extra = requirements.extra as unknown as CommerceExtra
+    const extra = requirements.extra as unknown as AuthCaptureExtra
 
     // Validate required EIP-712 domain parameters (M3, M10)
     if (!extra.name) {
@@ -82,7 +82,7 @@ export class CommerceEvmScheme implements SchemeNetworkClient {
       salt: generateSalt(),
     }
 
-    const nonce = computeCommerceNonce(chainId, escrowAddress, paymentInfo)
+    const nonce = computeAuthCaptureNonce(chainId, escrowAddress, paymentInfo)
 
     // ERC-3009 authorization - validBefore MUST match what contract passes to receiveWithAuthorization
     // The contract uses paymentInfo.preApprovalExpiry as validBefore

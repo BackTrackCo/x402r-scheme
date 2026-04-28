@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { CommerceFacilitatorScheme } from '../../../src/commerce/facilitator/scheme'
+import { AuthCaptureFacilitatorScheme } from '../../../src/authCapture/facilitator/scheme'
 
-describe('CommerceFacilitatorScheme', () => {
+describe('AuthCaptureFacilitatorScheme', () => {
   const createMockSigner = () => ({
     getAddresses: () => ['0x1234567890123456789012345678901234567890'] as readonly `0x${string}`[],
     readContract: vi.fn().mockResolvedValue(BigInt('1000000000')),
@@ -24,10 +24,10 @@ describe('CommerceFacilitatorScheme', () => {
 
     const mockPayload = {
       x402Version: 2,
-      scheme: 'commerce',
+      scheme: 'authCapture',
       resource: { url: 'https://example.com/weather', method: 'GET' },
       accepted: {
-        scheme: 'commerce',
+        scheme: 'authCapture',
         network: 'eip155:84532',
         amount: '1000000',
         asset: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
@@ -62,7 +62,7 @@ describe('CommerceFacilitatorScheme', () => {
     }
 
     const mockRequirements = {
-      scheme: 'commerce',
+      scheme: 'authCapture',
       network: 'eip155:84532',
       amount: '1000000',
       asset: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' as const,
@@ -78,7 +78,7 @@ describe('CommerceFacilitatorScheme', () => {
     }
 
     it('should default to authorize when settlementMethod is absent', async () => {
-      const scheme = new CommerceFacilitatorScheme(mockSigner)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
       await scheme.settle(mockPayload, mockRequirements)
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('CommerceFacilitatorScheme', () => {
     })
 
     it('should call authorize when settlementMethod is explicitly "authorize"', async () => {
-      const scheme = new CommerceFacilitatorScheme(mockSigner)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
 
       const requirementsWithAuthorize = {
         ...mockRequirements,
@@ -109,7 +109,7 @@ describe('CommerceFacilitatorScheme', () => {
     })
 
     it('should call charge when settlementMethod is "charge"', async () => {
-      const scheme = new CommerceFacilitatorScheme(mockSigner)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
 
       const requirementsWithCharge = {
         ...mockRequirements,
@@ -129,7 +129,7 @@ describe('CommerceFacilitatorScheme', () => {
     })
 
     it('should fall back to authorize for unknown settlementMethod', async () => {
-      const scheme = new CommerceFacilitatorScheme(mockSigner)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
 
       const requirementsWithUnknown = {
         ...mockRequirements,
@@ -149,7 +149,7 @@ describe('CommerceFacilitatorScheme', () => {
     })
 
     it('should always target operatorAddress', async () => {
-      const scheme = new CommerceFacilitatorScheme(mockSigner)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
       await scheme.settle(mockPayload, mockRequirements)
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(

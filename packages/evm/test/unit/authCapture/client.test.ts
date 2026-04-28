@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { CommerceEvmScheme } from '../../../src/commerce/client/index'
+import { AuthCaptureEvmScheme } from '../../../src/authCapture/client/index'
 import { x402Client } from '@x402/core/client'
-import { registerCommerceEvmScheme } from '../../../src/commerce/client/index'
-import { MAX_UINT48 } from '../../../src/commerce/shared/constants'
+import { registerAuthCaptureEvmScheme } from '../../../src/authCapture/client/index'
+import { MAX_UINT48 } from '../../../src/authCapture/shared/constants'
 
-describe('CommerceEvmScheme', () => {
+describe('AuthCaptureEvmScheme', () => {
   const createMockSigner = () => ({
     address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const,
     signTypedData: vi.fn().mockResolvedValue('0xdeadbeef' as `0x${string}`),
@@ -21,7 +21,7 @@ describe('CommerceEvmScheme', () => {
   })
 
   const mockRequirements = {
-    scheme: 'commerce',
+    scheme: 'authCapture',
     network: 'eip155:84532',
     amount: '1000000',
     asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
@@ -37,15 +37,15 @@ describe('CommerceEvmScheme', () => {
   }
 
   describe('constructor and properties', () => {
-    it('should have scheme set to "commerce"', () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
-      expect(scheme.scheme).toBe('commerce')
+    it('should have scheme set to "authCapture"', () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      expect(scheme.scheme).toBe('authCapture')
     })
   })
 
   describe('createPaymentPayload', () => {
     it('should create a valid payment payload for x402Version 2', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.x402Version).toBe(2)
@@ -56,7 +56,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw for unsupported x402Version', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
 
       await expect(scheme.createPaymentPayload(1, mockRequirements)).rejects.toThrow(
         'Unsupported x402Version: 1. Only version 2 is supported.',
@@ -64,7 +64,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw for x402Version 0', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
 
       await expect(scheme.createPaymentPayload(0, mockRequirements)).rejects.toThrow(
         'Unsupported x402Version: 0',
@@ -72,7 +72,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw for x402Version 3', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
 
       await expect(scheme.createPaymentPayload(3, mockRequirements)).rejects.toThrow(
         'Unsupported x402Version: 3',
@@ -80,7 +80,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw when EIP-712 name is missing', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const requirementsNoName = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, name: '' },
@@ -92,7 +92,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw when EIP-712 version is missing', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const requirementsNoVersion = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, version: '' },
@@ -104,28 +104,28 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should set authorization.from to signer address', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.authorization.from).toBe(mockSigner.address)
     })
 
     it('should set authorization.to to tokenCollector', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.authorization.to).toBe(mockRequirements.extra.tokenCollector)
     })
 
     it('should set authorization.value to requirements amount', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.authorization.value).toBe('1000000')
     })
 
     it('should set paymentInfo fields correctly', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.paymentInfo.operator).toBe(mockRequirements.extra.operatorAddress)
@@ -134,7 +134,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should default feeReceiver to zeroAddress when not specified', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.paymentInfo.feeReceiver).toBe(
@@ -143,7 +143,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should use provided feeReceiver when specified', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const requirementsWithFeeReceiver = {
         ...mockRequirements,
         extra: {
@@ -163,7 +163,7 @@ describe('CommerceEvmScheme', () => {
       vi.spyOn(Date, 'now').mockReturnValue(fakeNow)
       const nowSeconds = 1700000000
 
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const requirementsWithExpiries = {
         ...mockRequirements,
         extra: {
@@ -181,7 +181,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should default expiries to MAX_UINT48 when not specified', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.payload.paymentInfo.preApprovalExpiry).toBe(MAX_UINT48)
@@ -190,7 +190,7 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should throw for invalid network format', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       const badNetworkRequirements = {
         ...mockRequirements,
         network: 'solana:mainnet',
@@ -202,18 +202,18 @@ describe('CommerceEvmScheme', () => {
     })
 
     it('should call signTypedData on signer', async () => {
-      const scheme = new CommerceEvmScheme(mockSigner)
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
       await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(mockSigner.signTypedData).toHaveBeenCalledOnce()
     })
   })
 
-  describe('registerCommerceEvmScheme', () => {
+  describe('registerAuthCaptureEvmScheme', () => {
     it('should register scheme without throwing', () => {
       const client = new x402Client()
       expect(() =>
-        registerCommerceEvmScheme(client, {
+        registerAuthCaptureEvmScheme(client, {
           signer: mockSigner,
           networks: 'eip155:84532',
         }),
@@ -223,7 +223,7 @@ describe('CommerceEvmScheme', () => {
     it('should register scheme for multiple networks without throwing', () => {
       const client = new x402Client()
       expect(() =>
-        registerCommerceEvmScheme(client, {
+        registerAuthCaptureEvmScheme(client, {
           signer: mockSigner,
           networks: ['eip155:84532', 'eip155:8453'],
         }),
@@ -232,7 +232,7 @@ describe('CommerceEvmScheme', () => {
 
     it('should return the client for chaining', () => {
       const client = new x402Client()
-      const result = registerCommerceEvmScheme(client, {
+      const result = registerAuthCaptureEvmScheme(client, {
         signer: mockSigner,
         networks: 'eip155:84532',
       })

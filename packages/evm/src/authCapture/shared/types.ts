@@ -1,7 +1,7 @@
 /**
- * Type guard for CommercePayload
+ * Type guard for AuthCapturePayload
  */
-export function isCommercePayload(value: unknown): value is CommercePayload {
+export function isAuthCapturePayload(value: unknown): value is AuthCapturePayload {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -12,9 +12,9 @@ export function isCommercePayload(value: unknown): value is CommercePayload {
 }
 
 /**
- * Type guard for CommerceExtra
+ * Type guard for AuthCaptureExtra
  */
-export function isCommerceExtra(value: unknown): value is CommerceExtra {
+export function isAuthCaptureExtra(value: unknown): value is AuthCaptureExtra {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -24,8 +24,8 @@ export function isCommerceExtra(value: unknown): value is CommerceExtra {
   )
 }
 
-// CommerceExtra - fields in PaymentRequirements.extra
-export interface CommerceExtra {
+// AuthCaptureExtra - fields in PaymentRequirements.extra
+export interface AuthCaptureExtra {
   escrowAddress: `0x${string}`
   operatorAddress: `0x${string}`
   tokenCollector: `0x${string}`
@@ -40,8 +40,8 @@ export interface CommerceExtra {
   version: string // EIP-712 domain version (e.g., "2" for USDC)
 }
 
-// CommercePayload - the payload field in PaymentPayload
-export interface CommercePayload {
+// AuthCapturePayload - the payload field in PaymentPayload
+export interface AuthCapturePayload {
   authorization: {
     from: `0x${string}`
     to: `0x${string}`

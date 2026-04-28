@@ -1,18 +1,18 @@
 import type { Network } from '@x402/core/types'
 import type { FacilitatorEvmSigner } from '@x402/evm'
 import { x402Facilitator } from '@x402/core/facilitator'
-import { CommerceFacilitatorScheme } from './scheme'
-import type { CommerceFacilitatorOptions } from './scheme'
+import { AuthCaptureFacilitatorScheme } from './scheme'
+import type { AuthCaptureFacilitatorOptions } from './scheme'
 
 export interface EvmFacilitatorConfig {
   signer: FacilitatorEvmSigner
   networks: Network | Network[]
   /** Override default escrow/tokenCollector addresses in /supported */
-  defaults?: CommerceFacilitatorOptions
+  defaults?: AuthCaptureFacilitatorOptions
 }
 
 /**
- * Register commerce scheme with x402Facilitator
+ * Register authCapture scheme with x402Facilitator
  *
  * The facilitator is operator-agnostic — it supports any operator. Operator
  * addresses are provided per-request by the merchant in `requirements.extra`.
@@ -22,7 +22,7 @@ export interface EvmFacilitatorConfig {
  *
  * @example Default (commerce-payments addresses)
  * ```typescript
- * registerCommerceEvmScheme(facilitator, {
+ * registerAuthCaptureEvmScheme(facilitator, {
  *   signer: evmSigner,
  *   networks: "eip155:84532",
  * });
@@ -30,7 +30,7 @@ export interface EvmFacilitatorConfig {
  *
  * @example Custom defaults (e.g. x402r fork)
  * ```typescript
- * registerCommerceEvmScheme(facilitator, {
+ * registerAuthCaptureEvmScheme(facilitator, {
  *   signer: evmSigner,
  *   networks: "eip155:84532",
  *   defaults: {
@@ -40,13 +40,13 @@ export interface EvmFacilitatorConfig {
  * });
  * ```
  */
-export function registerCommerceEvmScheme(
+export function registerAuthCaptureEvmScheme(
   facilitator: x402Facilitator,
   config: EvmFacilitatorConfig,
 ): x402Facilitator {
   facilitator.register(
     config.networks,
-    new CommerceFacilitatorScheme(config.signer, config.defaults),
+    new AuthCaptureFacilitatorScheme(config.signer, config.defaults),
   )
   return facilitator
 }

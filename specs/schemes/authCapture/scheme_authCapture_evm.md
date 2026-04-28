@@ -1,8 +1,8 @@
-# Scheme: `commerce` on `EVM`
+# Scheme: `authCapture` on `EVM`
 
 ## Summary
 
-The `commerce` scheme on EVM uses the [Commerce Payments Protocol](https://github.com/base/commerce-payments) contract stack:
+The `authCapture` scheme on EVM uses the [AuthCapture Payments Protocol](https://github.com/base/commerce-payments) contract stack:
 
 - **Escrow** (`AuthCaptureEscrow`): Singleton — locks funds, enforces expiries, distributes on capture/refund
 - **Operator**: Routes payments through escrow with fee management
@@ -10,18 +10,18 @@ The `commerce` scheme on EVM uses the [Commerce Payments Protocol](https://githu
 
 The client signs a single ERC-3009 authorization. The facilitator submits it to the operator, which handles token collection, escrow locking, and fee distribution — all in one transaction.
 
-The commerce scheme uses ERC-3009 (`receiveWithAuthorization`) exclusively. The commerce-payments token collector architecture supports pluggable collection methods; future collectors (e.g., Permit2) could be added via `assetTransferMethod` in `extra` without changing the scheme.
+The authCapture scheme uses ERC-3009 (`receiveWithAuthorization`) exclusively. The commerce-payments token collector architecture supports pluggable collection methods; future collectors (e.g., Permit2) could be added via `assetTransferMethod` in `extra` without changing the scheme.
 
 ## PaymentRequirements
 
-Commerce-accepting servers advertise with scheme `commerce`:
+AuthCapture-accepting servers advertise with scheme `authCapture`:
 
 ```json
 {
   "x402Version": 2,
   "accepts": [
     {
-      "scheme": "commerce",
+      "scheme": "authCapture",
       "network": "eip155:8453",
       "amount": "1000000",
       "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -73,7 +73,7 @@ Commerce-accepting servers advertise with scheme `commerce`:
     "method": "GET"
   },
   "accepted": {
-    "scheme": "commerce",
+    "scheme": "authCapture",
     "network": "eip155:8453",
     "amount": "1000000",
     "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -133,9 +133,9 @@ This ties the off-chain signature to the specific escrow contract and payment te
 The facilitator performs these checks in order:
 
 1. **Type guard**: Verify `payload` contains `authorization`, `signature`, and `paymentInfo` fields
-2. **Scheme match**: Verify `requirements.scheme === "commerce"` and `payload.accepted.scheme === "commerce"`
+2. **Scheme match**: Verify `requirements.scheme === "authCapture"` and `payload.accepted.scheme === "authCapture"`
 3. **Network match**: Verify `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`
-4. **Extra validation**: Verify `requirements.extra` contains required commerce fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
+4. **Extra validation**: Verify `requirements.extra` contains required authCapture fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
 5. **Time window**: Verify `validBefore > now + 6s` (not expired) and `validAfter <= now` (active)
 6. **ERC-3009 signature**: Recover signer from EIP-712 typed data (`ReceiveWithAuthorization` primary type) and verify matches `authorization.from`
 7. **Amount**: Verify `authorization.value === requirements.amount`
@@ -166,20 +166,20 @@ The operator handles:
 
 ## Error Codes
 
-The commerce scheme uses the standard x402 error codes plus these scheme-specific codes:
+The authCapture scheme uses the standard x402 error codes plus these scheme-specific codes:
 
 ### Verification Errors
 
 | Error Code                    | Description                                                                          |
 | :---------------------------- | :----------------------------------------------------------------------------------- |
 | `invalid_payload_format`      | Payload missing `authorization`, `signature`, or `paymentInfo`                       |
-| `unsupported_scheme`          | Scheme is not `commerce`                                                             |
+| `unsupported_scheme`          | Scheme is not `authCapture`                                                             |
 | `network_mismatch`            | Payload network does not match requirements                                          |
 | `invalid_network`             | Network format is not `eip155:<chainId>`                                             |
-| `invalid_commerce_extra`      | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
+| `invalid_authCapture_extra`      | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
 | `authorization_expired`       | `validBefore <= now + 6s`                                                            |
 | `authorization_not_yet_valid` | `validAfter > now`                                                                   |
-| `invalid_commerce_signature`  | ERC-3009 signature verification failed                                               |
+| `invalid_authCapture_signature`  | ERC-3009 signature verification failed                                               |
 | `amount_mismatch`             | `authorization.value !== requirements.amount`                                        |
 | `token_collector_mismatch`    | `authorization.to !== extra.tokenCollector`                                          |
 | `token_mismatch`              | `paymentInfo.token !== requirements.asset`                                           |

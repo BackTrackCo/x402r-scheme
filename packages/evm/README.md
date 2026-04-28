@@ -1,6 +1,6 @@
 # @x402r/evm
 
-Commerce payment scheme for x402 HTTP 402 flows. Bridges the x402 protocol with x402r commerce contracts on Base.
+AuthCapture payment scheme for x402 HTTP 402 flows. Bridges the x402 protocol with x402r commerce contracts on Base.
 
 ## Install
 
@@ -13,46 +13,49 @@ npm install @x402r/evm
 ### Client — Create payment payloads
 
 ```typescript
-import { CommerceEvmScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/client'
+import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/client'
 import { x402Client } from '@x402/core/client'
 
 const client = new x402Client()
-registerCommerceEvmScheme(client, { signer })
+registerAuthCaptureEvmScheme(client, { signer })
 // or with specific networks:
-registerCommerceEvmScheme(client, { signer, networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
 ```
 
 ### Server — Register with x402 resource server
 
 ```typescript
-import { CommerceServerScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/server'
+import {
+  AuthCaptureServerScheme,
+  registerAuthCaptureEvmScheme,
+} from '@x402r/evm/authCapture/server'
 import { x402ResourceServer } from '@x402/core/server'
 
 const server = new x402ResourceServer(facilitatorConfig)
-registerCommerceEvmScheme(server)
+registerAuthCaptureEvmScheme(server)
 // or with specific networks:
-registerCommerceEvmScheme(server, { networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
 ```
 
 ### Facilitator — Verify and settle payments
 
 ```typescript
 import {
-  CommerceFacilitatorScheme,
-  registerCommerceEvmScheme,
-} from '@x402r/evm/commerce/facilitator'
+  AuthCaptureFacilitatorScheme,
+  registerAuthCaptureEvmScheme,
+} from '@x402r/evm/authCapture/facilitator'
 import { x402Facilitator } from '@x402/core/facilitator'
 
 const facilitator = new x402Facilitator()
-registerCommerceEvmScheme(facilitator, { signer, networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(facilitator, { signer, networks: 'eip155:84532' })
 ```
 
 ## Exports
 
-- `@x402r/evm` — `CommerceEvmScheme` (client scheme class)
-- `@x402r/evm/commerce/client` — `CommerceEvmScheme`, `registerCommerceEvmScheme()`, `EvmClientConfig`
-- `@x402r/evm/commerce/server` — `CommerceServerScheme`, `registerCommerceEvmScheme()`, `EvmResourceServerConfig`
-- `@x402r/evm/commerce/facilitator` — `CommerceFacilitatorScheme`, `registerCommerceEvmScheme()`, `EvmFacilitatorConfig`
+- `@x402r/evm` — `AuthCaptureEvmScheme` (client scheme class)
+- `@x402r/evm/authCapture/client` — `AuthCaptureEvmScheme`, `registerAuthCaptureEvmScheme()`, `EvmClientConfig`
+- `@x402r/evm/authCapture/server` — `AuthCaptureServerScheme`, `registerAuthCaptureEvmScheme()`, `EvmResourceServerConfig`
+- `@x402r/evm/authCapture/facilitator` — `AuthCaptureFacilitatorScheme`, `registerAuthCaptureEvmScheme()`, `EvmFacilitatorConfig`
 
 ## Links
 

@@ -1,8 +1,8 @@
 /**
- * Commerce Scheme - Facilitator
- * Handles verification and settlement of commerce payments.
+ * AuthCapture Scheme - Facilitator
+ * Handles verification and settlement of authCapture payments.
  *
- * Implements x402's SchemeNetworkFacilitator interface so the commerce scheme
+ * Implements x402's SchemeNetworkFacilitator interface so the authCapture scheme
  * is a drop-in for the x402 facilitator, just like ExactEvmScheme.
  */
 
@@ -24,32 +24,32 @@ import {
   BASE_CHAIN_IDS,
 } from '../shared/constants'
 import { verifyERC3009Signature } from '../shared/nonce'
-import { isCommercePayload, isCommerceExtra } from '../shared/types'
-import type { CommerceExtra, CommercePayload } from '../shared/types'
+import { isAuthCapturePayload, isAuthCaptureExtra } from '../shared/types'
+import type { AuthCaptureExtra, AuthCapturePayload } from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /**
  * Build the on-chain PaymentInfo struct from the client's payload.
  * Used by both verify (simulation) and settle (transaction).
  */
-function buildPaymentInfo(commercePayload: CommercePayload) {
+function buildPaymentInfo(authCapturePayload: AuthCapturePayload) {
   return {
-    operator: commercePayload.paymentInfo.operator,
-    payer: commercePayload.authorization.from,
-    receiver: commercePayload.paymentInfo.receiver,
-    token: commercePayload.paymentInfo.token,
-    maxAmount: BigInt(commercePayload.paymentInfo.maxAmount),
-    preApprovalExpiry: commercePayload.paymentInfo.preApprovalExpiry,
-    authorizationExpiry: commercePayload.paymentInfo.authorizationExpiry,
-    refundExpiry: commercePayload.paymentInfo.refundExpiry,
-    minFeeBps: commercePayload.paymentInfo.minFeeBps,
-    maxFeeBps: commercePayload.paymentInfo.maxFeeBps,
-    feeReceiver: commercePayload.paymentInfo.feeReceiver,
-    salt: BigInt(commercePayload.paymentInfo.salt),
+    operator: authCapturePayload.paymentInfo.operator,
+    payer: authCapturePayload.authorization.from,
+    receiver: authCapturePayload.paymentInfo.receiver,
+    token: authCapturePayload.paymentInfo.token,
+    maxAmount: BigInt(authCapturePayload.paymentInfo.maxAmount),
+    preApprovalExpiry: authCapturePayload.paymentInfo.preApprovalExpiry,
+    authorizationExpiry: authCapturePayload.paymentInfo.authorizationExpiry,
+    refundExpiry: authCapturePayload.paymentInfo.refundExpiry,
+    minFeeBps: authCapturePayload.paymentInfo.minFeeBps,
+    maxFeeBps: authCapturePayload.paymentInfo.maxFeeBps,
+    feeReceiver: authCapturePayload.paymentInfo.feeReceiver,
+    salt: BigInt(authCapturePayload.paymentInfo.salt),
   }
 }
 
-export interface CommerceFacilitatorOptions {
+export interface AuthCaptureFacilitatorOptions {
   /** Override default escrowAddress in /supported (default: commerce-payments AuthCaptureEscrow) */
   escrowAddress?: `0x${string}`
   /** Override default tokenCollector in /supported (default: commerce-payments ERC3009PaymentCollector) */
@@ -57,7 +57,7 @@ export interface CommerceFacilitatorOptions {
 }
 
 /**
- * Commerce Facilitator Scheme - implements x402's SchemeNetworkFacilitator
+ * AuthCapture Facilitator Scheme - implements x402's SchemeNetworkFacilitator
  *
  * The facilitator is operator-agnostic: operator addresses are set by the merchant
  * and arrive in `requirements.extra` at verify/settle time.
@@ -67,8 +67,8 @@ export interface CommerceFacilitatorOptions {
  * `enhancePaymentRequirements` which merges them under the merchant's extra —
  * so the merchant can override, but doesn't have to set them if the defaults are fine.
  */
-export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
-  readonly scheme = 'commerce'
+export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
+  readonly scheme = 'authCapture'
   readonly caipFamily = 'eip155:*'
   private defaultEscrow: `0x${string}`
   private defaultTokenCollector: `0x${string}`
@@ -76,7 +76,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
 
   constructor(
     private signer: FacilitatorEvmSigner,
-    options?: CommerceFacilitatorOptions,
+    options?: AuthCaptureFacilitatorOptions,
   ) {
     this.defaultEscrow = options?.escrowAddress ?? COMMERCE_PAYMENTS_ESCROW
     this.defaultTokenCollector = options?.tokenCollector ?? COMMERCE_PAYMENTS_TOKEN_COLLECTOR
@@ -107,17 +107,17 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     _context?: FacilitatorContext,
   ): Promise<VerifyResponse> {
     // M5: Type guard instead of double cast
-    if (!isCommercePayload(payload.payload)) {
+    if (!isAuthCapturePayload(payload.payload)) {
       return {
         isValid: false,
         invalidReason: 'invalid_payload_format',
       }
     }
-    const commercePayload = payload.payload as CommercePayload
-    const payer = commercePayload.authorization.from
+    const authCapturePayload = payload.payload as AuthCapturePayload
+    const payer = authCapturePayload.authorization.from
 
     // Validate scheme on both payload and requirements
-    if (payload.accepted.scheme !== 'commerce' || requirements.scheme !== 'commerce') {
+    if (payload.accepted.scheme !== 'authCapture' || requirements.scheme !== 'authCapture') {
       return {
         isValid: false,
         invalidReason: 'unsupported_scheme',
@@ -145,20 +145,20 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // M5: Type guard for extra
-    if (!isCommerceExtra(requirements.extra)) {
+    if (!isAuthCaptureExtra(requirements.extra)) {
       return {
         isValid: false,
-        invalidReason: 'invalid_commerce_extra',
+        invalidReason: 'invalid_authCapture_extra',
         payer,
       }
     }
-    const extra = requirements.extra as CommerceExtra
+    const extra = requirements.extra as AuthCaptureExtra
     const chainId = parseChainId(requirements.network)
 
     // Time window validation
     const now = Math.floor(Date.now() / 1000)
-    const validBefore = Number(commercePayload.authorization.validBefore)
-    const validAfter = Number(commercePayload.authorization.validAfter)
+    const validBefore = Number(authCapturePayload.authorization.validBefore)
+    const validAfter = Number(authCapturePayload.authorization.validAfter)
 
     if (validBefore <= now + 6) {
       return {
@@ -179,12 +179,12 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     // Extract inner signature for verification if EIP-6492 wrapped.
     // The contract's ERC6492SignatureHandler handles deployment; the facilitator
     // only needs the inner ECDSA signature for ecrecover verification.
-    const { signature: signatureForVerify } = parseErc6492Signature(commercePayload.signature)
+    const { signature: signatureForVerify } = parseErc6492Signature(authCapturePayload.signature)
 
     // Verify ERC-3009 signature
     const isValidSignature = await verifyERC3009Signature(
       this.signer,
-      commercePayload.authorization,
+      authCapturePayload.authorization,
       signatureForVerify,
       { ...extra, chainId },
       requirements.asset as `0x${string}`,
@@ -193,13 +193,13 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     if (!isValidSignature) {
       return {
         isValid: false,
-        invalidReason: 'invalid_commerce_signature',
+        invalidReason: 'invalid_authCapture_signature',
         payer,
       }
     }
 
     // Verify amount exactly matches requirements
-    if (BigInt(commercePayload.authorization.value) !== BigInt(requirements.amount)) {
+    if (BigInt(authCapturePayload.authorization.value) !== BigInt(requirements.amount)) {
       return {
         isValid: false,
         invalidReason: 'amount_mismatch',
@@ -208,7 +208,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify authorization recipient is the token collector
-    if (commercePayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
+    if (authCapturePayload.authorization.to.toLowerCase() !== extra.tokenCollector.toLowerCase()) {
       return {
         isValid: false,
         invalidReason: 'token_collector_mismatch',
@@ -217,7 +217,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify token matches
-    if (commercePayload.paymentInfo.token.toLowerCase() !== requirements.asset.toLowerCase()) {
+    if (authCapturePayload.paymentInfo.token.toLowerCase() !== requirements.asset.toLowerCase()) {
       return {
         isValid: false,
         invalidReason: 'token_mismatch',
@@ -226,7 +226,9 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     // Verify receiver matches
-    if (commercePayload.paymentInfo.receiver.toLowerCase() !== requirements.payTo.toLowerCase()) {
+    if (
+      authCapturePayload.paymentInfo.receiver.toLowerCase() !== requirements.payTo.toLowerCase()
+    ) {
       return {
         isValid: false,
         invalidReason: 'receiver_mismatch',
@@ -238,12 +240,12 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
     // spending gas (balance, consumed nonces, domain mismatches, contract errors).
     const settlementMethod = extra.settlementMethod ?? 'authorize'
     const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
-    const paymentInfo = buildPaymentInfo(commercePayload)
+    const paymentInfo = buildPaymentInfo(authCapturePayload)
     const settlementArgs = [
       paymentInfo,
-      BigInt(commercePayload.authorization.value),
+      BigInt(authCapturePayload.authorization.value),
       extra.tokenCollector,
-      commercePayload.signature,
+      authCapturePayload.signature,
     ] as const
 
     try {
@@ -306,10 +308,10 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    const commercePayload = payload.payload as unknown as CommercePayload
-    const extra = requirements.extra as unknown as CommerceExtra
+    const authCapturePayload = payload.payload as unknown as AuthCapturePayload
+    const extra = requirements.extra as unknown as AuthCaptureExtra
 
-    const paymentInfo = buildPaymentInfo(commercePayload)
+    const paymentInfo = buildPaymentInfo(authCapturePayload)
     const settlementMethod = extra.settlementMethod ?? 'authorize'
     const functionName = settlementMethod === 'charge' ? 'charge' : 'authorize'
 
@@ -320,9 +322,9 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         functionName,
         args: [
           paymentInfo,
-          BigInt(commercePayload.authorization.value),
+          BigInt(authCapturePayload.authorization.value),
           extra.tokenCollector,
-          commercePayload.signature,
+          authCapturePayload.signature,
         ],
       })
 
@@ -341,7 +343,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
           errorReason: 'transaction_reverted',
           transaction: txHash,
           network: requirements.network,
-          payer: commercePayload.authorization.from,
+          payer: authCapturePayload.authorization.from,
         }
       }
 
@@ -349,7 +351,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         success: true,
         transaction: txHash,
         network: requirements.network,
-        payer: commercePayload.authorization.from,
+        payer: authCapturePayload.authorization.from,
       }
     } catch (error) {
       return {
@@ -357,7 +359,7 @@ export class CommerceFacilitatorScheme implements SchemeNetworkFacilitator {
         errorReason: error instanceof Error ? error.message : 'Settlement failed',
         transaction: '',
         network: requirements.network,
-        payer: commercePayload.authorization.from,
+        payer: authCapturePayload.authorization.from,
       }
     }
   }

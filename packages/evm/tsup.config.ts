@@ -2,10 +2,10 @@ import { defineConfig } from 'tsup'
 
 const baseConfig = {
   entry: {
-    index: 'src/commerce/index.ts',
-    'commerce/client/index': 'src/commerce/client/index.ts',
-    'commerce/server/index': 'src/commerce/server/index.ts',
-    'commerce/facilitator/index': 'src/commerce/facilitator/index.ts',
+    index: 'src/authCapture/index.ts',
+    'authCapture/client/index': 'src/authCapture/client/index.ts',
+    'authCapture/server/index': 'src/authCapture/server/index.ts',
+    'authCapture/facilitator/index': 'src/authCapture/facilitator/index.ts',
     'extensions/attestation/index': 'src/extensions/attestation/index.ts',
   },
   dts: { resolve: true },
