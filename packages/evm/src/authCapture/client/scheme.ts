@@ -1,6 +1,6 @@
 /**
  * AuthCapture Scheme - Client
- * Creates payment payloads for authCapture payments.
+ * Builds payment payloads for authCapture payments.
  *
  * Implements x402's SchemeNetworkClient interface so it can be registered
  * on an x402Client via client.register('eip155:84532', new AuthCaptureEvmScheme(signer)).
@@ -13,10 +13,23 @@ import type {
   SchemeNetworkClient,
 } from '@x402/core/types'
 import type { ClientEvmSigner } from '@x402/evm'
-import { computeAuthCaptureNonce, signERC3009, generateSalt } from '../shared/nonce'
-import { zeroAddress } from 'viem'
-import { MAX_UINT48 } from '../shared/constants'
-import type { AuthCaptureExtra } from '../shared/types'
+import { hexToBigInt } from 'viem'
+import {
+  EIP3009_TOKEN_COLLECTOR_ADDRESS,
+  PERMIT2_TOKEN_COLLECTOR_ADDRESS,
+} from '../shared/constants'
+import {
+  computePayerAgnosticPaymentInfoHash,
+  generateSalt,
+  signERC3009,
+  signPermit2,
+} from '../shared/nonce'
+import type {
+  AuthCaptureExtra,
+  Eip3009Payload,
+  PaymentInfoStruct,
+  Permit2Payload,
+} from '../shared/types'
 import { parseChainId } from '../shared/utils'
 
 /**
@@ -38,7 +51,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
 
     const extra = requirements.extra as unknown as AuthCaptureExtra
 
-    // Validate required EIP-712 domain parameters (M3, M10)
+    // Validate required EIP-712 token-domain parameters
     if (!extra.name) {
       throw new Error(
         `EIP-712 domain parameter 'name' is required in payment requirements for asset ${requirements.asset}`,
@@ -49,52 +62,70 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
         `EIP-712 domain parameter 'version' is required in payment requirements for asset ${requirements.asset}`,
       )
     }
-
-    const {
-      escrowAddress,
-      operatorAddress,
-      tokenCollector,
-      minFeeBps = 0,
-      maxFeeBps = 0,
-      feeReceiver,
-      preApprovalExpirySeconds,
-      refundExpirySeconds,
-      authorizationExpirySeconds,
-    } = extra
+    if (!extra.captureAuthorizer) {
+      throw new Error(`'captureAuthorizer' is required in payment requirements extra`)
+    }
+    if (!extra.feeRecipient) {
+      throw new Error(`'feeRecipient' is required in payment requirements extra`)
+    }
+    if (typeof extra.captureDeadline !== 'number') {
+      throw new Error(`'captureDeadline' is required in payment requirements extra`)
+    }
+    if (typeof extra.refundDeadline !== 'number') {
+      throw new Error(`'refundDeadline' is required in payment requirements extra`)
+    }
 
     const chainId = parseChainId(requirements.network)
     const maxAmount = requirements.amount
     const nowSeconds = Math.floor(Date.now() / 1000)
+    const preApprovalExpiry = nowSeconds + (requirements.maxTimeoutSeconds ?? 60)
+    const salt = generateSalt()
+    const assetTransferMethod = extra.assetTransferMethod ?? 'eip3009'
 
-    const paymentInfo = {
-      operator: operatorAddress,
+    // Build the canonical PaymentInfo struct (Solidity field names — do not rename).
+    const paymentInfo: PaymentInfoStruct = {
+      operator: extra.captureAuthorizer,
+      payer: this.signer.address,
       receiver: requirements.payTo as `0x${string}`,
       token: requirements.asset as `0x${string}`,
       maxAmount,
-      preApprovalExpiry:
-        preApprovalExpirySeconds != null ? nowSeconds + preApprovalExpirySeconds : MAX_UINT48,
-      authorizationExpiry:
-        authorizationExpirySeconds != null ? nowSeconds + authorizationExpirySeconds : MAX_UINT48,
-      refundExpiry: refundExpirySeconds != null ? nowSeconds + refundExpirySeconds : MAX_UINT48,
-      minFeeBps,
-      maxFeeBps,
-      feeReceiver: feeReceiver ?? zeroAddress,
-      salt: generateSalt(),
+      preApprovalExpiry,
+      authorizationExpiry: extra.captureDeadline,
+      refundExpiry: extra.refundDeadline,
+      minFeeBps: extra.minFeeBps ?? 0,
+      maxFeeBps: extra.maxFeeBps,
+      feeReceiver: extra.feeRecipient,
+      salt,
     }
 
-    const nonce = computeAuthCaptureNonce(chainId, escrowAddress, paymentInfo)
+    // Payer-agnostic PaymentInfo hash — used as ERC-3009 nonce or Permit2 nonce.
+    const nonce = computePayerAgnosticPaymentInfoHash(chainId, paymentInfo)
 
-    // ERC-3009 authorization - validBefore MUST match what contract passes to receiveWithAuthorization
-    // The contract uses paymentInfo.preApprovalExpiry as validBefore
-    const authorization = {
+    if (assetTransferMethod === 'permit2') {
+      const permit2Authorization: Permit2Payload['permit2Authorization'] = {
+        from: this.signer.address,
+        permitted: {
+          token: requirements.asset as `0x${string}`,
+          amount: maxAmount,
+        },
+        spender: PERMIT2_TOKEN_COLLECTOR_ADDRESS,
+        nonce: hexToBigInt(nonce).toString(),
+        deadline: String(preApprovalExpiry),
+      }
+      const signature = await signPermit2(this.signer, permit2Authorization, chainId)
+      const payload: Permit2Payload = { permit2Authorization, signature, salt }
+      return { x402Version, payload: payload as unknown as Record<string, unknown> }
+    }
+
+    // Default: EIP-3009 ReceiveWithAuthorization to the canonical EIP-3009 token collector.
+    const authorization: Eip3009Payload['authorization'] = {
       from: this.signer.address,
-      to: tokenCollector,
+      to: EIP3009_TOKEN_COLLECTOR_ADDRESS,
       value: maxAmount,
       validAfter: '0',
-      validBefore: String(paymentInfo.preApprovalExpiry),
+      validBefore: String(preApprovalExpiry),
       nonce,
     }
-
     const signature = await signERC3009(
       this.signer,
       authorization,
@@ -102,10 +133,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
       requirements.asset as `0x${string}`,
       chainId,
     )
-
-    return {
-      x402Version,
-      payload: { authorization, signature, paymentInfo },
-    }
+    const payload: Eip3009Payload = { authorization, signature, salt }
+    return { x402Version, payload: payload as unknown as Record<string, unknown> }
   }
 }

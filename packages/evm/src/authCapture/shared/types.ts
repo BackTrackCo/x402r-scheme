@@ -1,67 +1,138 @@
 /**
- * Type guard for AuthCapturePayload
+ * authCapture wire-format types.
+ *
+ * Spec-level field names (captureAuthorizer, captureDeadline, refundDeadline,
+ * feeRecipient) live here at the extra/wire layer. The on-chain PaymentInfo
+ * struct keeps the canonical Solidity field names (operator, authorizationExpiry,
+ * refundExpiry, feeReceiver) so the EIP-712 typehash stays byte-identical with
+ * the AuthCaptureEscrow contract.
+ *
+ * Salt is NOT in extra. It is generated client-side per signing call and rides
+ * on the payload alongside the signature.
  */
-export function isAuthCapturePayload(value: unknown): value is AuthCapturePayload {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'authorization' in value &&
-    'signature' in value &&
-    'paymentInfo' in value
-  )
+
+// AuthCaptureExtra — fields in PaymentRequirements.extra
+export interface AuthCaptureExtra {
+  // Required
+  captureAuthorizer: `0x${string}` // address authorized to capture/void/refund (formerly `operator`)
+  captureDeadline: number // absolute Unix seconds; capture must occur before this
+  refundDeadline: number // absolute Unix seconds; refunds allowed until this
+  feeRecipient: `0x${string}` // address that receives the fee portion (renamed from feeReceiver)
+  maxFeeBps: number
+  name: string // EIP-712 token-domain name (e.g., "USDC")
+  version: string // EIP-712 token-domain version (e.g., "2")
+  // Optional
+  minFeeBps?: number // default: 0
+  autoCapture?: boolean // default: false. true → facilitator calls charge(), false → authorize()
+  assetTransferMethod?: 'eip3009' | 'permit2' // default: 'eip3009'
 }
 
 /**
- * Type guard for AuthCaptureExtra
+ * Type guard for AuthCaptureExtra.
  */
 export function isAuthCaptureExtra(value: unknown): value is AuthCaptureExtra {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'escrowAddress' in value &&
-    'operatorAddress' in value &&
-    'tokenCollector' in value
+    typeof v.captureAuthorizer === 'string' &&
+    typeof v.captureDeadline === 'number' &&
+    typeof v.refundDeadline === 'number' &&
+    typeof v.feeRecipient === 'string' &&
+    typeof v.maxFeeBps === 'number' &&
+    typeof v.name === 'string' &&
+    typeof v.version === 'string'
   )
 }
 
-// AuthCaptureExtra - fields in PaymentRequirements.extra
-export interface AuthCaptureExtra {
-  escrowAddress: `0x${string}`
-  operatorAddress: `0x${string}`
-  tokenCollector: `0x${string}`
-  preApprovalExpirySeconds?: number
-  authorizationExpirySeconds?: number
-  refundExpirySeconds?: number
-  minFeeBps?: number
-  maxFeeBps?: number
-  feeReceiver?: `0x${string}`
-  settlementMethod?: 'authorize' | 'charge' // default: "authorize"
-  name: string // EIP-712 domain name (e.g., "USDC" for Base USDC)
-  version: string // EIP-712 domain version (e.g., "2" for USDC)
-}
-
-// AuthCapturePayload - the payload field in PaymentPayload
-export interface AuthCapturePayload {
+// EIP-3009 payload — ReceiveWithAuthorization to the canonical EIP-3009 token collector.
+export interface Eip3009Payload {
   authorization: {
     from: `0x${string}`
-    to: `0x${string}`
+    to: `0x${string}` // EIP3009_TOKEN_COLLECTOR_ADDRESS
     value: string
     validAfter: string
-    validBefore: string
-    nonce: `0x${string}`
+    validBefore: string // = preApprovalExpiry
+    nonce: `0x${string}` // = payer-agnostic PaymentInfo hash
   }
   signature: `0x${string}`
-  paymentInfo: {
-    operator: `0x${string}`
-    receiver: `0x${string}`
-    token: `0x${string}`
-    maxAmount: string
-    preApprovalExpiry: number
-    authorizationExpiry: number
-    refundExpiry: number
-    minFeeBps: number
-    maxFeeBps: number
-    feeReceiver: `0x${string}`
-    salt: `0x${string}`
+  salt: `0x${string}` // bytes32, fresh per request, used to reconstruct PaymentInfo
+}
+
+/**
+ * Type guard for Eip3009Payload.
+ */
+export function isEip3009Payload(value: unknown): value is Eip3009Payload {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    'authorization' in v &&
+    typeof v.authorization === 'object' &&
+    v.authorization !== null &&
+    typeof v.signature === 'string' &&
+    typeof v.salt === 'string'
+  )
+}
+
+// Permit2 payload — PermitTransferFrom to the canonical Permit2 token collector.
+export interface Permit2Payload {
+  permit2Authorization: {
+    from: `0x${string}`
+    permitted: {
+      token: `0x${string}`
+      amount: string
+    }
+    spender: `0x${string}` // PERMIT2_TOKEN_COLLECTOR_ADDRESS
+    nonce: string // uint256 string, = uint256(payer-agnostic PaymentInfo hash)
+    deadline: string // = preApprovalExpiry
   }
+  signature: `0x${string}`
+  salt: `0x${string}` // bytes32, fresh per request, used to reconstruct PaymentInfo
+}
+
+/**
+ * Type guard for Permit2Payload.
+ */
+export function isPermit2Payload(value: unknown): value is Permit2Payload {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (typeof v.signature !== 'string' || typeof v.salt !== 'string') return false
+  if (typeof v.permit2Authorization !== 'object' || v.permit2Authorization === null) return false
+  const a = v.permit2Authorization as Record<string, unknown>
+  return (
+    typeof a.from === 'string' &&
+    typeof a.spender === 'string' &&
+    typeof a.nonce === 'string' &&
+    typeof a.deadline === 'string' &&
+    typeof a.permitted === 'object' &&
+    a.permitted !== null
+  )
+}
+
+// Discriminated union of all authCapture payload shapes.
+export type AuthCapturePayload = Eip3009Payload | Permit2Payload
+
+/**
+ * Type guard for any authCapture payload (EIP-3009 or Permit2).
+ */
+export function isAuthCapturePayload(value: unknown): value is AuthCapturePayload {
+  return isEip3009Payload(value) || isPermit2Payload(value)
+}
+
+/**
+ * On-chain PaymentInfo struct (canonical Solidity names — DO NOT RENAME).
+ * Reconstructed by the facilitator from extra + payload.salt + payer + receiver/asset/amount.
+ */
+export interface PaymentInfoStruct {
+  operator: `0x${string}` // = extra.captureAuthorizer
+  payer: `0x${string}`
+  receiver: `0x${string}` // = requirements.payTo
+  token: `0x${string}` // = requirements.asset
+  maxAmount: string // = requirements.amount
+  preApprovalExpiry: number
+  authorizationExpiry: number // = extra.captureDeadline
+  refundExpiry: number // = extra.refundDeadline
+  minFeeBps: number
+  maxFeeBps: number
+  feeReceiver: `0x${string}` // = extra.feeRecipient
+  salt: `0x${string}` // = payload.salt
 }

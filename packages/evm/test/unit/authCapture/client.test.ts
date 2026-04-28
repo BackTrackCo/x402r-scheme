@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { AuthCaptureEvmScheme } from '../../../src/authCapture/client/index'
 import { x402Client } from '@x402/core/client'
 import { registerAuthCaptureEvmScheme } from '../../../src/authCapture/client/index'
-import { MAX_UINT48 } from '../../../src/authCapture/shared/constants'
+import {
+  EIP3009_TOKEN_COLLECTOR_ADDRESS,
+  PERMIT2_TOKEN_COLLECTOR_ADDRESS,
+} from '../../../src/authCapture/shared/constants'
+import { isEip3009Payload, isPermit2Payload } from '../../../src/authCapture/shared/types'
+import type { Eip3009Payload, Permit2Payload } from '../../../src/authCapture/shared/types'
+
+const FUTURE = Math.floor(Date.now() / 1000) + 86400
 
 describe('AuthCaptureEvmScheme', () => {
   const createMockSigner = () => ({
@@ -28,9 +35,11 @@ describe('AuthCaptureEvmScheme', () => {
     payTo: '0x1234567890123456789012345678901234567890',
     maxTimeoutSeconds: 3600,
     extra: {
-      escrowAddress: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' as const,
-      operatorAddress: '0xcccccccccccccccccccccccccccccccccccccccc' as const,
-      tokenCollector: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as const,
+      captureAuthorizer: '0xcccccccccccccccccccccccccccccccccccccccc' as `0x${string}`,
+      captureDeadline: FUTURE,
+      refundDeadline: FUTURE + 86400,
+      feeRecipient: '0x4444444444444444444444444444444444444444' as `0x${string}`,
+      maxFeeBps: 100,
       name: 'USDC',
       version: '2',
     },
@@ -43,21 +52,21 @@ describe('AuthCaptureEvmScheme', () => {
     })
   })
 
-  describe('createPaymentPayload', () => {
-    it('should create a valid payment payload for x402Version 2', async () => {
+  describe('createPaymentPayload — EIP-3009 (default)', () => {
+    it('should create a valid EIP-3009 payload for x402Version 2', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
 
       expect(result.x402Version).toBe(2)
-      expect(result.payload).toBeDefined()
-      expect(result.payload.authorization).toBeDefined()
-      expect(result.payload.signature).toBe('0xdeadbeef')
-      expect(result.payload.paymentInfo).toBeDefined()
+      expect(isEip3009Payload(result.payload)).toBe(true)
+      const payload = result.payload as unknown as Eip3009Payload
+      expect(payload.authorization).toBeDefined()
+      expect(payload.signature).toBe('0xdeadbeef')
+      expect(payload.salt).toMatch(/^0x[a-fA-F0-9]{64}$/)
     })
 
     it('should throw for unsupported x402Version', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
-
       await expect(scheme.createPaymentPayload(1, mockRequirements)).rejects.toThrow(
         'Unsupported x402Version: 1. Only version 2 is supported.',
       )
@@ -65,17 +74,8 @@ describe('AuthCaptureEvmScheme', () => {
 
     it('should throw for x402Version 0', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
-
       await expect(scheme.createPaymentPayload(0, mockRequirements)).rejects.toThrow(
         'Unsupported x402Version: 0',
-      )
-    })
-
-    it('should throw for x402Version 3', async () => {
-      const scheme = new AuthCaptureEvmScheme(mockSigner)
-
-      await expect(scheme.createPaymentPayload(3, mockRequirements)).rejects.toThrow(
-        'Unsupported x402Version: 3',
       )
     })
 
@@ -85,7 +85,6 @@ describe('AuthCaptureEvmScheme', () => {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, name: '' },
       }
-
       await expect(scheme.createPaymentPayload(2, requirementsNoName)).rejects.toThrow(
         "EIP-712 domain parameter 'name' is required",
       )
@@ -97,105 +96,78 @@ describe('AuthCaptureEvmScheme', () => {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, version: '' },
       }
-
       await expect(scheme.createPaymentPayload(2, requirementsNoVersion)).rejects.toThrow(
         "EIP-712 domain parameter 'version' is required",
+      )
+    })
+
+    it('should throw when captureAuthorizer is missing', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      const bad = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, captureAuthorizer: '' as `0x${string}` },
+      }
+      await expect(scheme.createPaymentPayload(2, bad)).rejects.toThrow(
+        "'captureAuthorizer' is required",
+      )
+    })
+
+    it('should throw when feeRecipient is missing', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      const bad = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, feeRecipient: '' as `0x${string}` },
+      }
+      await expect(scheme.createPaymentPayload(2, bad)).rejects.toThrow(
+        "'feeRecipient' is required",
       )
     })
 
     it('should set authorization.from to signer address', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.authorization.from).toBe(mockSigner.address)
+      const payload = result.payload as unknown as Eip3009Payload
+      expect(payload.authorization.from).toBe(mockSigner.address)
     })
 
-    it('should set authorization.to to tokenCollector', async () => {
+    it('should set authorization.to to the canonical EIP-3009 token collector', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.authorization.to).toBe(mockRequirements.extra.tokenCollector)
+      const payload = result.payload as unknown as Eip3009Payload
+      expect(payload.authorization.to).toBe(EIP3009_TOKEN_COLLECTOR_ADDRESS)
     })
 
     it('should set authorization.value to requirements amount', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
       const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.authorization.value).toBe('1000000')
+      const payload = result.payload as unknown as Eip3009Payload
+      expect(payload.authorization.value).toBe('1000000')
     })
 
-    it('should set paymentInfo fields correctly', async () => {
+    it('should derive validBefore from now + maxTimeoutSeconds', async () => {
+      const fakeNowMs = 1700000000000
+      vi.spyOn(Date, 'now').mockReturnValue(fakeNowMs)
       const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.paymentInfo.operator).toBe(mockRequirements.extra.operatorAddress)
-      expect(result.payload.paymentInfo.receiver).toBe(mockRequirements.payTo)
-      expect(result.payload.paymentInfo.token).toBe(mockRequirements.asset)
-    })
-
-    it('should default feeReceiver to zeroAddress when not specified', async () => {
-      const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.paymentInfo.feeReceiver).toBe(
-        '0x0000000000000000000000000000000000000000',
-      )
-    })
-
-    it('should use provided feeReceiver when specified', async () => {
-      const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const requirementsWithFeeReceiver = {
+      const result = await scheme.createPaymentPayload(2, {
         ...mockRequirements,
-        extra: {
-          ...mockRequirements.extra,
-          feeReceiver: '0x1111111111111111111111111111111111111111' as const,
-        },
-      }
-      const result = await scheme.createPaymentPayload(2, requirementsWithFeeReceiver)
-
-      expect(result.payload.paymentInfo.feeReceiver).toBe(
-        '0x1111111111111111111111111111111111111111',
-      )
+        maxTimeoutSeconds: 600,
+      })
+      const payload = result.payload as unknown as Eip3009Payload
+      expect(payload.authorization.validBefore).toBe('1700000600')
     })
 
-    it('should convert expirySeconds to absolute timestamps', async () => {
-      const fakeNow = 1700000000000 // fixed ms
-      vi.spyOn(Date, 'now').mockReturnValue(fakeNow)
-      const nowSeconds = 1700000000
-
+    it('should generate a fresh salt on each call', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const requirementsWithExpiries = {
-        ...mockRequirements,
-        extra: {
-          ...mockRequirements.extra,
-          preApprovalExpirySeconds: 3600,
-          authorizationExpirySeconds: 86400,
-          refundExpirySeconds: 604800,
-        },
-      }
-      const result = await scheme.createPaymentPayload(2, requirementsWithExpiries)
-
-      expect(result.payload.paymentInfo.preApprovalExpiry).toBe(nowSeconds + 3600)
-      expect(result.payload.paymentInfo.authorizationExpiry).toBe(nowSeconds + 86400)
-      expect(result.payload.paymentInfo.refundExpiry).toBe(nowSeconds + 604800)
-    })
-
-    it('should default expiries to MAX_UINT48 when not specified', async () => {
-      const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const result = await scheme.createPaymentPayload(2, mockRequirements)
-
-      expect(result.payload.paymentInfo.preApprovalExpiry).toBe(MAX_UINT48)
-      expect(result.payload.paymentInfo.authorizationExpiry).toBe(MAX_UINT48)
-      expect(result.payload.paymentInfo.refundExpiry).toBe(MAX_UINT48)
+      const a = (await scheme.createPaymentPayload(2, mockRequirements))
+        .payload as unknown as Eip3009Payload
+      const b = (await scheme.createPaymentPayload(2, mockRequirements))
+        .payload as unknown as Eip3009Payload
+      expect(a.salt).not.toBe(b.salt)
     })
 
     it('should throw for invalid network format', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
-      const badNetworkRequirements = {
-        ...mockRequirements,
-        network: 'solana:mainnet',
-      }
-
+      const badNetworkRequirements = { ...mockRequirements, network: 'solana:mainnet' }
       await expect(scheme.createPaymentPayload(2, badNetworkRequirements)).rejects.toThrow(
         'Invalid network format',
       )
@@ -204,8 +176,37 @@ describe('AuthCaptureEvmScheme', () => {
     it('should call signTypedData on signer', async () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner)
       await scheme.createPaymentPayload(2, mockRequirements)
-
       expect(mockSigner.signTypedData).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('createPaymentPayload — Permit2', () => {
+    it('should create a valid Permit2 payload when assetTransferMethod is permit2', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      const result = await scheme.createPaymentPayload(2, {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      })
+
+      expect(isPermit2Payload(result.payload)).toBe(true)
+      const payload = result.payload as unknown as Permit2Payload
+      expect(payload.permit2Authorization.from).toBe(mockSigner.address)
+      expect(payload.permit2Authorization.spender).toBe(PERMIT2_TOKEN_COLLECTOR_ADDRESS)
+      expect(payload.permit2Authorization.permitted.token).toBe(mockRequirements.asset)
+      expect(payload.permit2Authorization.permitted.amount).toBe(mockRequirements.amount)
+      expect(payload.salt).toMatch(/^0x[a-fA-F0-9]{64}$/)
+    })
+
+    it('should compute a uint256-string Permit2 nonce', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      const result = await scheme.createPaymentPayload(2, {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      })
+      const payload = result.payload as unknown as Permit2Payload
+      // uint256 stringified — should parse as a valid bigint
+      expect(() => BigInt(payload.permit2Authorization.nonce)).not.toThrow()
+      expect(payload.permit2Authorization.nonce.length).toBeGreaterThan(0)
     })
   })
 
@@ -236,7 +237,6 @@ describe('AuthCaptureEvmScheme', () => {
         signer: mockSigner,
         networks: 'eip155:84532',
       })
-
       expect(result).toBe(client)
     })
   })

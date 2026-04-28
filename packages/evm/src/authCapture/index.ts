@@ -1,3 +1,14 @@
 export { AuthCaptureEvmScheme } from './client/scheme'
-export type { AuthCapturePayload, AuthCaptureExtra } from './shared/types'
-export { isAuthCapturePayload, isAuthCaptureExtra } from './shared/types'
+export type {
+  AuthCaptureExtra,
+  AuthCapturePayload,
+  Eip3009Payload,
+  PaymentInfoStruct,
+  Permit2Payload,
+} from './shared/types'
+export {
+  isAuthCaptureExtra,
+  isAuthCapturePayload,
+  isEip3009Payload,
+  isPermit2Payload,
+} from './shared/types'

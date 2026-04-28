@@ -1,15 +1,19 @@
 /**
- * Nonce computation and ERC-3009 signing utilities
- * Adapted from @agentokratia/x402-escrow (MIT)
+ * Nonce computation, salt generation, and signing helpers.
  */
 
 import { encodeAbiParameters, getAddress, keccak256, toHex, zeroAddress } from 'viem'
 import type { ClientEvmSigner } from '@x402/evm'
-import { RECEIVE_AUTHORIZATION_TYPES } from './constants'
-import type { AuthCaptureExtra, AuthCapturePayload } from './types'
+import {
+  AUTH_CAPTURE_ESCROW_ADDRESS,
+  PERMIT2_ADDRESS,
+  PERMIT2_TRANSFER_FROM_TYPES,
+  RECEIVE_AUTHORIZATION_TYPES,
+} from './constants'
+import type { AuthCaptureExtra, Eip3009Payload, PaymentInfoStruct, Permit2Payload } from './types'
 
 /**
- * PaymentInfo typehash - must match AuthCaptureEscrow.PAYMENT_INFO_TYPEHASH
+ * PaymentInfo typehash — must match AuthCaptureEscrow.PAYMENT_INFO_TYPEHASH.
  */
 const PAYMENT_INFO_TYPEHASH = keccak256(
   new TextEncoder().encode(
@@ -18,15 +22,17 @@ const PAYMENT_INFO_TYPEHASH = keccak256(
 )
 
 /**
- * Compute authCapture nonce for ERC-3009 authorization
- * Must match AuthCaptureEscrow.getHash() with payer=address(0)
+ * Compute the payer-agnostic PaymentInfo hash. Used as the ERC-3009 nonce
+ * (bytes32) and as the Permit2 nonce (uint256). Payer is zeroed so the same
+ * hash can be reconstructed by the facilitator regardless of who pays.
+ *
+ * Freshness is the responsibility of `paymentInfo.salt` — generate a new salt
+ * per signing call (see `generateSalt`).
  */
-export function computeAuthCaptureNonce(
+export function computePayerAgnosticPaymentInfoHash(
   chainId: number,
-  escrowAddress: `0x${string}`,
-  paymentInfo: AuthCapturePayload['paymentInfo'],
+  paymentInfo: PaymentInfoStruct,
 ): `0x${string}` {
-  // Step 1: Encode paymentInfo with payer=0 (payer-agnostic)
   const paymentInfoEncoded = encodeAbiParameters(
     [
       { name: 'typehash', type: 'bytes32' },
@@ -46,7 +52,7 @@ export function computeAuthCaptureNonce(
     [
       PAYMENT_INFO_TYPEHASH,
       paymentInfo.operator,
-      zeroAddress, // payer-agnostic
+      zeroAddress,
       paymentInfo.receiver,
       paymentInfo.token,
       BigInt(paymentInfo.maxAmount),
@@ -61,32 +67,30 @@ export function computeAuthCaptureNonce(
   )
   const paymentInfoHash = keccak256(paymentInfoEncoded)
 
-  // Step 2: Encode (chainId, escrow, paymentInfoHash) and hash
   const outerEncoded = encodeAbiParameters(
     [
       { name: 'chainId', type: 'uint256' },
       { name: 'escrow', type: 'address' },
       { name: 'paymentInfoHash', type: 'bytes32' },
     ],
-    [BigInt(chainId), escrowAddress, paymentInfoHash],
+    [BigInt(chainId), AUTH_CAPTURE_ESCROW_ADDRESS, paymentInfoHash],
   )
 
   return keccak256(outerEncoded)
 }
 
 /**
- * Sign ERC-3009 ReceiveWithAuthorization
- * Note: receiveWithAuthorization uses a different primary type than transferWithAuthorization
+ * Sign ERC-3009 ReceiveWithAuthorization. The token's EIP-712 domain (name,
+ * version) comes from `extra` because it varies per asset (e.g. "USDC" on
+ * Sepolia, "USD Coin" on mainnet).
  */
 export async function signERC3009(
   signer: ClientEvmSigner,
-  authorization: AuthCapturePayload['authorization'],
+  authorization: Eip3009Payload['authorization'],
   extra: AuthCaptureExtra,
   tokenAddress: `0x${string}`,
   chainId: number,
 ): Promise<`0x${string}`> {
-  // EIP-712 domain - name must match the token's EIP-712 domain
-  // (e.g., "USDC" for Base USDC, not "USD Coin")
   const domain = {
     name: extra.name,
     version: extra.version,
@@ -112,12 +116,7 @@ export async function signERC3009(
 }
 
 /**
- * Verify ERC-3009 signature (facilitator-side)
- * @param signer - The signer with verifyTypedData method
- * @param authorization - ERC-3009 authorization data
- * @param signature - The signature to verify
- * @param extra - Extra configuration including chainId
- * @param tokenAddress - The token contract address (verifyingContract for EIP-712)
+ * Verify ERC-3009 ReceiveWithAuthorization signature.
  */
 export async function verifyERC3009Signature(
   signer: {
@@ -130,7 +129,7 @@ export async function verifyERC3009Signature(
       signature: `0x${string}`
     }) => Promise<boolean>
   },
-  authorization: AuthCapturePayload['authorization'],
+  authorization: Eip3009Payload['authorization'],
   signature: `0x${string}`,
   extra: AuthCaptureExtra & { chainId: number },
   tokenAddress: `0x${string}`,
@@ -166,7 +165,92 @@ export async function verifyERC3009Signature(
 }
 
 /**
- * Generate random salt for paymentInfo
+ * Sign Permit2 PermitTransferFrom. No witness — the deterministic nonce
+ * (payer-agnostic PaymentInfo hash) cryptographically binds all payment
+ * parameters including the merchant address.
+ */
+export async function signPermit2(
+  signer: ClientEvmSigner,
+  permit: Permit2Payload['permit2Authorization'],
+  chainId: number,
+): Promise<`0x${string}`> {
+  const domain = {
+    name: 'Permit2',
+    chainId,
+    verifyingContract: PERMIT2_ADDRESS,
+  }
+
+  const message = {
+    permitted: {
+      token: getAddress(permit.permitted.token),
+      amount: BigInt(permit.permitted.amount),
+    },
+    spender: getAddress(permit.spender),
+    nonce: BigInt(permit.nonce),
+    deadline: BigInt(permit.deadline),
+  }
+
+  return signer.signTypedData({
+    domain,
+    types: PERMIT2_TRANSFER_FROM_TYPES,
+    primaryType: 'PermitTransferFrom',
+    message,
+  })
+}
+
+/**
+ * Verify Permit2 PermitTransferFrom signature.
+ */
+export async function verifyPermit2Signature(
+  signer: {
+    verifyTypedData: (_args: {
+      address: `0x${string}`
+      domain: Record<string, unknown>
+      types: Record<string, unknown>
+      primaryType: string
+      message: Record<string, unknown>
+      signature: `0x${string}`
+    }) => Promise<boolean>
+  },
+  permit: Permit2Payload['permit2Authorization'],
+  signature: `0x${string}`,
+  chainId: number,
+): Promise<boolean> {
+  const domain = {
+    name: 'Permit2',
+    chainId,
+    verifyingContract: PERMIT2_ADDRESS,
+  }
+
+  const message = {
+    permitted: {
+      token: getAddress(permit.permitted.token),
+      amount: BigInt(permit.permitted.amount),
+    },
+    spender: getAddress(permit.spender),
+    nonce: BigInt(permit.nonce),
+    deadline: BigInt(permit.deadline),
+  }
+
+  try {
+    return await signer.verifyTypedData({
+      address: getAddress(permit.from),
+      domain,
+      types: PERMIT2_TRANSFER_FROM_TYPES,
+      primaryType: 'PermitTransferFrom',
+      message,
+      signature,
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Generate a fresh cryptographically-random 32-byte salt. MUST be called once
+ * per signing request — never reuse across requests. Freshness is required
+ * because the nonce derivation zeroes the payer field; identical extras with
+ * the same salt would collide across payers.
  */
 export function generateSalt(): `0x${string}` {
   const bytes = new Uint8Array(32)
