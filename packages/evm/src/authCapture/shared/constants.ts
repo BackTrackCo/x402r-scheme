@@ -2,10 +2,11 @@ export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
 // Canonical AuthCaptureEscrow + token collector deployments from base/commerce-payments.
-// These are universal constants — not configurable per merchant. The same address is
-// expected on every supported chain (CREATE2 deploy under deterministic salts).
-// Currently only Base mainnet + Base Sepolia are confirmed; BASE_CHAIN_IDS gates
-// /supported until additional chains are deployed.
+// These are universal constants — not configurable per merchant. CREATE2-deployed
+// at the same address on every chain they ship to. Currently confirmed on Base
+// mainnet + Base Sepolia only; until additional deploys land, the server scheme's
+// ASSET_INFO registry is restricted to those two networks (settle would revert
+// elsewhere because the escrow contract doesn't exist).
 // https://github.com/base/commerce-payments
 export const AUTH_CAPTURE_ESCROW_ADDRESS =
   '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff' as const satisfies `0x${string}`
@@ -18,8 +19,6 @@ export const PERMIT2_TOKEN_COLLECTOR_ADDRESS =
 // https://github.com/Uniswap/permit2
 export const PERMIT2_ADDRESS =
   '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const satisfies `0x${string}`
-
-export const BASE_CHAIN_IDS = new Set(['eip155:8453', 'eip155:84532'])
 
 // PaymentInfo struct for AuthCaptureEscrow (matches base/commerce-payments contract).
 // Field names are canonical Solidity — do not rename. Spec-level field renames
@@ -70,6 +69,8 @@ export const ESCROW_ABI = [
       { name: 'amount', type: 'uint256' },
       { name: 'tokenCollector', type: 'address' },
       { name: 'collectorData', type: 'bytes' },
+      { name: 'feeBps', type: 'uint16' },
+      { name: 'feeReceiver', type: 'address' },
     ],
     outputs: [],
   },

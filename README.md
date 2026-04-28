@@ -29,7 +29,10 @@ registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
 ### Server
 
 ```typescript
-import { AuthCaptureServerScheme, registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/server'
+import {
+  AuthCaptureServerScheme,
+  registerAuthCaptureEvmScheme,
+} from '@x402r/evm/authCapture/server'
 import { x402ResourceServer } from '@x402/core/server'
 
 const server = new x402ResourceServer(facilitatorConfig)

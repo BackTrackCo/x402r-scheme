@@ -173,6 +173,11 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     if (extra.refundDeadline <= extra.captureDeadline) {
       return { isValid: false, invalidReason: 'invalid_deadline_ordering', payer }
     }
+    // Mirror AuthCaptureEscrow._validatePayment ordering check upfront so the
+    // facilitator rejects with a typed reason instead of letting the contract
+    // revert with InvalidExpiries. preApprovalExpiry is client-derived from
+    // requirements.maxTimeoutSeconds; if a merchant pairs a tight captureDeadline
+    // with a generous maxTimeoutSeconds, the inequality breaks.
 
     let preApprovalExpiry: number
     let amount: bigint
@@ -242,6 +247,13 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
 
     if (amount !== BigInt(requirements.amount)) {
       return { isValid: false, invalidReason: 'amount_mismatch', payer }
+    }
+
+    if (preApprovalExpiry > extra.captureDeadline) {
+      // AuthCaptureEscrow._validatePayment requires preApprovalExp <= authorizationExp <= refundExp.
+      // Surface this as the same invalid_deadline_ordering reason rather than letting the
+      // contract revert with InvalidExpiries on settle.
+      return { isValid: false, invalidReason: 'invalid_deadline_ordering', payer }
     }
 
     // Reconstruct PaymentInfo and verify the wire nonce matches the
@@ -324,13 +336,29 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     )
 
     const functionName = extra.autoCapture === true ? 'charge' : 'authorize'
+    const tuple = paymentInfoToContractTuple(paymentInfo)
+    // charge() takes 6 args (adds feeBps + feeReceiver); authorize() takes 4.
+    // Use minFeeBps as the safe default within the merchant's signed [min, max]
+    // range; feeReceiver mirrors paymentInfo.feeReceiver (= extra.feeRecipient)
+    // because _validateFee requires actual to match configured when configured != 0.
+    const args =
+      functionName === 'charge'
+        ? ([
+            tuple,
+            amount,
+            tokenCollector,
+            collectorData,
+            paymentInfo.minFeeBps,
+            paymentInfo.feeReceiver,
+          ] as const)
+        : ([tuple, amount, tokenCollector, collectorData] as const)
 
     try {
       const txHash = await this.signer.writeContract({
         address: AUTH_CAPTURE_ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName,
-        args: [paymentInfoToContractTuple(paymentInfo), amount, tokenCollector, collectorData],
+        args,
       })
 
       const receiptPromise = this.signer.waitForTransactionReceipt({ hash: txHash })
@@ -380,13 +408,25 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     const assetTransferMethod = extra.assetTransferMethod ?? 'eip3009'
     const { tokenCollector, collectorData } = unpackForSettle(wirePayload, assetTransferMethod)
     const functionName = extra.autoCapture === true ? 'charge' : 'authorize'
+    const tuple = paymentInfoToContractTuple(paymentInfo)
+    const args =
+      functionName === 'charge'
+        ? ([
+            tuple,
+            amount,
+            tokenCollector,
+            collectorData,
+            paymentInfo.minFeeBps,
+            paymentInfo.feeReceiver,
+          ] as const)
+        : ([tuple, amount, tokenCollector, collectorData] as const)
 
     try {
       await this.signer.readContract({
         address: AUTH_CAPTURE_ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName,
-        args: [paymentInfoToContractTuple(paymentInfo), amount, tokenCollector, collectorData],
+        args,
       })
       return 'ok'
     } catch {

@@ -18,10 +18,10 @@ Unlike `exact`, which has no built-in mechanism for returning funds, `authCaptur
 
 The scheme supports two settlement paths, selected via `extra.autoCapture`:
 
-| `autoCapture` | Behavior                                                                |
-| :------------ | :---------------------------------------------------------------------- |
+| `autoCapture`     | Behavior                                                                                                                     |
+| :---------------- | :--------------------------------------------------------------------------------------------------------------------------- |
 | `false` (default) | Two-phase. Funds held in escrow. CaptureAuthorizer can capture, void, refund. Client can reclaim if capture deadline passes. |
-| `true`        | Single-shot. Funds sent directly to receiver. Refundable post-settlement. |
+| `true`            | Single-shot. Funds sent directly to receiver. Refundable post-settlement.                                                    |
 
 ### Two-phase (`autoCapture: false`, default)
 
@@ -69,11 +69,11 @@ Two absolute-timestamp deadlines govern the payment lifecycle (network-specific 
 
 ## Relationship to `exact`
 
-| Aspect     | `exact`            | `authCapture`                                                                |
-| :--------- | :----------------- | :--------------------------------------------------------------------------- |
-| Settlement | Immediate transfer | Via escrow (two-phase) or direct with refund capability (single-shot)        |
-| Refundable | No                 | Yes (both paths)                                                             |
-| Fee system | None               | Configurable (min/max bounds, client-signed)                                 |
+| Aspect     | `exact`            | `authCapture`                                                         |
+| :--------- | :----------------- | :-------------------------------------------------------------------- |
+| Settlement | Immediate transfer | Via escrow (two-phase) or direct with refund capability (single-shot) |
+| Refundable | No                 | Yes (both paths)                                                      |
+| Fee system | None               | Configurable (min/max bounds, client-signed)                          |
 
 ## Appendix
 

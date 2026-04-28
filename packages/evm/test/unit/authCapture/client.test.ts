@@ -4,6 +4,7 @@ import { x402Client } from '@x402/core/client'
 import { registerAuthCaptureEvmScheme } from '../../../src/authCapture/client/index'
 import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
+  PERMIT2_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from '../../../src/authCapture/shared/constants'
 import { isEip3009Payload, isPermit2Payload } from '../../../src/authCapture/shared/types'
@@ -178,6 +179,18 @@ describe('AuthCaptureEvmScheme', () => {
       await scheme.createPaymentPayload(2, mockRequirements)
       expect(mockSigner.signTypedData).toHaveBeenCalledOnce()
     })
+
+    it('should sign with EIP-712 domain bound to the asset (verifyingContract = requirements.asset)', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      await scheme.createPaymentPayload(2, mockRequirements)
+      const args = mockSigner.signTypedData.mock.calls[0][0]
+      expect(args.primaryType).toBe('ReceiveWithAuthorization')
+      expect(args.domain.name).toBe('USDC')
+      expect(args.domain.version).toBe('2')
+      expect(args.domain.chainId).toBe(84532)
+      // Critical: verifyingContract is the token, NOT the collector
+      expect(args.domain.verifyingContract.toLowerCase()).toBe(mockRequirements.asset.toLowerCase())
+    })
   })
 
   describe('createPaymentPayload — Permit2', () => {
@@ -207,6 +220,20 @@ describe('AuthCaptureEvmScheme', () => {
       // uint256 stringified — should parse as a valid bigint
       expect(() => BigInt(payload.permit2Authorization.nonce)).not.toThrow()
       expect(payload.permit2Authorization.nonce.length).toBeGreaterThan(0)
+    })
+
+    it('should sign with EIP-712 domain bound to canonical Permit2 (NOT the token)', async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner)
+      await scheme.createPaymentPayload(2, {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      })
+      const args = mockSigner.signTypedData.mock.calls[0][0]
+      expect(args.primaryType).toBe('PermitTransferFrom')
+      expect(args.domain.name).toBe('Permit2')
+      expect(args.domain.chainId).toBe(84532)
+      // Critical: verifyingContract is the canonical Permit2, NOT the token, NOT the collector
+      expect(args.domain.verifyingContract).toBe(PERMIT2_ADDRESS)
     })
   })
 

@@ -230,6 +230,237 @@ describe('AuthCaptureFacilitatorScheme', () => {
       expect(result.isValid).toBe(false)
       expect(result.invalidReason).toBe('token_collector_mismatch')
     })
+
+    it('should reject when Permit2 payload.spender is not the canonical collector', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      }
+      const payload = buildPermit2Payload()
+      payload.payload.permit2Authorization.spender =
+        '0x9999999999999999999999999999999999999999' as `0x${string}`
+      const result = await scheme.verify(payload, reqs)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('token_collector_mismatch')
+    })
+
+    it('should reject when Permit2 token does not match requirements.asset', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      }
+      const payload = buildPermit2Payload()
+      payload.payload.permit2Authorization.permitted.token =
+        '0x9999999999999999999999999999999999999999' as `0x${string}`
+      const result = await scheme.verify(payload, reqs)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('token_mismatch')
+    })
+
+    it('should reject when authorization.value does not match requirements.amount', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const payload = buildEip3009Payload()
+      payload.payload.authorization.value = '999999'
+      const result = await scheme.verify(payload, mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('amount_mismatch')
+    })
+
+    it('should reject when EIP-3009 validBefore is in the past', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const payload = buildEip3009Payload()
+      payload.payload.authorization.validBefore = String(Math.floor(Date.now() / 1000) - 60)
+      const result = await scheme.verify(payload, mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('authorization_expired')
+    })
+
+    it('should reject when EIP-3009 validAfter is in the future', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const payload = buildEip3009Payload()
+      payload.payload.authorization.validAfter = String(Math.floor(Date.now() / 1000) + 3600)
+      const result = await scheme.verify(payload, mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('authorization_not_yet_valid')
+    })
+
+    it('should reject unsupported assetTransferMethod', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          assetTransferMethod: 'allowance' as unknown as 'eip3009',
+        },
+      }
+      const result = await scheme.verify(buildEip3009Payload(), reqs)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('unsupported_asset_transfer_method')
+    })
+
+    it('should reject when payload.accepted.network differs from requirements.network', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const payload = buildEip3009Payload()
+      payload.accepted = { ...payload.accepted, network: 'eip155:8453' }
+      const result = await scheme.verify(payload, mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('network_mismatch')
+    })
+
+    it('should reject invalid signature', async () => {
+      mockSigner.verifyTypedData.mockResolvedValueOnce(false)
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('invalid_authCapture_signature')
+    })
+
+    it('should reject when simulation reverts and balance is sufficient', async () => {
+      mockSigner.readContract.mockReset()
+      // First call: simulateSettle (escrow.authorize) → revert
+      // Second call: balanceOf for the actionable-error fallback → sufficient
+      mockSigner.readContract
+        .mockRejectedValueOnce(new Error('execution reverted'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('simulation_failed')
+    })
+
+    it('should surface insufficient_balance when simulation fails and balance is short', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(new Error('execution reverted'))
+        .mockResolvedValueOnce(BigInt('1')) // balance < amount
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('insufficient_balance')
+    })
+
+    it('should reject when preApprovalExpiry exceeds captureDeadline', async () => {
+      // maxTimeoutSeconds = 60s, but captureDeadline only 5s in the future →
+      // preApprovalExpiry (now + 60) > captureDeadline. Mirrors the on-chain
+      // _validatePayment ordering check.
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const tightCaptureDeadline = Math.floor(Date.now() / 1000) + 30
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          captureDeadline: tightCaptureDeadline,
+          refundDeadline: tightCaptureDeadline + 86400,
+        },
+      }
+      // Build payload with a fresh preApprovalExpiry that exceeds captureDeadline
+      const futureSecondsLocal = Math.floor(Date.now() / 1000) + 3600
+      const paymentInfo: PaymentInfoStruct = {
+        operator: CAPTURE_AUTHORIZER,
+        payer: PAYER,
+        receiver: PAY_TO,
+        token: ASSET,
+        maxAmount: '1000000',
+        preApprovalExpiry: futureSecondsLocal,
+        authorizationExpiry: tightCaptureDeadline,
+        refundExpiry: tightCaptureDeadline + 86400,
+        minFeeBps: 0,
+        maxFeeBps: 100,
+        feeReceiver: FEE_RECIPIENT,
+        salt: SALT,
+      }
+      const nonce = computePayerAgnosticPaymentInfoHash(84532, paymentInfo)
+      const payload = {
+        x402Version: 2,
+        scheme: 'authCapture',
+        resource: { url: 'https://example.com', method: 'GET' },
+        accepted: { ...reqs },
+        payload: {
+          authorization: {
+            from: PAYER,
+            to: EIP3009_TOKEN_COLLECTOR_ADDRESS,
+            value: '1000000',
+            validAfter: '0',
+            validBefore: String(futureSecondsLocal),
+            nonce,
+          },
+          signature: '0xabcd' as `0x${string}`,
+          salt: SALT,
+        },
+      }
+      const result = await scheme.verify(payload, reqs)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('invalid_deadline_ordering')
+    })
+  })
+
+  describe('verify — nonce binding (regression for payer-agnostic-hash design)', () => {
+    it('should reject when salt is mutated after signing', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const payload = buildEip3009Payload()
+      // Tamper with salt — wire nonce was computed against SALT, not this new value
+      payload.payload.salt =
+        '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' as `0x${string}`
+      const result = await scheme.verify(payload, mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('nonce_mismatch')
+    })
+
+    it('should reject when extra.captureAuthorizer is mutated after signing', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const tampered = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          captureAuthorizer: '0x9999999999999999999999999999999999999999' as `0x${string}`,
+        },
+      }
+      const result = await scheme.verify(buildEip3009Payload(), tampered)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('nonce_mismatch')
+    })
+
+    it('should reject when requirements.amount is mutated after signing (Permit2)', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        amount: '999999',
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      }
+      // amount_mismatch fires before nonce_mismatch — that's the expected order.
+      // Either way, the tampering is rejected.
+      const result = await scheme.verify(buildPermit2Payload(), reqs)
+      expect(result.isValid).toBe(false)
+      expect(['amount_mismatch', 'nonce_mismatch']).toContain(result.invalidReason)
+    })
+  })
+
+  describe('settle — charge fee args (ABI 6-arg correctness)', () => {
+    it('should pass feeBps and feeReceiver as args[4] and args[5] for charge', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, autoCapture: true },
+      }
+      await scheme.settle(buildEip3009Payload(), reqs)
+
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.functionName).toBe('charge')
+      expect(call.args.length).toBe(6)
+      // Default minFeeBps is 0 when extra.minFeeBps is omitted (matches buildPaymentInfo).
+      expect(call.args[4]).toBe(0)
+      expect(call.args[5]).toBe(FEE_RECIPIENT)
+    })
+
+    it('should pass 4 args for authorize (no feeBps/feeReceiver)', async () => {
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      await scheme.settle(buildEip3009Payload(), mockRequirements)
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.functionName).toBe('authorize')
+      expect(call.args.length).toBe(4)
+    })
   })
 
   describe('getExtra', () => {

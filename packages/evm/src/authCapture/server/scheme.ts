@@ -16,7 +16,11 @@ import type {
 } from '@x402/core/types'
 
 /**
- * Asset info including EIP-712 domain parameters per network
+ * Asset info including EIP-712 domain parameters per network. Restricted to
+ * the chains where AuthCaptureEscrow is deployed (currently Base mainnet +
+ * Base Sepolia). Adding a chain here without a corresponding escrow deploy
+ * would cause settle to revert silently. New chains belong here once the
+ * canonical commerce-payments contracts are deployed there.
  */
 const ASSET_INFO: Record<
   string,
@@ -32,55 +36,6 @@ const ASSET_INFO: Record<
   // Base mainnet
   'eip155:8453': {
     address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    name: 'USD Coin',
-    version: '2',
-    decimals: 6,
-  },
-  // Ethereum Sepolia
-  'eip155:11155111': {
-    address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-    name: 'USDC',
-    version: '2',
-    decimals: 6,
-  },
-  // Ethereum mainnet
-  'eip155:1': {
-    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    name: 'USD Coin',
-    version: '2',
-    decimals: 6,
-  },
-  // Polygon
-  'eip155:137': {
-    address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
-    name: 'USD Coin',
-    version: '2',
-    decimals: 6,
-  },
-  // Arbitrum
-  'eip155:42161': {
-    address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-    name: 'USD Coin',
-    version: '2',
-    decimals: 6,
-  },
-  // Celo
-  'eip155:42220': {
-    address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C',
-    name: 'USD Coin',
-    version: '2',
-    decimals: 6,
-  },
-  // Monad
-  'eip155:143': {
-    address: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603',
-    name: 'USDC',
-    version: '2',
-    decimals: 6,
-  },
-  // Avalanche
-  'eip155:43114': {
-    address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
     name: 'USD Coin',
     version: '2',
     decimals: 6,

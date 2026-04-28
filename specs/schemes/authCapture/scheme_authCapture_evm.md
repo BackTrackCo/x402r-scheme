@@ -48,37 +48,43 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 
 ### `extra` Fields
 
-| Field                 | Required | Type                       | Description                                                                                  |
-| :-------------------- | :------- | :------------------------- | :------------------------------------------------------------------------------------------- |
-| `name`                | Yes      | `string`                   | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                  |
-| `version`             | Yes      | `string`                   | EIP-712 token-domain version (e.g., `"2"`).                                                  |
-| `captureAuthorizer`   | Yes      | `address`                  | Address authorized to capture/void/refund (committed on-chain in `PaymentInfo.operator`).    |
-| `captureDeadline`     | Yes      | `uint48`                   | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.    |
-| `refundDeadline`      | Yes      | `uint48`                   | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.               |
-| `feeRecipient`        | Yes      | `address`                  | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                             |
-| `maxFeeBps`           | Yes      | `uint16`                   | Maximum fee in basis points.                                                                 |
-| `minFeeBps`           | No       | `uint16`                   | Minimum fee in basis points. Default: `0`.                                                   |
-| `autoCapture`         | No       | `bool`                     | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`. |
-| `assetTransferMethod` | No       | `"eip3009" \| "permit2"`   | Which token collector to use. Default: `"eip3009"`.                                          |
+| Field                 | Required | Type                     | Description                                                                                            |
+| :-------------------- | :------- | :----------------------- | :----------------------------------------------------------------------------------------------------- |
+| `name`                | Yes      | `string`                 | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                            |
+| `version`             | Yes      | `string`                 | EIP-712 token-domain version (e.g., `"2"`).                                                            |
+| `captureAuthorizer`   | Yes      | `address`                | Address authorized to capture/void/refund (committed on-chain in `PaymentInfo.operator`).              |
+| `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.              |
+| `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                         |
+| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                       |
+| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points.                                                                           |
+| `minFeeBps`           | No       | `uint16`                 | Minimum fee in basis points. Default: `0`.                                                             |
+| `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`. |
+| `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                    |
 
 > **`salt` is NOT in `extra`.** It is generated client-side per signing call and rides on `PaymentPayload`. See "PaymentPayload" below.
 >
-> **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants pinned in the implementation:
-> - `AUTH_CAPTURE_ESCROW_ADDRESS`
-> - `EIP3009_TOKEN_COLLECTOR_ADDRESS`
-> - `PERMIT2_TOKEN_COLLECTOR_ADDRESS`
+> **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants. Same address on every supported chain (CREATE2 deployed by base/commerce-payments):
+>
+> | Constant                              | Address                                      |
+> | :------------------------------------ | :------------------------------------------- |
+> | `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff` |
+> | `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x0E3dF9510de65469C4518D7843919c0b8C7A7757` |
+> | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26` |
+> | `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+>
+> Currently confirmed on Base mainnet + Base Sepolia. Other chains will share the same address when base/commerce-payments deploys there.
 
 ### Spec → on-chain field name mapping
 
 The wire-format extra uses spec-level field names. The on-chain `PaymentInfo` struct keeps canonical Solidity names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
 
-| Wire (`extra`)          | On-chain (`PaymentInfo`)        |
-| :---------------------- | :------------------------------ |
-| `captureAuthorizer`     | `operator`                      |
-| `captureDeadline`       | `authorizationExpiry`           |
-| `refundDeadline`        | `refundExpiry`                  |
-| `feeRecipient`          | `feeReceiver`                   |
-| (derived: `now + maxTimeoutSeconds`) | `preApprovalExpiry` |
+| Wire (`extra`)                       | On-chain (`PaymentInfo`) |
+| :----------------------------------- | :----------------------- |
+| `captureAuthorizer`                  | `operator`               |
+| `captureDeadline`                    | `authorizationExpiry`    |
+| `refundDeadline`                     | `refundExpiry`           |
+| `feeRecipient`                       | `feeReceiver`            |
+| (derived: `now + maxTimeoutSeconds`) | `preApprovalExpiry`      |
 
 ## PaymentPayload
 
@@ -206,9 +212,9 @@ The authCapture scheme uses the standard x402 error codes plus these scheme-spec
 
 ### Settlement Errors
 
-| Error Code             | Description                                      |
-| :--------------------- | :----------------------------------------------- |
-| `verification_failed`  | Re-verification before settlement failed.        |
+| Error Code             | Description                                       |
+| :--------------------- | :------------------------------------------------ |
+| `verification_failed`  | Re-verification before settlement failed.         |
 | `transaction_reverted` | On-chain transaction reverted after confirmation. |
 
 ## Appendix
@@ -236,11 +242,11 @@ struct PaymentInfo {
 
 The contract enforces: `preApprovalExpiry <= authorizationExpiry <= refundExpiry`.
 
-| Expiry                | Wire field         | Enforced at                | Effect                              |
-| :-------------------- | :----------------- | :------------------------- | :---------------------------------- |
-| `preApprovalExpiry`   | derived            | `authorize()` / `charge()` | Blocks settlement after this time   |
-| `authorizationExpiry` | `captureDeadline`  | `capture()`                | Blocks capture; enables `reclaim()` |
-| `refundExpiry`        | `refundDeadline`   | `refund()`                 | Blocks refund requests              |
+| Expiry                | Wire field        | Enforced at                | Effect                              |
+| :-------------------- | :---------------- | :------------------------- | :---------------------------------- |
+| `preApprovalExpiry`   | derived           | `authorize()` / `charge()` | Blocks settlement after this time   |
+| `authorizationExpiry` | `captureDeadline` | `capture()`                | Blocks capture; enables `reclaim()` |
+| `refundExpiry`        | `refundDeadline`  | `refund()`                 | Blocks refund requests              |
 
 ### Fee System
 
