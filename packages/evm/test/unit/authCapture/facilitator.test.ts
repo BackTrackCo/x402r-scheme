@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { hexToBigInt } from 'viem'
+import {
+  ContractFunctionExecutionError,
+  ContractFunctionRevertedError,
+  encodeErrorResult,
+  hexToBigInt,
+} from 'viem'
 import { AuthCaptureFacilitatorScheme } from '../../../src/authCapture/facilitator/scheme'
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
@@ -434,6 +439,106 @@ describe('AuthCaptureFacilitatorScheme', () => {
       const result = await scheme.verify(buildPermit2Payload(), reqs)
       expect(result.isValid).toBe(false)
       expect(['amount_mismatch', 'nonce_mismatch']).toContain(result.invalidReason)
+    })
+  })
+
+  describe('verify — typed simulation revert decoding', () => {
+    /**
+     * Build a viem ContractFunctionExecutionError that wraps a real
+     * ContractFunctionRevertedError encoded from the named custom error.
+     * Mirrors what viem produces when the chain reverts with a known error
+     * declared in the call's ABI.
+     */
+    function buildRevertError(errorName: string): Error {
+      const errorAbi = [{ type: 'error' as const, name: errorName, inputs: [] }]
+      const data = encodeErrorResult({ abi: errorAbi, errorName })
+      const inner = new ContractFunctionRevertedError({
+        abi: errorAbi,
+        data,
+        functionName: 'authorize',
+      })
+      return new ContractFunctionExecutionError(inner, {
+        abi: errorAbi,
+        functionName: 'authorize',
+        args: [],
+      })
+    }
+
+    it('should decode AfterPreApprovalExpiry → authorization_expired', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('AfterPreApprovalExpiry'))
+        .mockResolvedValueOnce(BigInt('1000000000')) // balanceOf — sufficient
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('authorization_expired')
+    })
+
+    it('should decode PaymentAlreadyCollected → payment_already_collected', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('PaymentAlreadyCollected'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('payment_already_collected')
+    })
+
+    it('should decode FeeBpsOutOfRange → fee_bps_out_of_range', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('FeeBpsOutOfRange'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('fee_bps_out_of_range')
+    })
+
+    it('should decode InvalidFeeReceiver → invalid_fee_receiver', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('InvalidFeeReceiver'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('invalid_fee_receiver')
+    })
+
+    it('should decode TokenCollectionFailed → token_collection_failed', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('TokenCollectionFailed'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('token_collection_failed')
+    })
+
+    it('should fall through unknown reverts to generic simulation_failed', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(buildRevertError('SomeUnmappedError'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('simulation_failed')
+    })
+
+    it('should fall through plain Error (not BaseError) to simulation_failed', async () => {
+      mockSigner.readContract.mockReset()
+      mockSigner.readContract
+        .mockRejectedValueOnce(new Error('RPC went sideways'))
+        .mockResolvedValueOnce(BigInt('1000000000'))
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements)
+      expect(result.isValid).toBe(false)
+      expect(result.invalidReason).toBe('simulation_failed')
     })
   })
 

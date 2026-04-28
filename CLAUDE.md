@@ -1,6 +1,6 @@
 # x402r-scheme
 
-Commerce scheme bridging x402 protocol with x402r commerce contracts.
+authCapture scheme bridging the x402 protocol with the canonical AuthCaptureEscrow contracts (base/commerce-payments).
 
 ## Commands
 
@@ -13,13 +13,14 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/evm/`:
 
 ```
-commerce/client      → createPaymentPayload()
-commerce/server      → CommerceServerScheme
-commerce/facilitator → Settlement and verification
+authCapture/client      → createPaymentPayload()
+authCapture/server      → AuthCaptureServerScheme
+authCapture/facilitator → Settlement and verification
+authCapture/shared      → types, constants, nonce + signing helpers
 ```
 
 ## Dependencies
 
 - Types from `@x402/core` and `@x402/evm` (base x402 protocol)
-- Calls on-chain AuthCaptureEscrow and PaymentOperator (commerce-payments)
-- Extends base x402 scheme pattern (x402/)
+- Calls on-chain AuthCaptureEscrow directly (canonical universal CREATE2 deploy from base/commerce-payments)
+- Extends base x402 scheme pattern

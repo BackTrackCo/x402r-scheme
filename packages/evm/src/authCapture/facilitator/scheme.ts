@@ -20,12 +20,20 @@ import type {
   VerifyResponse,
 } from '@x402/core/types'
 import type { FacilitatorEvmSigner } from '@x402/evm'
-import { encodeAbiParameters, hexToBigInt, parseErc6492Signature } from 'viem'
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  encodeAbiParameters,
+  hexToBigInt,
+  parseErc6492Signature,
+} from 'viem'
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   ERC20_BALANCE_OF_ABI,
   ESCROW_ABI,
+  ESCROW_ERRORS_ABI,
+  ESCROW_ERROR_TO_INVALID_REASON,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from '../shared/constants'
 import {
@@ -79,20 +87,7 @@ function reconstructPaymentInfo(
 }
 
 function paymentInfoToContractTuple(p: PaymentInfoStruct) {
-  return {
-    operator: p.operator,
-    payer: p.payer,
-    receiver: p.receiver,
-    token: p.token,
-    maxAmount: BigInt(p.maxAmount),
-    preApprovalExpiry: p.preApprovalExpiry,
-    authorizationExpiry: p.authorizationExpiry,
-    refundExpiry: p.refundExpiry,
-    minFeeBps: p.minFeeBps,
-    maxFeeBps: p.maxFeeBps,
-    feeReceiver: p.feeReceiver,
-    salt: BigInt(p.salt),
-  }
+  return { ...p, maxAmount: BigInt(p.maxAmount), salt: BigInt(p.salt) }
 }
 
 /**
@@ -395,8 +390,14 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
   }
 
   /**
-   * Simulate the settle call via eth_call. Returns 'ok' on success or an
-   * invalidReason string on failure.
+   * Simulate the settle call via eth_call. Returns 'ok' on success or a
+   * stable invalidReason string on failure.
+   *
+   * On revert, viem walks the error chain for ContractFunctionRevertedError
+   * and decodes the custom-error name against ESCROW_ABI + ESCROW_ERRORS_ABI.
+   * Known errors map to typed reasons via ESCROW_ERROR_TO_INVALID_REASON;
+   * anything unmapped (e.g. token-collector reverts like consumed ERC-3009
+   * nonce) falls through to the generic 'simulation_failed'.
    */
   private async simulateSettle(
     paymentInfo: PaymentInfoStruct,
@@ -424,15 +425,38 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     try {
       await this.signer.readContract({
         address: AUTH_CAPTURE_ESCROW_ADDRESS,
-        abi: ESCROW_ABI,
+        abi: ESCROW_ABI_WITH_ERRORS,
         functionName,
         args,
       })
       return 'ok'
-    } catch {
-      return 'simulation_failed'
+    } catch (err) {
+      return decodeRevertReason(err)
     }
   }
+}
+
+// Combined ABI: function definitions + custom-error definitions. viem decodes
+// revert data against any error in the ABI passed to the call.
+const ESCROW_ABI_WITH_ERRORS = [...ESCROW_ABI, ...ESCROW_ERRORS_ABI] as const
+
+/**
+ * Walk a viem error chain to find a decoded custom-error name and map it to
+ * a stable invalidReason. Returns 'simulation_failed' for unknown reverts.
+ */
+function decodeRevertReason(err: unknown): string {
+  if (err instanceof BaseError) {
+    const revert = err.walk(
+      (e): e is ContractFunctionRevertedError => e instanceof ContractFunctionRevertedError,
+    )
+    if (revert instanceof ContractFunctionRevertedError) {
+      const errorName = revert.data?.errorName
+      if (errorName && errorName in ESCROW_ERROR_TO_INVALID_REASON) {
+        return ESCROW_ERROR_TO_INVALID_REASON[errorName]
+      }
+    }
+  }
+  return 'simulation_failed'
 }
 
 /**

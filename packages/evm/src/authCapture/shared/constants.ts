@@ -112,3 +112,73 @@ export const ERC20_BALANCE_OF_ABI = [
     outputs: [{ name: 'balance', type: 'uint256' }],
   },
 ] as const
+
+// AuthCaptureEscrow custom errors. Spliced into the ABI passed to simulateContract
+// so viem can decode `ContractFunctionRevertedError.data.errorName` instead of
+// falling back to an opaque hex selector. Names mirror the Solidity definitions
+// at base/commerce-payments/src/AuthCaptureEscrow.sol.
+export const ESCROW_ERRORS_ABI = [
+  { type: 'error', name: 'InvalidSender', inputs: [{ type: 'address' }, { type: 'address' }] },
+  { type: 'error', name: 'ZeroAmount', inputs: [] },
+  { type: 'error', name: 'AmountOverflow', inputs: [{ type: 'uint256' }, { type: 'uint256' }] },
+  { type: 'error', name: 'ExceedsMaxAmount', inputs: [{ type: 'uint256' }, { type: 'uint256' }] },
+  {
+    type: 'error',
+    name: 'AfterPreApprovalExpiry',
+    inputs: [{ type: 'uint48' }, { type: 'uint48' }],
+  },
+  {
+    type: 'error',
+    name: 'InvalidExpiries',
+    inputs: [{ type: 'uint48' }, { type: 'uint48' }, { type: 'uint48' }],
+  },
+  { type: 'error', name: 'FeeBpsOverflow', inputs: [{ type: 'uint16' }] },
+  { type: 'error', name: 'InvalidFeeBpsRange', inputs: [{ type: 'uint16' }, { type: 'uint16' }] },
+  {
+    type: 'error',
+    name: 'FeeBpsOutOfRange',
+    inputs: [{ type: 'uint16' }, { type: 'uint16' }, { type: 'uint16' }],
+  },
+  { type: 'error', name: 'ZeroFeeReceiver', inputs: [] },
+  { type: 'error', name: 'InvalidFeeReceiver', inputs: [{ type: 'address' }, { type: 'address' }] },
+  { type: 'error', name: 'InvalidCollectorForOperation', inputs: [] },
+  { type: 'error', name: 'TokenCollectionFailed', inputs: [] },
+  { type: 'error', name: 'PaymentAlreadyCollected', inputs: [{ type: 'bytes32' }] },
+  {
+    type: 'error',
+    name: 'AfterAuthorizationExpiry',
+    inputs: [{ type: 'uint48' }, { type: 'uint48' }],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientAuthorization',
+    inputs: [{ type: 'bytes32' }, { type: 'uint256' }, { type: 'uint256' }],
+  },
+  { type: 'error', name: 'ZeroAuthorization', inputs: [{ type: 'bytes32' }] },
+] as const
+
+/**
+ * Map an AuthCaptureEscrow custom-error name (decoded by viem from a
+ * ContractFunctionRevertedError) to a stable `invalidReason` string. Anything
+ * unmapped falls through to the generic `simulation_failed` so verify() never
+ * leaks raw selectors to callers.
+ */
+export const ESCROW_ERROR_TO_INVALID_REASON: Record<string, string> = {
+  AfterPreApprovalExpiry: 'authorization_expired',
+  InvalidExpiries: 'invalid_deadline_ordering',
+  ExceedsMaxAmount: 'amount_mismatch',
+  PaymentAlreadyCollected: 'payment_already_collected',
+  TokenCollectionFailed: 'token_collection_failed',
+  InvalidCollectorForOperation: 'invalid_collector',
+  InvalidSender: 'invalid_capture_authorizer',
+  ZeroAmount: 'amount_mismatch',
+  AmountOverflow: 'amount_overflow',
+  FeeBpsOverflow: 'invalid_fee_bps',
+  InvalidFeeBpsRange: 'invalid_fee_bps_range',
+  FeeBpsOutOfRange: 'fee_bps_out_of_range',
+  ZeroFeeReceiver: 'zero_fee_receiver',
+  InvalidFeeReceiver: 'invalid_fee_receiver',
+  AfterAuthorizationExpiry: 'capture_deadline_expired',
+  InsufficientAuthorization: 'insufficient_authorization',
+  ZeroAuthorization: 'zero_authorization',
+}

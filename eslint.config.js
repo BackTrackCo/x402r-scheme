@@ -17,6 +17,7 @@ export default [
         crypto: 'readonly',
         setTimeout: 'readonly',
         console: 'readonly',
+        process: 'readonly',
       },
     },
     plugins: {

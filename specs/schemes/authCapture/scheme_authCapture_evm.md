@@ -6,8 +6,8 @@ The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github
 
 - **AuthCaptureEscrow**: Singleton — locks funds, enforces expiries, distributes on capture/refund. Universal canonical address (CREATE2-deployed; same address on every supported chain).
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
-  - `EIP3009_TOKEN_COLLECTOR` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
-  - `PERMIT2_TOKEN_COLLECTOR` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
+  - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
+  - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
 - **CaptureAuthorizer**: Address authorized to capture, void, or refund a payment. Set per-merchant in `extra.captureAuthorizer`. May be the merchant itself, the facilitator, an arbiter contract, etc.
 
 The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it to `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`).
@@ -162,7 +162,7 @@ The facilitator performs these checks in order:
 5. **Method routing**: `extra.assetTransferMethod` (default `"eip3009"`) matches the payload shape.
 6. **Deadline ordering**: `refundDeadline > captureDeadline` and `captureDeadline > now + 6s`.
 7. **Time window**: `payload.deadline / validBefore > now + 6s` (not expired) and `validAfter <= now` (active, EIP-3009 only).
-8. **Spender / collector match**: `payload.to === EIP3009_TOKEN_COLLECTOR` (EIP-3009) or `payload.spender === PERMIT2_TOKEN_COLLECTOR` (Permit2).
+8. **Spender / collector match**: `payload.to === EIP3009_TOKEN_COLLECTOR_ADDRESS` (EIP-3009) or `payload.spender === PERMIT2_TOKEN_COLLECTOR_ADDRESS` (Permit2).
 9. **Token match**: `payload.permitted.token === requirements.asset` (Permit2 only — EIP-3009 binds via signing domain).
 10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match `payer`.
 11. **Amount**: Authorization value matches `requirements.amount`.
@@ -208,7 +208,30 @@ The authCapture scheme uses the standard x402 error codes plus these scheme-spec
 | `token_mismatch`                    | Permit2 `permitted.token` doesn't match `requirements.asset`.            |
 | `nonce_mismatch`                    | Wire nonce doesn't match the recomputed payer-agnostic PaymentInfo hash. |
 | `insufficient_balance`              | Payer balance is less than required amount.                              |
-| `simulation_failed`                 | Settlement simulation via `eth_call` failed.                             |
+| `simulation_failed`                 | Settlement simulation reverted with an unmapped error.                   |
+
+### Typed simulation reverts
+
+If the simulate call reverts with an `AuthCaptureEscrow` custom error declared in the call's ABI, the facilitator decodes it via `BaseError.walk()` + `ContractFunctionRevertedError` and surfaces a stable reason instead of the opaque `simulation_failed` fallback:
+
+| Custom error                    | `invalidReason`                       |
+| :------------------------------ | :------------------------------------ |
+| `AfterPreApprovalExpiry`        | `authorization_expired`               |
+| `InvalidExpiries`               | `invalid_deadline_ordering`           |
+| `ExceedsMaxAmount`              | `amount_mismatch`                     |
+| `PaymentAlreadyCollected`       | `payment_already_collected`           |
+| `TokenCollectionFailed`         | `token_collection_failed`             |
+| `InvalidCollectorForOperation`  | `invalid_collector`                   |
+| `InvalidSender`                 | `invalid_capture_authorizer`          |
+| `ZeroAmount` / `AmountOverflow` | `amount_mismatch` / `amount_overflow` |
+| `FeeBpsOverflow`                | `invalid_fee_bps`                     |
+| `InvalidFeeBpsRange`            | `invalid_fee_bps_range`               |
+| `FeeBpsOutOfRange`              | `fee_bps_out_of_range`                |
+| `ZeroFeeReceiver`               | `zero_fee_receiver`                   |
+| `InvalidFeeReceiver`            | `invalid_fee_receiver`                |
+| `AfterAuthorizationExpiry`      | `capture_deadline_expired`            |
+| `InsufficientAuthorization`     | `insufficient_authorization`          |
+| `ZeroAuthorization`             | `zero_authorization`                  |
 
 ### Settlement Errors
 
