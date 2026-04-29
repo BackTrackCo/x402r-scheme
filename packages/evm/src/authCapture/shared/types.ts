@@ -19,7 +19,7 @@
 // on the wire and avoids "did they mean 0 or did they forget?" ambiguity.
 export interface AuthCaptureExtra {
   // Required
-  captureAuthorizer: `0x${string}` // address authorized to capture/void/refund (formerly `operator`)
+  captureAuthorizer: `0x${string}` // address authorized to authorize/capture/void/refund/charge (formerly `operator`)
   captureDeadline: number // absolute Unix seconds; capture must occur before this
   refundDeadline: number // absolute Unix seconds; refunds allowed until this
   feeRecipient: `0x${string}` // address that receives the fee portion (renamed from feeReceiver)

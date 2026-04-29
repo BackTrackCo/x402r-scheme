@@ -8,7 +8,7 @@ The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
   - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
-- **CaptureAuthorizer**: Address authorized to capture, void, or refund a payment. Set per-merchant in `extra.captureAuthorizer`. May be the merchant itself, the facilitator, an arbiter contract, etc.
+- **CaptureAuthorizer**: Address authorized to authorize, capture, void, refund, or charge a payment. Set per-merchant in `extra.captureAuthorizer`. May be the merchant itself, the facilitator, an arbiter contract, etc.
 
 The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it to `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`).
 
@@ -48,18 +48,18 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 
 ### `extra` Fields
 
-| Field                 | Required | Type                     | Description                                                                                            |
-| :-------------------- | :------- | :----------------------- | :----------------------------------------------------------------------------------------------------- |
-| `name`                | Yes      | `string`                 | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                            |
-| `version`             | Yes      | `string`                 | EIP-712 token-domain version (e.g., `"2"`).                                                            |
-| `captureAuthorizer`   | Yes      | `address`                | Address authorized to capture/void/refund (committed on-chain in `PaymentInfo.operator`).              |
-| `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.              |
-| `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                         |
-| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                       |
-| `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.         |
-| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                  |
-| `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`. |
-| `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                    |
+| Field                 | Required | Type                     | Description                                                                                                |
+| :-------------------- | :------- | :----------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `name`                | Yes      | `string`                 | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                                |
+| `version`             | Yes      | `string`                 | EIP-712 token-domain version (e.g., `"2"`).                                                                |
+| `captureAuthorizer`   | Yes      | `address`                | Address authorized to authorize/capture/void/refund/charge (committed on-chain in `PaymentInfo.operator`). |
+| `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.                  |
+| `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                             |
+| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                           |
+| `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.             |
+| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                      |
+| `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.     |
+| `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                        |
 
 > **`salt` is NOT in `extra`.** It is generated client-side per signing call and rides on `PaymentPayload`. See "PaymentPayload" below.
 >
