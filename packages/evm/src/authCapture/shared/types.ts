@@ -21,11 +21,14 @@ export interface AuthCaptureExtra {
   // Required
   // The only address allowed to call authorize/capture/void/refund/charge on
   // AuthCaptureEscrow (gated by onlySender(paymentInfo.operator) on every
-  // method). In x402's facilitator-driven flow that means the facilitator's
-  // EOA itself, or a smart contract (PaymentOperator, arbiter, etc.) the
-  // facilitator can call. The merchant address can't be the captureAuthorizer
-  // unless the merchant self-hosts the facilitator. Independent of
-  // assetTransferMethod — applies to both EIP-3009 and Permit2 paths.
+  // method) — i.e., it must be msg.sender of the on-chain settle. In x402's
+  // facilitator-submits flow that means either the facilitator's EOA, or any
+  // smart contract that ultimately calls escrow (PaymentOperator, arbiter
+  // with dispute logic, multisig, etc.). It can NOT be the merchant's EOA
+  // directly, because the merchant's EOA isn't the one submitting the
+  // on-chain tx. The merchant can still gain lifecycle authority through a
+  // smart contract whose access control lets them trigger escrow calls.
+  // Independent of assetTransferMethod — applies to both EIP-3009 and Permit2.
   captureAuthorizer: `0x${string}` // formerly `operator` in commerce-payments
   captureDeadline: number // absolute Unix seconds; capture must occur before this
   refundDeadline: number // absolute Unix seconds; refunds allowed until this
