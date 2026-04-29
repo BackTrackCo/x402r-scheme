@@ -40,6 +40,7 @@ describe('AuthCaptureEvmScheme', () => {
       captureDeadline: FUTURE,
       refundDeadline: FUTURE + 86400,
       feeRecipient: '0x4444444444444444444444444444444444444444' as `0x${string}`,
+      minFeeBps: 0,
       maxFeeBps: 100,
       name: 'USDC',
       version: '2',

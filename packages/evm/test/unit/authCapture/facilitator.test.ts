@@ -55,6 +55,7 @@ describe('AuthCaptureFacilitatorScheme', () => {
       captureDeadline,
       refundDeadline,
       feeRecipient: FEE_RECIPIENT,
+      minFeeBps: 0,
       maxFeeBps: 100,
       name: 'USDC',
       version: '2',

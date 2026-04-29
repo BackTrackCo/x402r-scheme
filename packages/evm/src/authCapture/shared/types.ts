@@ -11,18 +11,23 @@
  * on the payload alongside the signature.
  */
 
-// AuthCaptureExtra — fields in PaymentRequirements.extra
+// AuthCaptureExtra — fields in PaymentRequirements.extra.
+//
+// Fee-policy fields (minFeeBps, maxFeeBps, feeRecipient) are all required.
+// No implicit defaults: a merchant who wants no minimum fee writes
+// `minFeeBps: 0` explicitly. This forces fee policy to be a conscious choice
+// on the wire and avoids "did they mean 0 or did they forget?" ambiguity.
 export interface AuthCaptureExtra {
   // Required
   captureAuthorizer: `0x${string}` // address authorized to capture/void/refund (formerly `operator`)
   captureDeadline: number // absolute Unix seconds; capture must occur before this
   refundDeadline: number // absolute Unix seconds; refunds allowed until this
   feeRecipient: `0x${string}` // address that receives the fee portion (renamed from feeReceiver)
-  maxFeeBps: number
+  minFeeBps: number // floor on the captureAuthorizer's fee; 0 = no minimum
+  maxFeeBps: number // cap on the captureAuthorizer's fee
   name: string // EIP-712 token-domain name (e.g., "USDC")
   version: string // EIP-712 token-domain version (e.g., "2")
   // Optional
-  minFeeBps?: number // default: 0
   autoCapture?: boolean // default: false. true → facilitator calls charge(), false → authorize()
   assetTransferMethod?: 'eip3009' | 'permit2' // default: 'eip3009'
 }
@@ -38,6 +43,7 @@ export function isAuthCaptureExtra(value: unknown): value is AuthCaptureExtra {
     typeof v.captureDeadline === 'number' &&
     typeof v.refundDeadline === 'number' &&
     typeof v.feeRecipient === 'string' &&
+    typeof v.minFeeBps === 'number' &&
     typeof v.maxFeeBps === 'number' &&
     typeof v.name === 'string' &&
     typeof v.version === 'string'

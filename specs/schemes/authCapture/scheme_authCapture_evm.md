@@ -56,8 +56,8 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.              |
 | `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                         |
 | `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                       |
-| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points.                                                                           |
-| `minFeeBps`           | No       | `uint16`                 | Minimum fee in basis points. Default: `0`.                                                             |
+| `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.         |
+| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                  |
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`. |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                    |
 

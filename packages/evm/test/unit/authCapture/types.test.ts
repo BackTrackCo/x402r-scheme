@@ -14,6 +14,7 @@ describe('type guards', () => {
     captureDeadline: FUTURE,
     refundDeadline: FUTURE + 86400,
     feeRecipient: '0x4444444444444444444444444444444444444444',
+    minFeeBps: 0,
     maxFeeBps: 100,
     name: 'USDC',
     version: '2',
@@ -75,6 +76,16 @@ describe('type guards', () => {
 
     it('rejects when name/version are missing', () => {
       const { name: _n, ...rest } = validExtra
+      expect(isAuthCaptureExtra(rest)).toBe(false)
+    })
+
+    it('rejects when minFeeBps is missing (required per spec, no implicit default)', () => {
+      const { minFeeBps: _m, ...rest } = validExtra
+      expect(isAuthCaptureExtra(rest)).toBe(false)
+    })
+
+    it('rejects when maxFeeBps is missing', () => {
+      const { maxFeeBps: _m, ...rest } = validExtra
       expect(isAuthCaptureExtra(rest)).toBe(false)
     })
 

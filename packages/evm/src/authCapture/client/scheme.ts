@@ -74,11 +74,22 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
     if (typeof extra.refundDeadline !== 'number') {
       throw new Error(`'refundDeadline' is required in payment requirements extra`)
     }
+    if (typeof extra.minFeeBps !== 'number') {
+      throw new Error(`'minFeeBps' is required in payment requirements extra`)
+    }
+    if (typeof extra.maxFeeBps !== 'number') {
+      throw new Error(`'maxFeeBps' is required in payment requirements extra`)
+    }
+    if (typeof requirements.maxTimeoutSeconds !== 'number') {
+      throw new Error(
+        `'maxTimeoutSeconds' is required in PaymentRequirements (used to derive preApprovalExpiry)`,
+      )
+    }
 
     const chainId = parseChainId(requirements.network)
     const maxAmount = requirements.amount
     const nowSeconds = Math.floor(Date.now() / 1000)
-    const preApprovalExpiry = nowSeconds + (requirements.maxTimeoutSeconds ?? 60)
+    const preApprovalExpiry = nowSeconds + requirements.maxTimeoutSeconds
     const salt = generateSalt()
     const assetTransferMethod = extra.assetTransferMethod ?? 'eip3009'
 
@@ -92,7 +103,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
       preApprovalExpiry,
       authorizationExpiry: extra.captureDeadline,
       refundExpiry: extra.refundDeadline,
-      minFeeBps: extra.minFeeBps ?? 0,
+      minFeeBps: extra.minFeeBps,
       maxFeeBps: extra.maxFeeBps,
       feeReceiver: extra.feeRecipient,
       salt,

@@ -79,7 +79,7 @@ function reconstructPaymentInfo(
     preApprovalExpiry,
     authorizationExpiry: extra.captureDeadline,
     refundExpiry: extra.refundDeadline,
-    minFeeBps: extra.minFeeBps ?? 0,
+    minFeeBps: extra.minFeeBps,
     maxFeeBps: extra.maxFeeBps,
     feeReceiver: extra.feeRecipient,
     salt,
