@@ -19,7 +19,14 @@
 // on the wire and avoids "did they mean 0 or did they forget?" ambiguity.
 export interface AuthCaptureExtra {
   // Required
-  captureAuthorizer: `0x${string}` // address authorized to authorize/capture/void/refund/charge (formerly `operator`)
+  // The only address allowed to call authorize/capture/void/refund/charge on
+  // AuthCaptureEscrow (gated by onlySender(paymentInfo.operator) on every
+  // method). In x402's facilitator-driven flow that means the facilitator's
+  // EOA itself, or a smart contract (PaymentOperator, arbiter, etc.) the
+  // facilitator can call. The merchant address can't be the captureAuthorizer
+  // unless the merchant self-hosts the facilitator. Independent of
+  // assetTransferMethod — applies to both EIP-3009 and Permit2 paths.
+  captureAuthorizer: `0x${string}` // formerly `operator` in commerce-payments
   captureDeadline: number // absolute Unix seconds; capture must occur before this
   refundDeadline: number // absolute Unix seconds; refunds allowed until this
   feeRecipient: `0x${string}` // address that receives the fee portion (renamed from feeReceiver)
