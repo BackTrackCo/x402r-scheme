@@ -4,7 +4,7 @@
 
 `authCapture` is a payment scheme where funds can be held and settled later. The client authorizes a maximum amount, and the facilitator submits it — either locking funds in escrow for later settlement (two-phase) or sending them directly to the receiver with refund capability (single-shot).
 
-The **captureAuthorizer** is the entity authorized to authorize, capture, void, refund, or charge a payment — i.e., the only address that can drive the on-chain payment lifecycle. In a facilitator-submits flow, that's either the facilitator itself or any smart contract that ends up calling the underlying escrow (per-network specifics in the per-network spec document). It cannot be the merchant address directly — the merchant receives funds, but lifecycle authority belongs to the captureAuthorizer. The merchant can still wield captureAuthorizer powers indirectly via a smart contract that grants them call rights.
+The **captureAuthorizer** is the entity authorized to authorize, capture, void, refund, or charge a payment — i.e., the only address that can drive the on-chain payment lifecycle. In a facilitator-submits flow, that's either the facilitator itself or any smart contract that ends up calling the underlying escrow (per-network specifics in the per-network spec document).
 
 Unlike `exact`, which has no built-in mechanism for returning funds, `authCapture` supports returning funds to the client through void, refund, and reclaim.
 
