@@ -57,6 +57,24 @@ registerAuthCaptureEvmScheme(facilitator, { signer, networks: 'eip155:84532' })
 - `@x402r/evm/authCapture/server` — `AuthCaptureServerScheme`, `registerAuthCaptureEvmScheme()`, `EvmResourceServerConfig`
 - `@x402r/evm/authCapture/facilitator` — `AuthCaptureFacilitatorScheme`, `registerAuthCaptureEvmScheme()`, `EvmFacilitatorConfig`
 
+## Testing
+
+```bash
+pnpm test          # unit tests (mock-only, network-free)
+pnpm test:fork     # fork tests (require BASE_SEPOLIA_RPC_URL)
+```
+
+Fork tests spawn a local anvil instance forked from Base Sepolia and exercise the full settle path against the canonical `AuthCaptureEscrow` and token-collector deploys. They cover `{authorize, charge} × {eip3009, permit2}` and assert post-settle on-chain state via `escrow.paymentState(hash)`.
+
+Required env:
+
+| Var                       | Purpose                                                             | Default                                                                   |
+| :------------------------ | :------------------------------------------------------------------ | :------------------------------------------------------------------------ |
+| `BASE_SEPOLIA_RPC_URL`    | Upstream RPC anvil forks from. Any working Base Sepolia endpoint.   | _required_ — fork tests skip cleanly if unset                             |
+| `ANVIL_BIN`               | Path to the `anvil` binary.                                         | `anvil` (must be on `PATH`; install via [Foundry](https://getfoundry.sh)) |
+| `BASE_SEPOLIA_FORK_BLOCK` | Pin the fork to a specific block (recommended for reproducibility). | _unset_ — uses chain head                                                 |
+| `ANVIL_VERBOSE`           | If set, anvil's stdout/stderr is inherited (default: silenced).     | _unset_                                                                   |
+
 ## Links
 
 - [Documentation](https://docs.x402r.org)

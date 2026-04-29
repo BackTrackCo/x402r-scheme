@@ -113,6 +113,41 @@ export const ERC20_BALANCE_OF_ABI = [
   },
 ] as const
 
+// View functions on AuthCaptureEscrow used by tests / introspection. Not part
+// of ESCROW_ABI because settle/simulate paths only need authorize + charge.
+export const ESCROW_VIEW_ABI = [
+  {
+    name: 'getHash',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      {
+        name: 'paymentInfo',
+        type: 'tuple',
+        components: PAYMENT_INFO_COMPONENTS,
+      },
+    ],
+    outputs: [{ type: 'bytes32' }],
+  },
+  {
+    name: 'paymentState',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'paymentInfoHash', type: 'bytes32' }],
+    outputs: [
+      {
+        name: 'state',
+        type: 'tuple',
+        components: [
+          { name: 'hasCollectedPayment', type: 'bool' },
+          { name: 'capturableAmount', type: 'uint120' },
+          { name: 'refundableAmount', type: 'uint120' },
+        ],
+      },
+    ],
+  },
+] as const
+
 // AuthCaptureEscrow custom errors. Spliced into the ABI passed to simulateContract
 // so viem can decode `ContractFunctionRevertedError.data.errorName` instead of
 // falling back to an opaque hex selector. Names mirror the Solidity definitions

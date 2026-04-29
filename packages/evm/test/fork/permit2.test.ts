@@ -30,7 +30,12 @@ import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { baseSepolia } from 'viem/chains'
 import { AuthCaptureEvmScheme } from '../../src/authCapture/client/scheme'
 import { AuthCaptureFacilitatorScheme } from '../../src/authCapture/facilitator/scheme'
-import { PERMIT2_ADDRESS } from '../../src/authCapture/shared/constants'
+import {
+  AUTH_CAPTURE_ESCROW_ADDRESS,
+  ESCROW_VIEW_ABI,
+  PERMIT2_ADDRESS,
+} from '../../src/authCapture/shared/constants'
+import type { PaymentInfoStruct, Permit2Payload } from '../../src/authCapture/shared/types'
 
 const USDC_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const
 const BALANCE_SLOT = 9n
@@ -138,6 +143,41 @@ describe('fork — Permit2 settle against canonical AuthCaptureEscrow', () => {
     }
   }
 
+  function reconstructPaymentInfo(
+    requirements: ReturnType<typeof buildRequirements>,
+    payload: Permit2Payload,
+  ): PaymentInfoStruct {
+    return {
+      operator: requirements.extra.captureAuthorizer,
+      payer: payerAccount.address,
+      receiver: requirements.payTo,
+      token: requirements.asset,
+      maxAmount: requirements.amount,
+      preApprovalExpiry: Number(payload.permit2Authorization.deadline),
+      authorizationExpiry: requirements.extra.captureDeadline,
+      refundExpiry: requirements.extra.refundDeadline,
+      minFeeBps: requirements.extra.minFeeBps,
+      maxFeeBps: requirements.extra.maxFeeBps,
+      feeReceiver: requirements.extra.feeRecipient,
+      salt: payload.salt,
+    }
+  }
+
+  async function readPaymentState(p: PaymentInfoStruct) {
+    const hash = (await publicClient.readContract({
+      address: AUTH_CAPTURE_ESCROW_ADDRESS,
+      abi: ESCROW_VIEW_ABI,
+      functionName: 'getHash',
+      args: [{ ...p, maxAmount: BigInt(p.maxAmount), salt: BigInt(p.salt) }],
+    })) as `0x${string}`
+    return (await publicClient.readContract({
+      address: AUTH_CAPTURE_ESCROW_ADDRESS,
+      abi: ESCROW_VIEW_ABI,
+      functionName: 'paymentState',
+      args: [hash],
+    })) as { hasCollectedPayment: boolean; capturableAmount: bigint; refundableAmount: bigint }
+  }
+
   it('settles authorize() via Permit2 collector', async () => {
     const client = new AuthCaptureEvmScheme(clientSigner)
     const facilitator = new AuthCaptureFacilitatorScheme(
@@ -146,6 +186,7 @@ describe('fork — Permit2 settle against canonical AuthCaptureEscrow', () => {
 
     const requirements = buildRequirements(false)
     const { payload } = await client.createPaymentPayload(2, requirements)
+    const wirePayload = payload as unknown as Permit2Payload
 
     const settleResult = await facilitator.settle(
       {
@@ -162,6 +203,12 @@ describe('fork — Permit2 settle against canonical AuthCaptureEscrow', () => {
       throw new Error(`settle authorize+permit2 failed: ${settleResult.errorReason}`)
     }
     expect(settleResult.success).toBe(true)
+
+    // Post-state: capturableAmount should equal the authorized amount.
+    const state = await readPaymentState(reconstructPaymentInfo(requirements, wirePayload))
+    expect(state.hasCollectedPayment).toBe(true)
+    expect(state.capturableAmount).toBe(oneUsdc)
+    expect(state.refundableAmount).toBe(0n)
   })
 
   it('settles charge() via Permit2 collector (autoCapture + permit2 combo)', async () => {
@@ -172,6 +219,7 @@ describe('fork — Permit2 settle against canonical AuthCaptureEscrow', () => {
 
     const requirements = buildRequirements(true)
     const { payload } = await client.createPaymentPayload(2, requirements)
+    const wirePayload = payload as unknown as Permit2Payload
 
     const settleResult = await facilitator.settle(
       {
@@ -188,5 +236,10 @@ describe('fork — Permit2 settle against canonical AuthCaptureEscrow', () => {
       throw new Error(`settle charge+permit2 failed: ${settleResult.errorReason}`)
     }
     expect(settleResult.success).toBe(true)
+
+    const state = await readPaymentState(reconstructPaymentInfo(requirements, wirePayload))
+    expect(state.hasCollectedPayment).toBe(true)
+    expect(state.capturableAmount).toBe(0n)
+    expect(state.refundableAmount).toBe(oneUsdc)
   })
 })

@@ -38,6 +38,11 @@ import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { baseSepolia } from 'viem/chains'
 import { AuthCaptureEvmScheme } from '../../src/authCapture/client/scheme'
 import { AuthCaptureFacilitatorScheme } from '../../src/authCapture/facilitator/scheme'
+import {
+  AUTH_CAPTURE_ESCROW_ADDRESS,
+  ESCROW_VIEW_ABI,
+} from '../../src/authCapture/shared/constants'
+import type { Eip3009Payload, PaymentInfoStruct } from '../../src/authCapture/shared/types'
 
 const USDC_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const
 const BALANCE_SLOT = 9n
@@ -154,6 +159,40 @@ describe('fork — EIP-3009 settle against canonical AuthCaptureEscrow', () => {
     }
   }
 
+  /**
+   * Reconstruct the on-chain PaymentInfo struct from the requirements + the
+   * client-generated salt + payer. Mirrors the facilitator's own reconstruction
+   * — used here to compute the post-settle paymentInfoHash.
+   */
+  function reconstructPaymentInfo(
+    requirements: ReturnType<typeof buildRequirements>,
+    payload: Eip3009Payload,
+  ): PaymentInfoStruct {
+    return {
+      operator: requirements.extra.captureAuthorizer,
+      payer: payerAccount.address,
+      receiver: requirements.payTo,
+      token: requirements.asset,
+      maxAmount: requirements.amount,
+      preApprovalExpiry: Number(payload.authorization.validBefore),
+      authorizationExpiry: requirements.extra.captureDeadline,
+      refundExpiry: requirements.extra.refundDeadline,
+      minFeeBps: requirements.extra.minFeeBps,
+      maxFeeBps: requirements.extra.maxFeeBps,
+      feeReceiver: requirements.extra.feeRecipient,
+      salt: payload.salt,
+    }
+  }
+
+  async function readPaymentState(paymentInfoHash: `0x${string}`) {
+    return (await publicClient.readContract({
+      address: AUTH_CAPTURE_ESCROW_ADDRESS,
+      abi: ESCROW_VIEW_ABI,
+      functionName: 'paymentState',
+      args: [paymentInfoHash],
+    })) as { hasCollectedPayment: boolean; capturableAmount: bigint; refundableAmount: bigint }
+  }
+
   it('settles authorize() against canonical AuthCaptureEscrow', async () => {
     const client = new AuthCaptureEvmScheme(clientSigner)
     const facilitator = new AuthCaptureFacilitatorScheme(
@@ -162,6 +201,7 @@ describe('fork — EIP-3009 settle against canonical AuthCaptureEscrow', () => {
 
     const requirements = buildRequirements(false)
     const { payload } = await client.createPaymentPayload(2, requirements)
+    const wirePayload = payload as unknown as Eip3009Payload
 
     const settleResult = await facilitator.settle(
       {
@@ -181,6 +221,28 @@ describe('fork — EIP-3009 settle against canonical AuthCaptureEscrow', () => {
     }
     expect(settleResult.success).toBe(true)
     expect(settleResult.transaction).toMatch(/^0x[a-fA-F0-9]{64}$/)
+
+    // Post-state assertion: authorize() should record capturableAmount = amount,
+    // refundableAmount = 0, hasCollectedPayment = true. Read via the escrow's
+    // canonical getHash + paymentState views to prove the on-chain effect, not
+    // just non-revert.
+    const paymentInfo = reconstructPaymentInfo(requirements, wirePayload)
+    const paymentInfoHash = (await publicClient.readContract({
+      address: AUTH_CAPTURE_ESCROW_ADDRESS,
+      abi: ESCROW_VIEW_ABI,
+      functionName: 'getHash',
+      args: [
+        {
+          ...paymentInfo,
+          maxAmount: BigInt(paymentInfo.maxAmount),
+          salt: BigInt(paymentInfo.salt),
+        },
+      ],
+    })) as `0x${string}`
+    const state = await readPaymentState(paymentInfoHash)
+    expect(state.hasCollectedPayment).toBe(true)
+    expect(state.capturableAmount).toBe(oneUsdc)
+    expect(state.refundableAmount).toBe(0n)
   })
 
   it('settles charge() against canonical AuthCaptureEscrow (regression for 6-arg ABI)', async () => {
@@ -191,6 +253,7 @@ describe('fork — EIP-3009 settle against canonical AuthCaptureEscrow', () => {
 
     const requirements = buildRequirements(true)
     const { payload } = await client.createPaymentPayload(2, requirements)
+    const wirePayload = payload as unknown as Eip3009Payload
 
     const settleResult = await facilitator.settle(
       {
@@ -208,5 +271,44 @@ describe('fork — EIP-3009 settle against canonical AuthCaptureEscrow', () => {
     }
     expect(settleResult.success).toBe(true)
     expect(settleResult.transaction).toMatch(/^0x[a-fA-F0-9]{64}$/)
+
+    // Post-state assertion: charge() records hasCollectedPayment = true,
+    // capturableAmount = 0, refundableAmount = amount (funds went straight
+    // to receiver, fully refundable within the refund window).
+    const paymentInfo = reconstructPaymentInfo(requirements, wirePayload)
+    const paymentInfoHash = (await publicClient.readContract({
+      address: AUTH_CAPTURE_ESCROW_ADDRESS,
+      abi: ESCROW_VIEW_ABI,
+      functionName: 'getHash',
+      args: [
+        {
+          ...paymentInfo,
+          maxAmount: BigInt(paymentInfo.maxAmount),
+          salt: BigInt(paymentInfo.salt),
+        },
+      ],
+    })) as `0x${string}`
+    const state = await readPaymentState(paymentInfoHash)
+    expect(state.hasCollectedPayment).toBe(true)
+    expect(state.capturableAmount).toBe(0n)
+    expect(state.refundableAmount).toBe(oneUsdc)
+
+    // Also: receiver actually got the tokens (charge sends funds direct).
+    const receiverBalance = (await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: [
+        {
+          name: 'balanceOf',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: 'a', type: 'address' }],
+          outputs: [{ type: 'uint256' }],
+        },
+      ],
+      functionName: 'balanceOf',
+      args: [requirements.payTo],
+    })) as bigint
+    // minFeeBps = 0 in the test fixture, so the receiver gets the full amount.
+    expect(receiverBalance).toBe(oneUsdc)
   })
 })
