@@ -21,7 +21,7 @@ export interface AuthCaptureExtra {
   // Required
   // The only address allowed to call authorize/capture/void/refund/charge on
   // AuthCaptureEscrow (each of those is gated by onlySender(paymentInfo.operator))
-  // — i.e., it must be msg.sender of the on-chain settle. In x402's
+  // — i.e., it must be msg.sender of the "Authorize" call. In x402's
   // facilitator-submits flow that means either the facilitator's EOA, or any
   // smart contract that ultimately calls escrow (arbiter with dispute logic,
   // multisig, etc.). Independent of assetTransferMethod — applies to both
