@@ -23,9 +23,9 @@ export interface AuthCaptureExtra {
   // AuthCaptureEscrow (each of those is gated by onlySender(paymentInfo.operator))
   // — i.e., it must be msg.sender of the on-chain settle. In x402's
   // facilitator-submits flow that means either the facilitator's EOA, or any
-  // smart contract that ultimately calls escrow (PaymentOperator, arbiter
-  // with dispute logic, multisig, etc.). Independent of assetTransferMethod
-  // — applies to both EIP-3009 and Permit2.
+  // smart contract that ultimately calls escrow (arbiter with dispute logic,
+  // multisig, etc.). Independent of assetTransferMethod — applies to both
+  // EIP-3009 and Permit2.
   captureAuthorizer: `0x${string}` // formerly `operator` in commerce-payments
   captureDeadline: number // absolute Unix seconds; capture must occur before this
   refundDeadline: number // absolute Unix seconds; refunds allowed until this
