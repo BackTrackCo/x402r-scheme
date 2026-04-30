@@ -63,16 +63,16 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 
 > **`salt` is NOT in `extra`.** It is generated client-side per signing call and rides on `PaymentPayload`. See "PaymentPayload" below.
 >
-> **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants. Same address on every supported chain (CREATE2 deployed by base/commerce-payments):
+> **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants — same address on every supported EVM chain via deterministic CREATE2:
 >
 > | Constant                              | Address                                      |
 > | :------------------------------------ | :------------------------------------------- |
-> | `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff` |
-> | `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x0E3dF9510de65469C4518D7843919c0b8C7A7757` |
-> | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26` |
+> | `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
+> | `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
+> | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
 > | `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
 >
-> Currently confirmed on Base mainnet + Base Sepolia. Other chains will share the same address when base/commerce-payments deploys there.
+> See [Canonical Addresses](#canonical-addresses) for the deployed-chain list and the salt scheme.
 
 ### Spec → on-chain field name mapping
 
@@ -280,3 +280,39 @@ Fees are enforced on-chain by the escrow contract:
 - If `feeReceiver` (`extra.feeRecipient`) is set in `PaymentInfo`, actual `feeReceiver` at capture/charge must match
 - If `feeReceiver` is `address(0)`, the caller can specify any non-zero address
 - Fee distribution: `feeAmount = amount * feeBps / 10000`, remainder goes to receiver
+
+### Canonical Addresses
+
+> **Requirement**: The escrow and token collectors are deployed at the same address across every supported EVM chain via deterministic CREATE2. Bytecode is byte-identical (locked compiler, optimizer, and dependency pins); anyone with the source can reproduce and verify the addresses, and any first-mover deployer who broadcasts the canonical bytecode at the canonical salt lands at the same address.
+
+**Source**: [base/commerce-payments@v1.0.0](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
+
+**Salt scheme**: `bytes20(0) || 0x00 || bytes11(keccak256(label))`. The leading 21 bytes are constant; the label is the per-contract namespace below.
+
+| Constant                              | Salt label                                        | Canonical Address                            |
+| :------------------------------------ | :------------------------------------------------ | :------------------------------------------- |
+| `AUTH_CAPTURE_ESCROW_ADDRESS`         | `commerce-payments::v1::AuthCaptureEscrow`        | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
+| `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `commerce-payments::v1::ERC3009PaymentCollector`  | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
+| `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `commerce-payments::v1::Permit2PaymentCollector`  | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
+| `PERMIT2_ADDRESS` (Uniswap canonical) | (Uniswap canonical, not CREATE2'd by this scheme) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+
+**Deployed chains**:
+
+| Network           | Chain ID |
+| :---------------- | :------- |
+| Ethereum          | 1        |
+| Base              | 8453     |
+| Optimism          | 10       |
+| Arbitrum One      | 42161    |
+| Polygon           | 137      |
+| Celo              | 42220    |
+| Avalanche C-Chain | 43114    |
+| Linea             | 59144    |
+| Monad             | 143      |
+| BNB Smart Chain   | 56       |
+| Tempo             | 4217     |
+| Ethereum Sepolia  | 11155111 |
+| Base Sepolia      | 84532    |
+| Arbitrum Sepolia  | 421614   |
+
+Facilitators that wish to add a chain not in this table SHOULD reproduce the canonical bytecode using the source repo's pinned compiler / optimizer settings and broadcast at the salt labels above; the addresses will match the table by construction.

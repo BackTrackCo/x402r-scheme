@@ -1,19 +1,20 @@
 export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
-// Canonical AuthCaptureEscrow + token collector deployments from base/commerce-payments.
-// These are universal constants — not configurable per merchant. CREATE2-deployed
-// at the same address on every chain they ship to. Currently confirmed on Base
-// mainnet + Base Sepolia only; until additional deploys land, the server scheme's
-// ASSET_INFO registry is restricted to those two networks (settle would revert
-// elsewhere because the escrow contract doesn't exist).
-// https://github.com/base/commerce-payments
+// Canonical AuthCaptureEscrow + token collector deployments from base/commerce-payments
+// (https://github.com/base/commerce-payments). Universal constants — not configurable per
+// merchant. Deployed via deterministic CREATE2 so the addresses are identical on every
+// supported chain.
+//
+// Live on: Ethereum (1), Base (8453), Optimism (10), Arbitrum One (42161), Polygon (137),
+// Celo (42220), Avalanche C-Chain (43114), Linea (59144), Monad (143), BSC (56),
+// Tempo (4217), plus Ethereum Sepolia, Base Sepolia, and Arbitrum Sepolia testnets.
 export const AUTH_CAPTURE_ESCROW_ADDRESS =
-  '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff' as const satisfies `0x${string}`
+  '0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6' as const satisfies `0x${string}`
 export const EIP3009_TOKEN_COLLECTOR_ADDRESS =
-  '0x0E3dF9510de65469C4518D7843919c0b8C7A7757' as const satisfies `0x${string}`
+  '0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0' as const satisfies `0x${string}`
 export const PERMIT2_TOKEN_COLLECTOR_ADDRESS =
-  '0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26' as const satisfies `0x${string}`
+  '0xD8490609d2da0ee626b0e676941b225cbc1A8C08' as const satisfies `0x${string}`
 
 // Canonical Uniswap Permit2 contract — same address on every chain it's deployed to.
 // https://github.com/Uniswap/permit2

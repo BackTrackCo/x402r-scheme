@@ -17,15 +17,88 @@ import type {
 
 /**
  * Asset info including EIP-712 domain parameters per network. Restricted to
- * the chains where AuthCaptureEscrow is deployed (currently Base mainnet +
- * Base Sepolia). Adding a chain here without a corresponding escrow deploy
- * would cause settle to revert silently. New chains belong here once the
- * canonical commerce-payments contracts are deployed there.
+ * the chains where AuthCaptureEscrow is deployed AND a Circle-native USDC
+ * with EIP-3009 v2 support is canonical. BSC (Binance-Peg USDC) and Tempo
+ * (uses pathUSD, not USDC) are intentionally absent — adding either would
+ * require a different domain config per their stablecoin's EIP-712 metadata.
  */
 const ASSET_INFO: Record<
   string,
   { address: string; name: string; version: string; decimals: number }
 > = {
+  // ----- Mainnets -----
+  // Ethereum
+  'eip155:1': {
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Base
+  'eip155:8453': {
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Optimism
+  'eip155:10': {
+    address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Arbitrum One
+  'eip155:42161': {
+    address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Polygon
+  'eip155:137': {
+    address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Celo
+  'eip155:42220': {
+    address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Avalanche C-Chain
+  'eip155:43114': {
+    address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Linea
+  'eip155:59144': {
+    address: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+  // Monad
+  'eip155:143': {
+    address: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603',
+    name: 'USD Coin',
+    version: '2',
+    decimals: 6,
+  },
+
+  // ----- Testnets -----
+  // Ethereum Sepolia
+  'eip155:11155111': {
+    address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    name: 'USDC',
+    version: '2',
+    decimals: 6,
+  },
   // Base Sepolia
   'eip155:84532': {
     address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
@@ -33,10 +106,10 @@ const ASSET_INFO: Record<
     version: '2',
     decimals: 6,
   },
-  // Base mainnet
-  'eip155:8453': {
-    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    name: 'USD Coin',
+  // Arbitrum Sepolia
+  'eip155:421614': {
+    address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    name: 'USDC',
     version: '2',
     decimals: 6,
   },
