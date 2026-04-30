@@ -8,7 +8,7 @@ The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
   - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
-- **CaptureAuthorizer**: Address authorized to authorize, capture, void, refund, or charge a payment. Each of those methods on `AuthCaptureEscrow` is gated by `onlySender(paymentInfo.operator)`, so this address must be `msg.sender` of the "Authorize" call. In x402's facilitator-submits flow that means either **the facilitator's EOA**, or **any smart contract** that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.) — the contract's own access control determines who can trigger it. Independent of `assetTransferMethod` — the constraint is on the escrow's sender check, not on the collector.
+- **CaptureAuthorizer**: Address authorized to authorize, capture, void, refund, or charge a payment. Each of those methods on `AuthCaptureEscrow` is gated by `onlySender(paymentInfo.operator)`, so this address must be `msg.sender` of the "Authorize" call. In x402's facilitator-submits flow that means either **the facilitator's EOA**, or **any smart contract** that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.).
 
 The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it to `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`).
 
