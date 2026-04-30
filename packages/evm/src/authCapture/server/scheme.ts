@@ -16,15 +16,28 @@ import type {
 } from '@x402/core/types'
 
 /**
- * Asset info including EIP-712 domain parameters per network. Restricted to
- * the chains where AuthCaptureEscrow is deployed AND a Circle-native USDC
- * with EIP-3009 v2 support is canonical. BSC (Binance-Peg USDC) and Tempo
- * (uses pathUSD, not USDC) are intentionally absent — adding either would
- * require a different domain config per their stablecoin's EIP-712 metadata.
+ * Asset info including EIP-712 domain parameters per network. Each entry is the
+ * default stablecoin used by `defaultMoneyConversion` when the merchant gives a
+ * decimal price like "$1.50".
+ *
+ * The `name` / `version` fields are the EIP-712 domain used by the ERC-3009
+ * `assetTransferMethod`. Chains where the canonical stable does NOT support
+ * ERC-3009 (BSC's Binance-Peg USDC, Tempo's pathUSD) are still listed so that
+ * default price parsing works — but on those chains merchants MUST set
+ * `assetTransferMethod: "permit2"` in `extra`. Permit2 has its own EIP-712
+ * domain (chain-invariant), so the per-token name/version are irrelevant on
+ * the Permit2 path.
  */
 const ASSET_INFO: Record<
   string,
-  { address: string; name: string; version: string; decimals: number }
+  {
+    address: string
+    name: string
+    version: string
+    decimals: number
+    /** If true, the canonical stable on this chain does not support ERC-3009; merchants must use Permit2. */
+    permit2Only?: boolean
+  }
 > = {
   // ----- Mainnets -----
   // Ethereum
@@ -112,6 +125,24 @@ const ASSET_INFO: Record<
     name: 'USDC',
     version: '2',
     decimals: 6,
+  },
+
+  // ----- Permit2-only mainnets -----
+  // BNB Smart Chain — Binance-Peg USDC (18 decimals; lacks ERC-3009).
+  'eip155:56': {
+    address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+    name: 'USDC',
+    version: '1',
+    decimals: 18,
+    permit2Only: true,
+  },
+  // Tempo — pathUSD (TIP-20 predeploy, 6 decimals; not USDC, lacks ERC-3009).
+  'eip155:4217': {
+    address: '0x20c0000000000000000000000000000000000000',
+    name: 'pathUSD',
+    version: '1',
+    decimals: 6,
+    permit2Only: true,
   },
 }
 

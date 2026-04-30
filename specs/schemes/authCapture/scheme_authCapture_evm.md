@@ -298,21 +298,21 @@ Fees are enforced on-chain by the escrow contract:
 
 **Deployed chains**:
 
-| Network           | Chain ID |
-| :---------------- | :------- |
-| Ethereum          | 1        |
-| Base              | 8453     |
-| Optimism          | 10       |
-| Arbitrum One      | 42161    |
-| Polygon           | 137      |
-| Celo              | 42220    |
-| Avalanche C-Chain | 43114    |
-| Linea             | 59144    |
-| Monad             | 143      |
-| BNB Smart Chain   | 56       |
-| Tempo             | 4217     |
-| Ethereum Sepolia  | 11155111 |
-| Base Sepolia      | 84532    |
-| Arbitrum Sepolia  | 421614   |
+| Network           | Chain ID | `assetTransferMethod`                          |
+| :---------------- | :------- | :--------------------------------------------- |
+| Ethereum          | 1        | `eip3009` (Circle USDC) or `permit2`           |
+| Base              | 8453     | `eip3009` (Circle USDC) or `permit2`           |
+| Optimism          | 10       | `eip3009` (Circle USDC) or `permit2`           |
+| Arbitrum One      | 42161    | `eip3009` (Circle USDC) or `permit2`           |
+| Polygon           | 137      | `eip3009` (Circle USDC) or `permit2`           |
+| Celo              | 42220    | `eip3009` (Circle USDC) or `permit2`           |
+| Avalanche C-Chain | 43114    | `eip3009` (Circle USDC) or `permit2`           |
+| Linea             | 59144    | `eip3009` (Circle USDC) or `permit2`           |
+| Monad             | 143      | `eip3009` (Circle USDC) or `permit2`           |
+| BNB Smart Chain   | 56       | `permit2` only (Binance-Peg USDC, no ERC-3009) |
+| Tempo             | 4217     | `permit2` only (pathUSD TIP-20, no ERC-3009)   |
+| Ethereum Sepolia  | 11155111 | `eip3009` (Circle USDC) or `permit2`           |
+| Base Sepolia      | 84532    | `eip3009` (Circle USDC) or `permit2`           |
+| Arbitrum Sepolia  | 421614   | `eip3009` (Circle USDC) or `permit2`           |
 
 Facilitators that wish to add a chain not in this table SHOULD reproduce the canonical bytecode using the source repo's pinned compiler / optimizer settings and broadcast at the salt labels above; the addresses will match the table by construction.
