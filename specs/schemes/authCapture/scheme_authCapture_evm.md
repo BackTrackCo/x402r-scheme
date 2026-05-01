@@ -68,7 +68,7 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
 | `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
 
-See [Canonical Addresses](#canonical-addresses) for the deployed-chain list and the salt scheme.
+See [Canonical Addresses](#canonical-addresses) for the salt scheme.
 
 ### Spec → on-chain field name mapping
 
@@ -185,7 +185,7 @@ The facilitator performs these checks in order:
 8. **Spender / collector match**: `payload.to === EIP3009_TOKEN_COLLECTOR_ADDRESS` (EIP-3009) or `payload.spender === PERMIT2_TOKEN_COLLECTOR_ADDRESS` (Permit2).
 9. **Token match**: `payload.permitted.token === requirements.asset` (Permit2 only — EIP-3009 binds via signing domain).
 10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match `payer`.
-11. **Amount**: Authorization value matches `requirements.amount`.
+11. **Amount**: `authorization.value` (EIP-3009) or `permit2Authorization.permitted.amount` (Permit2) matches `requirements.amount`.
 12. **Nonce match**: Reconstruct `PaymentInfo` from extra + payload.salt + payer + requirements; recompute payer-agnostic hash; assert it matches the wire nonce.
 13. **Simulate** `AUTH_CAPTURE_ESCROW.authorize(...)` or `.charge(...)` to ensure success.
 
@@ -209,26 +209,26 @@ The authCapture scheme uses the standard x402 error codes plus these scheme-spec
 
 ### Verification Errors
 
-| Error Code                          | Description                                                              |
-| :---------------------------------- | :----------------------------------------------------------------------- |
-| `invalid_payload_format`            | Payload doesn't match `Eip3009Payload` or `Permit2Payload`.              |
-| `unsupported_scheme`                | Scheme is not `authCapture`.                                             |
-| `network_mismatch`                  | Payload network doesn't match requirements.                              |
-| `invalid_network`                   | Network format is not `eip155:<chainId>`.                                |
-| `invalid_authCapture_extra`         | Extra is missing required fields.                                        |
-| `unsupported_asset_transfer_method` | `assetTransferMethod` is not `"eip3009"` or `"permit2"`.                 |
-| `payload_method_mismatch`           | Payload shape doesn't match `assetTransferMethod`.                       |
-| `capture_deadline_expired`          | `captureDeadline <= now + 6s`.                                           |
-| `invalid_deadline_ordering`         | `refundDeadline < captureDeadline`.                                      |
-| `authorization_expired`             | EIP-3009 `validBefore` (or Permit2 `deadline`) `<= now + 6s`.            |
-| `authorization_not_yet_valid`       | EIP-3009 `validAfter > now`.                                             |
-| `invalid_authCapture_signature`     | Signature verification failed.                                           |
-| `amount_mismatch`                   | Authorization value doesn't match `requirements.amount`.                 |
-| `token_collector_mismatch`          | `to` / `spender` doesn't match the canonical collector for the method.   |
-| `token_mismatch`                    | Permit2 `permitted.token` doesn't match `requirements.asset`.            |
-| `nonce_mismatch`                    | Wire nonce doesn't match the recomputed payer-agnostic PaymentInfo hash. |
-| `insufficient_balance`              | Payer balance is less than required amount.                              |
-| `simulation_failed`                 | Settlement simulation reverted with an unmapped error.                   |
+| Error Code                          | Description                                                                       |
+| :---------------------------------- | :-------------------------------------------------------------------------------- |
+| `invalid_payload_format`            | Payload doesn't match `Eip3009Payload` or `Permit2Payload`.                       |
+| `unsupported_scheme`                | Scheme is not `authCapture`.                                                      |
+| `network_mismatch`                  | Payload network doesn't match requirements.                                       |
+| `invalid_network`                   | Network format is not `eip155:<chainId>`.                                         |
+| `invalid_authCapture_extra`         | Extra is missing required fields.                                                 |
+| `unsupported_asset_transfer_method` | `assetTransferMethod` is not `"eip3009"` or `"permit2"`.                          |
+| `payload_method_mismatch`           | Payload shape doesn't match `assetTransferMethod`.                                |
+| `capture_deadline_expired`          | `captureDeadline <= now + 6s`.                                                    |
+| `invalid_deadline_ordering`         | Deadlines violate `now + maxTimeoutSeconds <= captureDeadline <= refundDeadline`. |
+| `authorization_expired`             | EIP-3009 `validBefore` (or Permit2 `deadline`) `<= now + 6s`.                     |
+| `authorization_not_yet_valid`       | EIP-3009 `validAfter > now`.                                                      |
+| `invalid_authCapture_signature`     | Signature verification failed.                                                    |
+| `amount_mismatch`                   | Authorization value doesn't match `requirements.amount`.                          |
+| `token_collector_mismatch`          | `to` / `spender` doesn't match the canonical collector for the method.            |
+| `token_mismatch`                    | Permit2 `permitted.token` doesn't match `requirements.asset`.                     |
+| `nonce_mismatch`                    | Wire nonce doesn't match the recomputed payer-agnostic PaymentInfo hash.          |
+| `insufficient_balance`              | Payer balance is less than required amount.                                       |
+| `simulation_failed`                 | Settlement simulation reverted with an unmapped error.                            |
 
 ### Typed simulation reverts
 
