@@ -158,9 +158,9 @@ The facilitator performs these checks in order:
 1. **Type guard**: Verify payload matches one of `Eip3009Payload` or `Permit2Payload` (must include `signature` and `salt`).
 2. **Scheme match**: `requirements.scheme === "authCapture"` and `payload.accepted.scheme === "authCapture"`.
 3. **Network match**: `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`.
-4. **Extra validation**: `requirements.extra` contains all required fields (`captureAuthorizer`, `captureDeadline`, `refundDeadline`, `feeRecipient`, `maxFeeBps`, `name`, `version`).
+4. **Extra validation**: `requirements.extra` contains all required fields (`captureAuthorizer`, `captureDeadline`, `refundDeadline`, `feeRecipient`, `minFeeBps`, `maxFeeBps`, `name`, `version`).
 5. **Method routing**: `extra.assetTransferMethod` (default `"eip3009"`) matches the payload shape.
-6. **Deadline ordering**: `refundDeadline > captureDeadline` and `captureDeadline > now + 6s`.
+6. **Deadline ordering**: `refundDeadline > captureDeadline`, `captureDeadline > now + 6s`, and `payload.validBefore` (EIP-3009) / `payload.deadline` (Permit2) `<= captureDeadline`.
 7. **Time window**: `payload.deadline / validBefore > now + 6s` (not expired) and `validAfter <= now` (active, EIP-3009 only).
 8. **Spender / collector match**: `payload.to === EIP3009_TOKEN_COLLECTOR_ADDRESS` (EIP-3009) or `payload.spender === PERMIT2_TOKEN_COLLECTOR_ADDRESS` (Permit2).
 9. **Token match**: `payload.permitted.token === requirements.asset` (Permit2 only — EIP-3009 binds via signing domain).
