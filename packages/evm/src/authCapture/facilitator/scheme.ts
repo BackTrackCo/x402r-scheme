@@ -165,7 +165,7 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     if (extra.captureDeadline <= now + SAFETY_MARGIN_SECONDS) {
       return { isValid: false, invalidReason: 'capture_deadline_expired', payer }
     }
-    if (extra.refundDeadline <= extra.captureDeadline) {
+    if (extra.refundDeadline < extra.captureDeadline) {
       return { isValid: false, invalidReason: 'invalid_deadline_ordering', payer }
     }
     // Mirror AuthCaptureEscrow._validatePayment ordering check upfront so the
