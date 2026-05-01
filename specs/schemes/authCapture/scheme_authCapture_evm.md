@@ -46,17 +46,17 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 
 ### `extra` Fields
 
-| Field                 | Required | Type                     | Description                                                                                               |
-| :-------------------- | :------- | :----------------------- | :-------------------------------------------------------------------------------------------------------- |
-| `name`                | Yes      | `string`                 | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                               |
-| `version`             | Yes      | `string`                 | EIP-712 token-domain version (e.g., `"2"`).                                                               |
-| `captureAuthorizer`   | Yes      | `address`                | Address authorized to authorize/capture/void/refund/charge. Committed on-chain as `PaymentInfo.operator`. |
-| `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.                 |
-| `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                            |
-| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                          |
-| `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.            |
-| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                     |
-| `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.    |
+| Field                 | Required | Type                     | Description                                                                                                                                                                                                   |
+| :-------------------- | :------- | :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`                | Yes      | `string`                 | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only.                                                                                                                                   |
+| `version`             | Yes      | `string`                 | EIP-712 token-domain version (e.g., `"2"`).                                                                                                                                                                   |
+| `captureAuthorizer`   | Yes      | `address`                | Address authorized to authorize/capture/void/refund/charge. Committed on-chain as `PaymentInfo.operator`.                                                                                                     |
+| `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.                                                                                                                     |
+| `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                                                                                                                                |
+| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                                                                                                                              |
+| `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.                                                                                                                |
+| `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                                                                                                                         |
+| `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.                                                                                                        |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals. |
 
 **Universal contract addresses** (same on every supported EVM chain via deterministic CREATE2):
@@ -110,16 +110,16 @@ The payload carries the signature and the client-generated `salt`. The facilitat
 
 **Field derivation (EIP-3009):**
 
-| Payload field               | Derived from                                                                                          |
-| :-------------------------- | :---------------------------------------------------------------------------------------------------- |
-| `authorization.from`        | Client's own address                                                                                  |
-| `authorization.to`          | `EIP3009_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                |
-| `authorization.value`       | `requirements.amount`                                                                                 |
-| `authorization.validAfter`  | `0` (the token collector hardcodes the lower bound)                                                   |
+| Payload field               | Derived from                                                                                                |
+| :-------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| `authorization.from`        | Client's own address                                                                                        |
+| `authorization.to`          | `EIP3009_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                      |
+| `authorization.value`       | `requirements.amount`                                                                                       |
+| `authorization.validAfter`  | `0` (the token collector hardcodes the lower bound)                                                         |
 | `authorization.validBefore` | `now + requirements.maxTimeoutSeconds` (also used as `preApprovalExpiry` when reconstructing `PaymentInfo`) |
-| `authorization.nonce`       | Payer-agnostic `PaymentInfo` hash — see [Nonce Derivation](#nonce-derivation-both-methods)            |
-| `salt`                      | Fresh `bytes32` generated client-side per signing call                                                |
-| EIP-712 domain              | `{ name, version }` from `extra`; `chainId` from `network`; `verifyingContract = requirements.asset`  |
+| `authorization.nonce`       | Payer-agnostic `PaymentInfo` hash — see [Nonce Derivation](#nonce-derivation-both-methods)                  |
+| `salt`                      | Fresh `bytes32` generated client-side per signing call                                                      |
+| EIP-712 domain              | `{ name, version }` from `extra`; `chainId` from `network`; `verifyingContract = requirements.asset`        |
 
 ### Permit2
 
@@ -147,16 +147,16 @@ The payload carries the signature and the client-generated `salt`. The facilitat
 
 **Field derivation (Permit2):**
 
-| Payload field                            | Derived from                                                                                          |
-| :--------------------------------------- | :---------------------------------------------------------------------------------------------------- |
-| `permit2Authorization.from`              | Client's own address                                                                                  |
-| `permit2Authorization.permitted.token`   | `requirements.asset`                                                                                  |
-| `permit2Authorization.permitted.amount`  | `requirements.amount`                                                                                 |
-| `permit2Authorization.spender`           | `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                |
-| `permit2Authorization.nonce`             | `uint256(payerAgnosticPaymentInfoHash)` — see [Nonce Derivation](#nonce-derivation-both-methods)      |
-| `permit2Authorization.deadline`          | `now + requirements.maxTimeoutSeconds` (also used as `preApprovalExpiry` when reconstructing `PaymentInfo`) |
-| `salt`                                   | Fresh `bytes32` generated client-side per signing call                                                |
-| EIP-712 domain                           | Canonical Permit2 contract; `chainId` from `network`                                                  |
+| Payload field                           | Derived from                                                                                                |
+| :-------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| `permit2Authorization.from`             | Client's own address                                                                                        |
+| `permit2Authorization.permitted.token`  | `requirements.asset`                                                                                        |
+| `permit2Authorization.permitted.amount` | `requirements.amount`                                                                                       |
+| `permit2Authorization.spender`          | `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                      |
+| `permit2Authorization.nonce`            | `uint256(payerAgnosticPaymentInfoHash)` — see [Nonce Derivation](#nonce-derivation-both-methods)            |
+| `permit2Authorization.deadline`         | `now + requirements.maxTimeoutSeconds` (also used as `preApprovalExpiry` when reconstructing `PaymentInfo`) |
+| `salt`                                  | Fresh `bytes32` generated client-side per signing call                                                      |
+| EIP-712 domain                          | Canonical Permit2 contract; `chainId` from `network`                                                        |
 
 **No witness** — the merchant address is bound through the deterministic nonce, not a separate witness struct.
 
