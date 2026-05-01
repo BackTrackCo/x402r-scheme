@@ -61,8 +61,6 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.    |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                       |
 
-> **`salt` is NOT in `extra`.** It is generated client-side per signing call and rides on `PaymentPayload`. See "PaymentPayload" below.
->
 > **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants — same address on every supported EVM chain via deterministic CREATE2:
 >
 > | Constant                              | Address                                      |
@@ -112,7 +110,18 @@ The payload carries the signature and the client-generated `salt`. The facilitat
 }
 ```
 
-`authorization.to` is the universal `EIP3009_TOKEN_COLLECTOR_ADDRESS` constant. `validBefore` is `now + maxTimeoutSeconds`, also used as `preApprovalExpiry` when reconstructing PaymentInfo.
+**Field derivation (EIP-3009):**
+
+| Payload field               | Derived from                                                                                          |
+| :-------------------------- | :---------------------------------------------------------------------------------------------------- |
+| `authorization.from`        | Client's own address                                                                                  |
+| `authorization.to`          | `EIP3009_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                |
+| `authorization.value`       | `requirements.amount`                                                                                 |
+| `authorization.validAfter`  | `0` (the token collector hardcodes the lower bound)                                                   |
+| `authorization.validBefore` | `now + requirements.maxTimeoutSeconds` (also used as `preApprovalExpiry` when reconstructing `PaymentInfo`) |
+| `authorization.nonce`       | Payer-agnostic `PaymentInfo` hash — see [Nonce Derivation](#nonce-derivation-both-methods)            |
+| `salt`                      | Fresh `bytes32` generated client-side per signing call                                                |
+| EIP-712 domain              | `{ name, version }` from `extra`; `chainId` from `network`; `verifyingContract = requirements.asset`  |
 
 ### Permit2
 
@@ -138,7 +147,20 @@ The payload carries the signature and the client-generated `salt`. The facilitat
 }
 ```
 
-`spender` is the universal `PERMIT2_TOKEN_COLLECTOR_ADDRESS` constant. `nonce` is `uint256(payerAgnosticPaymentInfoHash)`. The `deadline` matches `now + maxTimeoutSeconds`. **No witness** — the merchant address is bound through the deterministic nonce.
+**Field derivation (Permit2):**
+
+| Payload field                            | Derived from                                                                                          |
+| :--------------------------------------- | :---------------------------------------------------------------------------------------------------- |
+| `permit2Authorization.from`              | Client's own address                                                                                  |
+| `permit2Authorization.permitted.token`   | `requirements.asset`                                                                                  |
+| `permit2Authorization.permitted.amount`  | `requirements.amount`                                                                                 |
+| `permit2Authorization.spender`           | `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (universal constant)                                                |
+| `permit2Authorization.nonce`             | `uint256(payerAgnosticPaymentInfoHash)` — see [Nonce Derivation](#nonce-derivation-both-methods)      |
+| `permit2Authorization.deadline`          | `now + requirements.maxTimeoutSeconds` (also used as `preApprovalExpiry` when reconstructing `PaymentInfo`) |
+| `salt`                                   | Fresh `bytes32` generated client-side per signing call                                                |
+| EIP-712 domain                           | Canonical Permit2 contract; `chainId` from `network`                                                  |
+
+**No witness** — the merchant address is bound through the deterministic nonce, not a separate witness struct.
 
 ### Nonce Derivation (both methods)
 
