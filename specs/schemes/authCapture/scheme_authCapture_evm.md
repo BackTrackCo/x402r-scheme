@@ -57,7 +57,7 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.            |
 | `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                     |
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.    |
-| `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. A server MAY include multiple `accepts[]` entries with different `assetTransferMethod` values to let the client choose based on the tokens it holds. |
+| `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. `eip3009` requires the token to implement `receiveWithAuthorization` (e.g., Circle USDC, EURC); `permit2` works with any ERC-20. A server MAY include multiple `accepts[]` entries with different `assetTransferMethod` values to let the client choose based on the tokens it holds. |
 
 **Universal contract addresses** (same on every supported EVM chain via deterministic CREATE2):
 
@@ -315,10 +315,3 @@ Fees are enforced on-chain by the escrow contract:
 | `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `commerce-payments::v1::ERC3009PaymentCollector`  | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
 | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `commerce-payments::v1::Permit2PaymentCollector`  | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
 | `PERMIT2_ADDRESS` (Uniswap canonical) | (Uniswap canonical, not CREATE2'd by this scheme) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
-
-**Method requirements**:
-
-- `eip3009`: requires the token to implement `receiveWithAuthorization` (ERC-3009). Examples: Circle USDC, EURC.
-- `permit2`: works with any ERC-20.
-
-For the current list of chains where the canonical contracts are live and which stablecoins each chain's deploy supports, see [base/commerce-payments](https://github.com/base/commerce-payments). Facilitators on chains without a live deploy SHOULD reproduce the canonical bytecode using the source repo's pinned compiler / optimizer settings and broadcast at the salt labels above; the resulting addresses match the constants in the table by construction.
