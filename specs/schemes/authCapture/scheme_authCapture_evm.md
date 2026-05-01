@@ -8,11 +8,9 @@ The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
   - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
-- **CaptureAuthorizer**: Address authorized to authorize, capture, void, refund, or charge a payment. Each of those methods on `AuthCaptureEscrow` is gated by `onlySender(paymentInfo.operator)`, so this address must be `msg.sender` of the "Authorize" call. In x402's facilitator-submits flow that means either **the facilitator's EOA**, or **any smart contract** that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.).
+- **`captureAuthorizer`**: Address authorized to authorize, capture, void, refund, or charge a payment. The escrow contract gates those operations on `msg.sender` matching this address, so whichever party calls the escrow on the merchant's behalf must come from this address. In x402's facilitator-submits flow that means either **the facilitator's EOA**, or **any smart contract** that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.).
 
 The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it to `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`).
-
-The escrow + token-collector addresses are **not configurable per merchant** — they are universal constants. The wire format never carries them.
 
 ## PaymentRequirements
 
@@ -61,16 +59,16 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.    |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`.                                                       |
 
-> **Escrow + token-collector addresses are NOT in `extra`.** They are universal constants — same address on every supported EVM chain via deterministic CREATE2:
->
-> | Constant                              | Address                                      |
-> | :------------------------------------ | :------------------------------------------- |
-> | `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
-> | `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
-> | `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
-> | `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
->
-> See [Canonical Addresses](#canonical-addresses) for the deployed-chain list and the salt scheme.
+**Universal contract addresses** (same on every supported EVM chain via deterministic CREATE2):
+
+| Constant                              | Address                                      |
+| :------------------------------------ | :------------------------------------------- |
+| `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
+| `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
+| `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
+| `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+
+See [Canonical Addresses](#canonical-addresses) for the deployed-chain list and the salt scheme.
 
 ### Spec → on-chain field name mapping
 
