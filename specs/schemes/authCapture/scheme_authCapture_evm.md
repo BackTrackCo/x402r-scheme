@@ -10,7 +10,7 @@ The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
 - **`captureAuthorizer`**: Address authorized to authorize, capture, void, refund, or charge a payment. The escrow contract gates those operations on `msg.sender` matching this address. In x402's facilitator-submits flow that means either **the facilitator's EOA**, or **any smart contract** that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.).
 
-The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it to `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`).
+The client signs a single signature (ERC-3009 or Permit2). The facilitator calls `AuthCaptureEscrow.authorize()` (two-phase) or `AuthCaptureEscrow.charge()` (single-shot via `autoCapture: true`), either directly or through a smart contract set as the captureAuthorizer.
 
 ## PaymentRequirements
 
