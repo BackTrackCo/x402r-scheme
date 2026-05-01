@@ -53,7 +53,7 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `captureAuthorizer`   | Yes      | `address`                | Address authorized to authorize/capture/void/refund/charge. Committed on-chain as `PaymentInfo.operator`.                                                                                                     |
 | `captureDeadline`     | Yes      | `uint48`                 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`.                                                                                                                     |
 | `refundDeadline`      | Yes      | `uint48`                 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`.                                                                                                                                |
-| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`).                                                                                                                                              |
+| `feeRecipient`        | Yes      | `address`                | Fee recipient (committed on-chain as `PaymentInfo.feeReceiver`). Set to `address(0)` to let the captureAuthorizer specify any non-zero recipient at capture/charge time.                                      |
 | `minFeeBps`           | Yes      | `uint16`                 | Minimum fee in basis points (the fee floor the captureAuthorizer must take). `0` = no minimum.                                                                                                                |
 | `maxFeeBps`           | Yes      | `uint16`                 | Maximum fee in basis points (the cap on the captureAuthorizer's fee).                                                                                                                                         |
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.                                                                                                        |
@@ -136,7 +136,7 @@ The payload carries the signature and the client-generated `salt`. The facilitat
         "amount": "1000000"
       },
       "spender": "0xPermit2TokenCollectorAddress",
-      "nonce": "12345678901234567890",
+      "nonce": "110210486920734568342928534950928740912034856789012345678901234567890123456789",
       "deadline": "1740675754"
     },
     "signature": "0x2d6a...571c",
