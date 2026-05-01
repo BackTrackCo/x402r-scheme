@@ -103,6 +103,42 @@ describe('AuthCaptureServerScheme', () => {
         'No USDC address configured for network',
       )
     })
+
+    it('should inject assetTransferMethod: "permit2" on BSC (permit2Only chain)', async () => {
+      const scheme = new AuthCaptureServerScheme()
+      const result = await scheme.parsePrice('$1.00', 'eip155:56')
+
+      expect(result.asset).toBe('0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d')
+      // BSC's Binance-Peg USDC has 18 decimals, so $1.00 = 1e18 base units.
+      expect(result.amount).toBe('1000000000000000000')
+      expect(result.extra).toEqual({
+        name: 'USDC',
+        version: '1',
+        assetTransferMethod: 'permit2',
+      })
+    })
+
+    it('should inject assetTransferMethod: "permit2" on Tempo (permit2Only chain)', async () => {
+      const scheme = new AuthCaptureServerScheme()
+      const result = await scheme.parsePrice('$1.00', 'eip155:4217')
+
+      expect(result.asset).toBe('0x20c0000000000000000000000000000000000000')
+      expect(result.amount).toBe('1000000')
+      expect(result.extra).toEqual({
+        name: 'pathUSD',
+        version: '1',
+        assetTransferMethod: 'permit2',
+      })
+    })
+
+    it('should NOT inject assetTransferMethod on ERC-3009 chains', async () => {
+      const scheme = new AuthCaptureServerScheme()
+      const result = await scheme.parsePrice('$1.00', 'eip155:8453')
+
+      // ERC-3009 chains rely on the default ('eip3009') in client/facilitator;
+      // the server intentionally omits the field so merchants can override.
+      expect(result.extra).not.toHaveProperty('assetTransferMethod')
+    })
   })
 
   describe('registerMoneyParser', () => {

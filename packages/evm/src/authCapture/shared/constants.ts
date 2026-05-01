@@ -1,10 +1,13 @@
 export const MAX_UINT48 = 281474976710655
 export const MAX_UINT32 = 4294967295
 
-// Canonical AuthCaptureEscrow + token collector deployments from base/commerce-payments
-// (https://github.com/base/commerce-payments). Universal constants — not configurable per
-// merchant. Deployed via deterministic CREATE2 so the addresses are identical on every
-// supported chain.
+// Canonical AuthCaptureEscrow + token collector deployments from
+// base/commerce-payments@v1.0.0 (https://github.com/base/commerce-payments).
+// Redeployed 2026-04-29 via CreateX with deterministic permissionless salts
+// (`commerce-payments::v1::*`), so the addresses are identical on every
+// supported chain. Universal constants — not configurable per merchant.
+// Predecessors at the prototype addresses (0xBdEA0D…, 0x0E3dF9…, 0x992476B9…)
+// are superseded; do not use them.
 //
 // Live on: Ethereum (1), Base (8453), Optimism (10), Arbitrum One (42161), Polygon (137),
 // Celo (42220), Avalanche C-Chain (43114), Linea (59144), Monad (143), BSC (56),

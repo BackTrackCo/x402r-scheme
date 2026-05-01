@@ -22,11 +22,12 @@ import type {
  *
  * The `name` / `version` fields are the EIP-712 domain used by the ERC-3009
  * `assetTransferMethod`. Chains where the canonical stable does NOT support
- * ERC-3009 (BSC's Binance-Peg USDC, Tempo's pathUSD) are still listed so that
- * default price parsing works — but on those chains merchants MUST set
- * `assetTransferMethod: "permit2"` in `extra`. Permit2 has its own EIP-712
- * domain (chain-invariant), so the per-token name/version are irrelevant on
- * the Permit2 path.
+ * ERC-3009 (BSC's Binance-Peg USDC, Tempo's pathUSD) are flagged `permit2Only`;
+ * `defaultMoneyConversion` then injects `assetTransferMethod: "permit2"` into
+ * the returned `extra` so the client signs a Permit2 PermitTransferFrom and
+ * the facilitator dispatches to the Permit2 collector. Permit2 has its own
+ * EIP-712 domain (chain-invariant), so the per-token name/version are
+ * irrelevant on the Permit2 path.
  */
 const ASSET_INFO: Record<
   string,
@@ -238,6 +239,10 @@ export class AuthCaptureServerScheme implements SchemeNetworkServer {
 
   /**
    * Default money conversion — converts decimal amount to the default stablecoin on the network.
+   *
+   * For `permit2Only` chains, injects `assetTransferMethod: "permit2"` so the
+   * client signs Permit2 instead of ERC-3009 (which the canonical stable on
+   * those chains doesn't support).
    */
   private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
     const assetInfo = ASSET_INFO[network]
@@ -247,13 +252,18 @@ export class AuthCaptureServerScheme implements SchemeNetworkServer {
 
     const tokenAmount = convertToTokenAmount(String(amount), assetInfo.decimals)
 
+    const extra: Record<string, unknown> = {
+      name: assetInfo.name,
+      version: assetInfo.version,
+    }
+    if (assetInfo.permit2Only) {
+      extra.assetTransferMethod = 'permit2'
+    }
+
     return {
       asset: assetInfo.address,
       amount: tokenAmount,
-      extra: {
-        name: assetInfo.name,
-        version: assetInfo.version,
-      },
+      extra,
     }
   }
 
