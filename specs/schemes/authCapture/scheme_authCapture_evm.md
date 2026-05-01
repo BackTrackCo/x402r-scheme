@@ -186,7 +186,7 @@ The facilitator performs these checks in order:
 9. **Token match**: `payload.permitted.token === requirements.asset` (Permit2 only — EIP-3009 binds via signing domain).
 10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match `payer`.
 11. **Amount**: `authorization.value` (EIP-3009) or `permit2Authorization.permitted.amount` (Permit2) matches `requirements.amount`.
-12. **Nonce match**: Reconstruct `PaymentInfo` from extra + payload.salt + payer + requirements; recompute payer-agnostic hash; assert it matches the wire nonce.
+12. **Nonce match**: Reconstruct `PaymentInfo` from extra + payload.salt + payer + requirements; recompute payer-agnostic hash; assert it matches the wire nonce. This transitively enforces equality on every field encoded in `PaymentInfo` (receiver, token, deadlines, fee bounds, feeRecipient), so individual field-by-field checks for those values are unnecessary.
 13. **Simulate** `AUTH_CAPTURE_ESCROW.authorize(...)` or `.charge(...)` to ensure success.
 
 ### EIP-6492 Support
