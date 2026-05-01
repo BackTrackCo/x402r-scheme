@@ -78,3 +78,8 @@ Two absolute-timestamp deadlines govern the payment lifecycle (network-specific 
 ## Appendix
 
 Network-specific implementation details (contracts, signature formats, verification logic) are in per-network documents: `scheme_authCapture_evm.md` (EVM).
+
+### References
+
+- [Escrow Scheme Proposal — Agentokratia (Issue #834)](https://github.com/coinbase/x402/issues/834)
+- [Escrow Scheme Proposal — x402r (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
