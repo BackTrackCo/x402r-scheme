@@ -20,14 +20,13 @@ import type {
  * default stablecoin used by `defaultMoneyConversion` when the merchant gives a
  * decimal price like "$1.50".
  *
- * The `name` / `version` fields are the EIP-712 domain used by the ERC-3009
- * `assetTransferMethod`. Chains where the canonical stable does NOT support
- * ERC-3009 (BSC's Binance-Peg USDC, Tempo's pathUSD) are flagged `permit2Only`;
- * `defaultMoneyConversion` then injects `assetTransferMethod: "permit2"` into
- * the returned `extra` so the client signs a Permit2 PermitTransferFrom and
- * the facilitator dispatches to the Permit2 collector. Permit2 has its own
- * EIP-712 domain (chain-invariant), so the per-token name/version are
- * irrelevant on the Permit2 path.
+ * `name` / `version` are the EIP-712 domain used by the ERC-3009
+ * `assetTransferMethod`. Whether a token supports ERC-3009 is a token-level
+ * capability, not a chain property; merchants whose chosen token lacks
+ * `receiveWithAuthorization` (e.g., BSC's Binance-Peg USDC, Tempo's pathUSD)
+ * MUST set `assetTransferMethod: "permit2"` in `extra` themselves. The server
+ * does not auto-pick a method based on chain. If the wrong method is paired
+ * with an incompatible token, the failure surfaces at facilitator simulation.
  */
 const ASSET_INFO: Record<
   string,
@@ -36,8 +35,6 @@ const ASSET_INFO: Record<
     name: string
     version: string
     decimals: number
-    /** If true, the canonical stable on this chain does not support ERC-3009; merchants must use Permit2. */
-    permit2Only?: boolean
   }
 > = {
   // ----- Mainnets -----
@@ -128,22 +125,21 @@ const ASSET_INFO: Record<
     decimals: 6,
   },
 
-  // ----- Permit2-only mainnets -----
-  // BNB Smart Chain — Binance-Peg USDC (18 decimals; lacks ERC-3009).
+  // ----- Mainnets where the canonical stable lacks ERC-3009 -----
+  // Merchants on these chains MUST set `assetTransferMethod: "permit2"` themselves.
+  // BNB Smart Chain — Binance-Peg USDC (18 decimals; no `receiveWithAuthorization`).
   'eip155:56': {
     address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
     name: 'USDC',
     version: '1',
     decimals: 18,
-    permit2Only: true,
   },
-  // Tempo — pathUSD (TIP-20 predeploy, 6 decimals; not USDC, lacks ERC-3009).
+  // Tempo — pathUSD (TIP-20 predeploy, 6 decimals; no `receiveWithAuthorization`).
   'eip155:4217': {
     address: '0x20c0000000000000000000000000000000000000',
     name: 'pathUSD',
     version: '1',
     decimals: 6,
-    permit2Only: true,
   },
 }
 
@@ -239,10 +235,9 @@ export class AuthCaptureServerScheme implements SchemeNetworkServer {
 
   /**
    * Default money conversion — converts decimal amount to the default stablecoin on the network.
-   *
-   * For `permit2Only` chains, injects `assetTransferMethod: "permit2"` so the
-   * client signs Permit2 instead of ERC-3009 (which the canonical stable on
-   * those chains doesn't support).
+   * Returns just the EIP-712 domain (`name` / `version`) in `extra`. The merchant
+   * is responsible for setting `assetTransferMethod` if the chosen token doesn't
+   * support the spec default (`"eip3009"`).
    */
   private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
     const assetInfo = ASSET_INFO[network]
@@ -252,18 +247,13 @@ export class AuthCaptureServerScheme implements SchemeNetworkServer {
 
     const tokenAmount = convertToTokenAmount(String(amount), assetInfo.decimals)
 
-    const extra: Record<string, unknown> = {
-      name: assetInfo.name,
-      version: assetInfo.version,
-    }
-    if (assetInfo.permit2Only) {
-      extra.assetTransferMethod = 'permit2'
-    }
-
     return {
       asset: assetInfo.address,
       amount: tokenAmount,
-      extra,
+      extra: {
+        name: assetInfo.name,
+        version: assetInfo.version,
+      },
     }
   }
 
