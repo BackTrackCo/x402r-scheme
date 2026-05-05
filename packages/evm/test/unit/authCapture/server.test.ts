@@ -198,16 +198,16 @@ describe('AuthCaptureServerScheme', () => {
         scheme: 'authCapture',
         network: 'eip155:84532' as const,
         extra: {
-          escrowAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          operatorAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          fromSupported1: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          fromSupported2: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         },
       }
 
       const result = await scheme.enhancePaymentRequirements(requirements, supportedKind, [])
 
       expect(result.extra).toEqual({
-        escrowAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        operatorAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        fromSupported1: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        fromSupported2: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       })
     })
 
@@ -231,14 +231,14 @@ describe('AuthCaptureServerScheme', () => {
         scheme: 'authCapture',
         network: 'eip155:84532' as const,
         extra: {
-          escrowAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          fromSupported: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         },
       }
 
       const result = await scheme.enhancePaymentRequirements(requirements, supportedKind, [])
 
       expect(result.extra).toEqual({
-        escrowAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        fromSupported: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         customField: 'custom-value',
       })
     })
@@ -254,7 +254,7 @@ describe('AuthCaptureServerScheme', () => {
         payTo: '0x1234567890123456789012345678901234567890',
         maxTimeoutSeconds: 300,
         extra: {
-          escrowAddress: '0xcccccccccccccccccccccccccccccccccccccccc',
+          sharedKey: '0xcccccccccccccccccccccccccccccccccccccccc',
         },
       }
 
@@ -263,14 +263,14 @@ describe('AuthCaptureServerScheme', () => {
         scheme: 'authCapture',
         network: 'eip155:84532' as const,
         extra: {
-          escrowAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          sharedKey: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         },
       }
 
       const result = await scheme.enhancePaymentRequirements(requirements, supportedKind, [])
 
       // Requirements extra should override supportedKind extra
-      expect(result.extra?.escrowAddress).toBe('0xcccccccccccccccccccccccccccccccccccccccc')
+      expect(result.extra?.sharedKey).toBe('0xcccccccccccccccccccccccccccccccccccccccc')
     })
 
     it('should preserve all original requirement fields', async () => {

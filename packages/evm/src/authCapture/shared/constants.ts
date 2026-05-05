@@ -1,6 +1,3 @@
-export const MAX_UINT48 = 281474976710655
-export const MAX_UINT32 = 4294967295
-
 // Canonical AuthCaptureEscrow + token collector deployments from
 // base/commerce-payments@v1.0.0 (https://github.com/base/commerce-payments).
 // Redeployed 2026-04-29 via CreateX with deterministic permissionless salts
