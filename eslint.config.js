@@ -16,7 +16,11 @@ export default [
         TextEncoder: 'readonly',
         crypto: 'readonly',
         setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         console: 'readonly',
+        process: 'readonly',
+        NodeJS: 'readonly',
       },
     },
     plugins: {

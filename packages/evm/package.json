@@ -1,7 +1,7 @@
 {
   "name": "@x402r/evm",
-  "version": "0.1.0",
-  "description": "Commerce payment scheme for x402 using Base Commerce Payments",
+  "version": "0.2.0",
+  "description": "AuthCapture payment scheme for x402 using Base Commerce Payments",
   "license": "MIT",
   "author": "x402r",
   "repository": {
@@ -20,24 +20,24 @@
         "default": "./dist/cjs/index.js"
       }
     },
-    "./commerce/client": {
+    "./authCapture/client": {
       "import": {
-        "types": "./dist/esm/commerce/client/index.d.mts",
-        "default": "./dist/esm/commerce/client/index.mjs"
+        "types": "./dist/esm/authCapture/client/index.d.mts",
+        "default": "./dist/esm/authCapture/client/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/commerce/client/index.d.ts",
-        "default": "./dist/cjs/commerce/client/index.js"
+        "types": "./dist/cjs/authCapture/client/index.d.ts",
+        "default": "./dist/cjs/authCapture/client/index.js"
       }
     },
-    "./commerce/server": {
+    "./authCapture/server": {
       "import": {
-        "types": "./dist/esm/commerce/server/index.d.mts",
-        "default": "./dist/esm/commerce/server/index.mjs"
+        "types": "./dist/esm/authCapture/server/index.d.mts",
+        "default": "./dist/esm/authCapture/server/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/commerce/server/index.d.ts",
-        "default": "./dist/cjs/commerce/server/index.js"
+        "types": "./dist/cjs/authCapture/server/index.d.ts",
+        "default": "./dist/cjs/authCapture/server/index.js"
       }
     },
     "./extensions/attestation": {
@@ -50,14 +50,14 @@
         "default": "./dist/cjs/extensions/attestation/index.js"
       }
     },
-    "./commerce/facilitator": {
+    "./authCapture/facilitator": {
       "import": {
-        "types": "./dist/esm/commerce/facilitator/index.d.mts",
-        "default": "./dist/esm/commerce/facilitator/index.mjs"
+        "types": "./dist/esm/authCapture/facilitator/index.d.mts",
+        "default": "./dist/esm/authCapture/facilitator/index.mjs"
       },
       "require": {
-        "types": "./dist/cjs/commerce/facilitator/index.d.ts",
-        "default": "./dist/cjs/commerce/facilitator/index.js"
+        "types": "./dist/cjs/authCapture/facilitator/index.d.ts",
+        "default": "./dist/cjs/authCapture/facilitator/index.js"
       }
     }
   },
@@ -74,6 +74,7 @@
     "clean": "rm -rf dist",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:fork": "vitest run --config vitest.fork.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",

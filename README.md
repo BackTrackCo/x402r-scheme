@@ -1,10 +1,10 @@
 # x402r-scheme
 
-Commerce payment scheme for x402 using Base Commerce Payments.
+AuthCapture payment scheme for x402 using Base Commerce Payments.
 
 ## Packages
 
-- **[@x402r/evm](./packages/evm)** - Commerce scheme implementation for EVM chains
+- **[@x402r/evm](./packages/evm)** - AuthCapture scheme implementation for EVM chains
 
 ## Installation
 
@@ -19,36 +19,39 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 ### Client
 
 ```typescript
-import { CommerceEvmScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/client'
+import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/client'
 import { x402Client } from '@x402/core/client'
 
 const client = new x402Client()
-registerCommerceEvmScheme(client, { signer, networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
 ```
 
 ### Server
 
 ```typescript
-import { CommerceServerScheme, registerCommerceEvmScheme } from '@x402r/evm/commerce/server'
+import {
+  AuthCaptureServerScheme,
+  registerAuthCaptureEvmScheme,
+} from '@x402r/evm/authCapture/server'
 import { x402ResourceServer } from '@x402/core/server'
 
 const server = new x402ResourceServer(facilitatorConfig)
-registerCommerceEvmScheme(server, { networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
 ```
 
 ### Facilitator
 
-The commerce scheme integrates with x402's facilitator via `registerCommerceEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
+The authCapture scheme integrates with x402's facilitator via `registerAuthCaptureEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
 
 ```typescript
 import { x402Facilitator } from '@x402/core/facilitator'
 import { toFacilitatorEvmSigner } from '@x402/evm'
-import { registerCommerceEvmScheme } from '@x402r/evm/commerce/facilitator'
+import { registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/facilitator'
 
 const evmSigner = toFacilitatorEvmSigner({ address, ...clients })
 
 const facilitator = new x402Facilitator()
-registerCommerceEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
 ```
 
 ## Development
