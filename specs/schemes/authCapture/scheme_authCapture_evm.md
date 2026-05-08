@@ -59,7 +59,7 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.                                                                                                        |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals. |
 
-**Canonical contract addresses** (the live `base/commerce-payments` deployment; the same addresses are reused on every chain it's deployed to):
+**Universal contract addresses** (same on every supported EVM chain):
 
 | Constant                              | Address                                      |
 | :------------------------------------ | :------------------------------------------- |
