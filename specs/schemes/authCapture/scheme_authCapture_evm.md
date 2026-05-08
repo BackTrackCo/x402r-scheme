@@ -4,7 +4,7 @@
 
 The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github.com/base/commerce-payments) contract stack:
 
-- **AuthCaptureEscrow**: Singleton — locks funds, enforces expiries, distributes on capture/refund. Canonical contract from `base/commerce-payments`, reused at the same address on every chain it's deployed to.
+- **AuthCaptureEscrow**: Singleton — locks funds, enforces expiries, distributes on capture/refund. Universal canonical address (same address on every supported chain).
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
   - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
