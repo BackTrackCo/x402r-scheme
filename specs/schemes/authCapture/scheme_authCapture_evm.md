@@ -4,7 +4,7 @@
 
 The `authCapture` scheme on EVM uses the [base/commerce-payments](https://github.com/base/commerce-payments) contract stack:
 
-- **AuthCaptureEscrow**: Singleton — locks funds, enforces expiries, distributes on capture/refund. Audited canonical contract from `base/commerce-payments`, reused at the same address on every chain Base deploys to.
+- **AuthCaptureEscrow**: Singleton — locks funds, enforces expiries, distributes on capture/refund. Audited canonical contract from `base/commerce-payments`, reused at the same address on every chain the `commerce-payments` maintainers deploy to.
 - **Token Collectors**: Universal canonical addresses, one per `assetTransferMethod`:
   - `EIP3009_TOKEN_COLLECTOR_ADDRESS` — collects funds via `receiveWithAuthorization` signatures (USDC, EURC, etc.)
   - `PERMIT2_TOKEN_COLLECTOR_ADDRESS` — collects funds via Uniswap Permit2 `permitTransferFrom` (any ERC-20)
@@ -59,7 +59,7 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.                                                                                                        |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals. |
 
-**Canonical contract addresses** (the live `base/commerce-payments` deployment; the same addresses are reused on every chain Base deploys to):
+**Canonical contract addresses** (the live `base/commerce-payments` deployment; the same addresses are reused on every chain the `commerce-payments` maintainers deploy to):
 
 | Constant                              | Address                                      |
 | :------------------------------------ | :------------------------------------------- |
@@ -303,7 +303,7 @@ Fees are enforced on-chain by the escrow contract:
 
 ### Canonical Addresses
 
-The escrow and token collectors are the audited, live `base/commerce-payments` deployment. Implementations MUST use these exact addresses; the same contracts will be deployed at the same addresses on additional EVM chains as Base extends coverage.
+The escrow and token collectors are the audited, live `base/commerce-payments` deployment. Implementations MUST use these exact addresses; the same contracts will be deployed at the same addresses on additional EVM chains as the `commerce-payments` maintainers extend coverage.
 
 **Source**: [base/commerce-payments](https://github.com/base/commerce-payments) (deployment addresses listed in the upstream README).
 
