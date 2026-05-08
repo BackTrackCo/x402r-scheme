@@ -292,6 +292,6 @@ Fees are enforced on-chain by the escrow contract:
 
 ### Canonical Addresses
 
-The `AUTH_CAPTURE_ESCROW_ADDRESS`, `EIP3009_TOKEN_COLLECTOR_ADDRESS`, and `PERMIT2_TOKEN_COLLECTOR_ADDRESS` constants resolve to the canonical contract addresses listed in the [base/commerce-payments@v1.0.0 release notes](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
+The `AUTH_CAPTURE_ESCROW_ADDRESS`, `EIP3009_TOKEN_COLLECTOR_ADDRESS`, and `PERMIT2_TOKEN_COLLECTOR_ADDRESS` constants resolve to the canonical contract addresses listed in [base/commerce-payments](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
 
 The `PERMIT2_ADDRESS` constant resolves to the canonical [Uniswap Permit2 contract](https://docs.uniswap.org/contracts/v4/deployments).
