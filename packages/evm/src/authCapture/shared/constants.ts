@@ -1,20 +1,17 @@
 // Canonical AuthCaptureEscrow + token collector deployments from
-// base/commerce-payments@v1.0.0 (https://github.com/base/commerce-payments).
-// Redeployed 2026-04-29 via CreateX with deterministic permissionless salts
-// (`commerce-payments::v1::*`), so the addresses are identical on every
-// supported chain. Universal constants — not configurable per merchant.
-// Predecessors at the prototype addresses (0xBdEA0D…, 0x0E3dF9…, 0x992476B9…)
-// are superseded; do not use them.
+// base/commerce-payments (https://github.com/base/commerce-payments). These are
+// the audited, live addresses listed in the upstream README — the source of
+// truth for this scheme. Universal constants — not configurable per merchant.
 //
-// Live on: Ethereum (1), Base (8453), Optimism (10), Arbitrum One (42161), Polygon (137),
-// Celo (42220), Avalanche C-Chain (43114), Linea (59144), Monad (143), BSC (56),
-// Tempo (4217), plus Ethereum Sepolia, Base Sepolia, and Arbitrum Sepolia testnets.
+// Currently live on: Base (8453) and Base Sepolia (84532). Additional EVM chains
+// will land at the same addresses as the upstream extends coverage; expand the
+// supported-chain list here as those deployments ship.
 export const AUTH_CAPTURE_ESCROW_ADDRESS =
-  '0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6' as const satisfies `0x${string}`
+  '0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff' as const satisfies `0x${string}`
 export const EIP3009_TOKEN_COLLECTOR_ADDRESS =
-  '0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0' as const satisfies `0x${string}`
+  '0x0E3dF9510de65469C4518D7843919c0b8C7A7757' as const satisfies `0x${string}`
 export const PERMIT2_TOKEN_COLLECTOR_ADDRESS =
-  '0xD8490609d2da0ee626b0e676941b225cbc1A8C08' as const satisfies `0x${string}`
+  '0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26' as const satisfies `0x${string}`
 
 // Canonical Uniswap Permit2 contract — same address on every chain it's deployed to.
 // https://github.com/Uniswap/permit2
