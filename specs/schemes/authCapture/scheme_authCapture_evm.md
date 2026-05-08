@@ -59,17 +59,6 @@ AuthCapture-accepting servers advertise with scheme `authCapture`:
 | `autoCapture`         | No       | `bool`                   | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). Default: `false`.                                                                                                        |
 | `assetTransferMethod` | No       | `"eip3009" \| "permit2"` | Which token collector to use. Default: `"eip3009"`. A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals. |
 
-**Universal contract addresses** (same on every supported EVM chain):
-
-| Constant                              | Address                                      |
-| :------------------------------------ | :------------------------------------------- |
-| `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff` |
-| `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x0E3dF9510de65469C4518D7843919c0b8C7A7757` |
-| `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26` |
-| `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
-
-See [Canonical Addresses](#canonical-addresses) for the source of truth.
-
 ### Spec → on-chain field name mapping
 
 The wire-format extra uses spec-level field names. The on-chain `PaymentInfo` struct keeps canonical Solidity names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
@@ -305,11 +294,6 @@ Fees are enforced on-chain by the escrow contract:
 
 > **Requirement**: The escrow and token collectors are deployed at the same address across every supported EVM chain.
 
-**Source**: [base/commerce-payments@v1.0.0](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
+The `AUTH_CAPTURE_ESCROW_ADDRESS`, `EIP3009_TOKEN_COLLECTOR_ADDRESS`, and `PERMIT2_TOKEN_COLLECTOR_ADDRESS` constants resolve to the canonical contract addresses listed in the [base/commerce-payments@v1.0.0 release notes](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
 
-| Constant                              | Address                                      |
-| :------------------------------------ | :------------------------------------------- |
-| `AUTH_CAPTURE_ESCROW_ADDRESS`         | `0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff` |
-| `EIP3009_TOKEN_COLLECTOR_ADDRESS`     | `0x0E3dF9510de65469C4518D7843919c0b8C7A7757` |
-| `PERMIT2_TOKEN_COLLECTOR_ADDRESS`     | `0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26` |
-| `PERMIT2_ADDRESS` (Uniswap canonical) | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+The `PERMIT2_ADDRESS` constant resolves to the canonical [Uniswap Permit2 contract](https://github.com/Uniswap/permit2).
