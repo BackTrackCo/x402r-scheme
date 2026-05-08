@@ -303,7 +303,7 @@ Fees are enforced on-chain by the escrow contract:
 
 ### Canonical Addresses
 
-The escrow and token collectors are the live `base/commerce-payments` deployment. Implementations MUST use these exact addresses; the same addresses are reused on every chain it's deployed to.
+> **Requirement**: The escrow and token collectors are deployed at the same address across every supported EVM chain.
 
 **Source**: [base/commerce-payments@v1.0.0](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
 
