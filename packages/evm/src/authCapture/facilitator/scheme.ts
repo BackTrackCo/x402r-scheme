@@ -348,9 +348,11 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
           ] as const)
         : ([tuple, amount, tokenCollector, collectorData] as const)
 
+    const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer)
+
     try {
       const txHash = await this.signer.writeContract({
-        address: AUTH_CAPTURE_ESCROW_ADDRESS,
+        address: settleTarget,
         abi: ESCROW_ABI,
         functionName,
         args,
@@ -422,9 +424,11 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
           ] as const)
         : ([tuple, amount, tokenCollector, collectorData] as const)
 
+    const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer)
+
     try {
       await this.signer.readContract({
-        address: AUTH_CAPTURE_ESCROW_ADDRESS,
+        address: settleTarget,
         abi: ESCROW_ABI_WITH_ERRORS,
         functionName,
         args,
@@ -433,6 +437,17 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     } catch (err) {
       return decodeRevertReason(err)
     }
+  }
+
+  // Spec (scheme_authCapture_evm.md): facilitator calls authorize/charge
+  // "either directly or through a smart contract set as the captureAuthorizer".
+  // EOA captureAuthorizer ⇒ call escrow directly; contract ⇒ call the
+  // captureAuthorizer (which MUST expose the literal `authorize`/`charge`
+  // escrow selectors and forward to escrow) so it becomes msg.sender there.
+  private async resolveSettleTarget(captureAuthorizer: `0x${string}`): Promise<`0x${string}`> {
+    const code = await this.signer.getCode({ address: captureAuthorizer })
+    if (!code || code === '0x') return AUTH_CAPTURE_ESCROW_ADDRESS
+    return captureAuthorizer
   }
 }
 
