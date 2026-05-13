@@ -27,34 +27,55 @@ import {
   hexToBigInt,
   parseErc6492Signature,
 } from "viem";
+import { ERC20_BALANCE_OF_ABI, ESCROW_ABI, ESCROW_ERRORS_ABI } from "../abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
+  AUTH_CAPTURE_SCHEME,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
-  ERC20_BALANCE_OF_ABI,
-  ESCROW_ABI,
-  ESCROW_ERRORS_ABI,
-  ESCROW_ERROR_TO_INVALID_REASON,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../shared/constants";
+} from "../constants";
+import {
+  ESCROW_ERROR_TO_INVALID_REASON,
+  ErrAmountMismatch,
+  ErrAuthorizationExpired,
+  ErrAuthorizationNotYetValid,
+  ErrCaptureDeadlineExpired,
+  ErrInsufficientBalance,
+  ErrInvalidAuthCaptureExtra,
+  ErrInvalidAuthCaptureSignature,
+  ErrInvalidDeadlineOrdering,
+  ErrInvalidNetwork,
+  ErrInvalidPayloadFormat,
+  ErrNetworkMismatch,
+  ErrNonceMismatch,
+  ErrPayloadMethodMismatch,
+  ErrSimulationFailed,
+  ErrTokenCollectorMismatch,
+  ErrTokenMismatch,
+  ErrTransactionReverted,
+  ErrUnsupportedAssetTransferMethod,
+  ErrUnsupportedScheme,
+  ErrVerificationFailed,
+} from "./errors";
 import {
   computePayerAgnosticPaymentInfoHash,
   verifyERC3009Signature,
   verifyPermit2Signature,
-} from "../shared/nonce";
+} from "../nonce";
 import {
   isAuthCaptureExtra,
   isAuthCapturePayload,
   isEip3009Payload,
   isPermit2Payload,
-} from "../shared/types";
+} from "../types";
 import type {
   AuthCaptureExtra,
   AuthCapturePayload,
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from "../shared/types";
-import { parseChainId } from "../shared/utils";
+} from "../types";
+import { parseChainId } from "../utils";
 
 /**
  * Reconstruct the on-chain PaymentInfo struct from a verified payload + extra.
@@ -101,8 +122,8 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
  *  - 'eip3009' (default) → ERC-3009 ReceiveWithAuthorization, EIP3009_TOKEN_COLLECTOR
  *  - 'permit2'           → Permit2 PermitTransferFrom, PERMIT2_TOKEN_COLLECTOR
  */
-export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
-  readonly scheme = "authCapture";
+export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
+  readonly scheme = AUTH_CAPTURE_SCHEME;
   readonly caipFamily = "eip155:*";
 
   constructor(private signer: FacilitatorEvmSigner) {}
@@ -123,50 +144,53 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     _context?: FacilitatorContext,
   ): Promise<VerifyResponse> {
     if (!isAuthCapturePayload(payload.payload)) {
-      return { isValid: false, invalidReason: "invalid_payload_format" };
+      return { isValid: false, invalidReason: ErrInvalidPayloadFormat };
     }
     const wirePayload = payload.payload as AuthCapturePayload;
     const payer = isEip3009Payload(wirePayload)
       ? wirePayload.authorization.from
       : (wirePayload as Permit2Payload).permit2Authorization.from;
 
-    if (payload.accepted.scheme !== "authCapture" || requirements.scheme !== "authCapture") {
-      return { isValid: false, invalidReason: "unsupported_scheme", payer };
+    if (
+      payload.accepted.scheme !== AUTH_CAPTURE_SCHEME ||
+      requirements.scheme !== AUTH_CAPTURE_SCHEME
+    ) {
+      return { isValid: false, invalidReason: ErrUnsupportedScheme, payer };
     }
 
     if (payload.accepted.network !== requirements.network) {
-      return { isValid: false, invalidReason: "network_mismatch", payer };
+      return { isValid: false, invalidReason: ErrNetworkMismatch, payer };
     }
 
     const networkParts = requirements.network.split(":");
     if (networkParts.length !== 2 || networkParts[0] !== "eip155") {
-      return { isValid: false, invalidReason: "invalid_network", payer };
+      return { isValid: false, invalidReason: ErrInvalidNetwork, payer };
     }
 
     if (!isAuthCaptureExtra(requirements.extra)) {
-      return { isValid: false, invalidReason: "invalid_authCapture_extra", payer };
+      return { isValid: false, invalidReason: ErrInvalidAuthCaptureExtra, payer };
     }
     const extra = requirements.extra as AuthCaptureExtra;
     const chainId = parseChainId(requirements.network);
     const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
 
     if (assetTransferMethod !== "eip3009" && assetTransferMethod !== "permit2") {
-      return { isValid: false, invalidReason: "unsupported_asset_transfer_method", payer };
+      return { isValid: false, invalidReason: ErrUnsupportedAssetTransferMethod, payer };
     }
     if (assetTransferMethod === "eip3009" && !isEip3009Payload(wirePayload)) {
-      return { isValid: false, invalidReason: "payload_method_mismatch", payer };
+      return { isValid: false, invalidReason: ErrPayloadMethodMismatch, payer };
     }
     if (assetTransferMethod === "permit2" && !isPermit2Payload(wirePayload)) {
-      return { isValid: false, invalidReason: "payload_method_mismatch", payer };
+      return { isValid: false, invalidReason: ErrPayloadMethodMismatch, payer };
     }
 
     const now = Math.floor(Date.now() / 1000);
     const SAFETY_MARGIN_SECONDS = 6;
     if (extra.captureDeadline <= now + SAFETY_MARGIN_SECONDS) {
-      return { isValid: false, invalidReason: "capture_deadline_expired", payer };
+      return { isValid: false, invalidReason: ErrCaptureDeadlineExpired, payer };
     }
     if (extra.refundDeadline < extra.captureDeadline) {
-      return { isValid: false, invalidReason: "invalid_deadline_ordering", payer };
+      return { isValid: false, invalidReason: ErrInvalidDeadlineOrdering, payer };
     }
     // Mirror AuthCaptureEscrow._validatePayment ordering check upfront so the
     // facilitator rejects with a typed reason instead of letting the contract
@@ -185,15 +209,15 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
       amount = BigInt(eipPayload.authorization.value);
 
       if (preApprovalExpiry <= now + SAFETY_MARGIN_SECONDS) {
-        return { isValid: false, invalidReason: "authorization_expired", payer };
+        return { isValid: false, invalidReason: ErrAuthorizationExpired, payer };
       }
       if (Number(eipPayload.authorization.validAfter) > now) {
-        return { isValid: false, invalidReason: "authorization_not_yet_valid", payer };
+        return { isValid: false, invalidReason: ErrAuthorizationNotYetValid, payer };
       }
       if (
         eipPayload.authorization.to.toLowerCase() !== EIP3009_TOKEN_COLLECTOR_ADDRESS.toLowerCase()
       ) {
-        return { isValid: false, invalidReason: "token_collector_mismatch", payer };
+        return { isValid: false, invalidReason: ErrTokenCollectorMismatch, payer };
       }
 
       const parsed = parseErc6492Signature(eipPayload.signature);
@@ -211,19 +235,19 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
       amount = BigInt(permitPayload.permit2Authorization.permitted.amount);
 
       if (preApprovalExpiry <= now + SAFETY_MARGIN_SECONDS) {
-        return { isValid: false, invalidReason: "authorization_expired", payer };
+        return { isValid: false, invalidReason: ErrAuthorizationExpired, payer };
       }
       if (
         permitPayload.permit2Authorization.spender.toLowerCase() !==
         PERMIT2_TOKEN_COLLECTOR_ADDRESS.toLowerCase()
       ) {
-        return { isValid: false, invalidReason: "token_collector_mismatch", payer };
+        return { isValid: false, invalidReason: ErrTokenCollectorMismatch, payer };
       }
       if (
         permitPayload.permit2Authorization.permitted.token.toLowerCase() !==
         requirements.asset.toLowerCase()
       ) {
-        return { isValid: false, invalidReason: "token_mismatch", payer };
+        return { isValid: false, invalidReason: ErrTokenMismatch, payer };
       }
 
       const parsed = parseErc6492Signature(permitPayload.signature);
@@ -237,18 +261,18 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     }
 
     if (!signatureValid) {
-      return { isValid: false, invalidReason: "invalid_authCapture_signature", payer };
+      return { isValid: false, invalidReason: ErrInvalidAuthCaptureSignature, payer };
     }
 
     if (amount !== BigInt(requirements.amount)) {
-      return { isValid: false, invalidReason: "amount_mismatch", payer };
+      return { isValid: false, invalidReason: ErrAmountMismatch, payer };
     }
 
     if (preApprovalExpiry > extra.captureDeadline) {
       // AuthCaptureEscrow._validatePayment requires preApprovalExp <= authorizationExp <= refundExp.
       // Surface this as the same invalid_deadline_ordering reason rather than letting the
       // contract revert with InvalidExpiries on settle.
-      return { isValid: false, invalidReason: "invalid_deadline_ordering", payer };
+      return { isValid: false, invalidReason: ErrInvalidDeadlineOrdering, payer };
     }
 
     // Reconstruct PaymentInfo and verify the wire nonce matches the
@@ -265,12 +289,12 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     if (assetTransferMethod === "eip3009") {
       const wireNonce = (wirePayload as Eip3009Payload).authorization.nonce;
       if (wireNonce.toLowerCase() !== expectedNonce.toLowerCase()) {
-        return { isValid: false, invalidReason: "nonce_mismatch", payer };
+        return { isValid: false, invalidReason: ErrNonceMismatch, payer };
       }
     } else {
       const wireNonce = BigInt((wirePayload as Permit2Payload).permit2Authorization.nonce);
       if (wireNonce !== hexToBigInt(expectedNonce)) {
-        return { isValid: false, invalidReason: "nonce_mismatch", payer };
+        return { isValid: false, invalidReason: ErrNonceMismatch, payer };
       }
     }
 
@@ -286,7 +310,7 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
           args: [payer],
         })) as bigint;
         if (balance < BigInt(requirements.amount)) {
-          return { isValid: false, invalidReason: "insufficient_balance", payer };
+          return { isValid: false, invalidReason: ErrInsufficientBalance, payer };
         }
       } catch {
         /* ignore — fall through */
@@ -306,7 +330,7 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     if (!verification.isValid) {
       return {
         success: false,
-        errorReason: verification.invalidReason ?? "verification_failed",
+        errorReason: verification.invalidReason ?? ErrVerificationFailed,
         transaction: "",
         network: requirements.network,
         payer: verification.payer,
@@ -367,7 +391,7 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
       if (receipt.status !== "success") {
         return {
           success: false,
-          errorReason: "transaction_reverted",
+          errorReason: ErrTransactionReverted,
           transaction: txHash,
           network: requirements.network,
           payer,
@@ -471,7 +495,7 @@ function decodeRevertReason(err: unknown): string {
       }
     }
   }
-  return "simulation_failed";
+  return ErrSimulationFailed;
 }
 
 /**

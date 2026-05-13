@@ -3,7 +3,7 @@
  * Handles price parsing and requirement enhancement for resource servers.
  *
  * Implements x402's SchemeNetworkServer interface so it can be registered
- * on an x402ResourceServer via server.register('eip155:84532', new AuthCaptureServerScheme()).
+ * on an x402ResourceServer via server.register('eip155:84532', new AuthCaptureEvmScheme()).
  */
 
 import type {
@@ -14,6 +14,7 @@ import type {
   Price,
   SchemeNetworkServer,
 } from "@x402/core/types";
+import { AUTH_CAPTURE_SCHEME } from "../constants";
 
 /**
  * Asset info including EIP-712 domain parameters per network. Each entry is the
@@ -163,8 +164,8 @@ function convertToTokenAmount(decimalAmount: string, decimals: number): string {
  * Server scheme - handles price parsing and requirement enhancement.
  * Implements x402's SchemeNetworkServer interface.
  */
-export class AuthCaptureServerScheme implements SchemeNetworkServer {
-  readonly scheme = "authCapture";
+export class AuthCaptureEvmScheme implements SchemeNetworkServer {
+  readonly scheme = AUTH_CAPTURE_SCHEME;
   private moneyParsers: MoneyParser[] = [];
 
   /**
@@ -177,7 +178,7 @@ export class AuthCaptureServerScheme implements SchemeNetworkServer {
    * @param parser - Custom function to convert amount to AssetAmount (or null to skip)
    * @returns The server instance for chaining
    */
-  registerMoneyParser(parser: MoneyParser): AuthCaptureServerScheme {
+  registerMoneyParser(parser: MoneyParser): AuthCaptureEvmScheme {
     this.moneyParsers.push(parser);
     return this;
   }

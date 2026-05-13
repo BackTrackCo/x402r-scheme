@@ -35,13 +35,11 @@ import {
 } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { AuthCaptureEvmScheme } from "../../src/authCapture/client/scheme";
-import { AuthCaptureFacilitatorScheme } from "../../src/authCapture/facilitator/scheme";
-import {
-  AUTH_CAPTURE_ESCROW_ADDRESS,
-  ESCROW_VIEW_ABI,
-} from "../../src/authCapture/shared/constants";
-import type { Eip3009Payload, PaymentInfoStruct } from "../../src/authCapture/shared/types";
+import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/authCapture/client/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/authCapture/facilitator/scheme";
+import { ESCROW_VIEW_ABI } from "../../src/authCapture/abi";
+import { AUTH_CAPTURE_ESCROW_ADDRESS } from "../../src/authCapture/constants";
+import type { Eip3009Payload, PaymentInfoStruct } from "../../src/authCapture/types";
 
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
 const BALANCE_SLOT = 9n;
@@ -193,9 +191,9 @@ describe("fork — EIP-3009 settle against canonical AuthCaptureEscrow", () => {
   }
 
   it("settles authorize() against canonical AuthCaptureEscrow", async () => {
-    const client = new AuthCaptureEvmScheme(clientSigner);
-    const facilitator = new AuthCaptureFacilitatorScheme(
-      facilitatorSigner as unknown as Parameters<typeof AuthCaptureFacilitatorScheme>[0],
+    const client = new AuthCaptureEvmClient(clientSigner);
+    const facilitator = new AuthCaptureEvmFacilitator(
+      facilitatorSigner as unknown as Parameters<typeof AuthCaptureEvmFacilitator>[0],
     );
 
     const requirements = buildRequirements(false);
@@ -245,9 +243,9 @@ describe("fork — EIP-3009 settle against canonical AuthCaptureEscrow", () => {
   });
 
   it("settles charge() against canonical AuthCaptureEscrow (regression for 6-arg ABI)", async () => {
-    const client = new AuthCaptureEvmScheme(clientSigner);
-    const facilitator = new AuthCaptureFacilitatorScheme(
-      facilitatorSigner as unknown as Parameters<typeof AuthCaptureFacilitatorScheme>[0],
+    const client = new AuthCaptureEvmClient(clientSigner);
+    const facilitator = new AuthCaptureEvmFacilitator(
+      facilitatorSigner as unknown as Parameters<typeof AuthCaptureEvmFacilitator>[0],
     );
 
     const requirements = buildRequirements(true);

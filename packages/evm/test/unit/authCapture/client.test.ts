@@ -6,9 +6,9 @@ import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../../../src/authCapture/shared/constants";
-import { isEip3009Payload, isPermit2Payload } from "../../../src/authCapture/shared/types";
-import type { Eip3009Payload, Permit2Payload } from "../../../src/authCapture/shared/types";
+} from "../../../src/authCapture/constants";
+import { isEip3009Payload, isPermit2Payload } from "../../../src/authCapture/types";
+import type { Eip3009Payload, Permit2Payload } from "../../../src/authCapture/types";
 
 const FUTURE = Math.floor(Date.now() / 1000) + 86400;
 

@@ -5,18 +5,17 @@ import {
   encodeErrorResult,
   hexToBigInt,
 } from "viem";
-import { AuthCaptureFacilitatorScheme } from "../../../src/authCapture/facilitator/scheme";
+import { AuthCaptureEvmScheme } from "../../../src/authCapture/facilitator/scheme";
+import { ESCROW_ABI, ESCROW_ERRORS_ABI } from "../../../src/authCapture/abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
-  ESCROW_ABI,
-  ESCROW_ERRORS_ABI,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../../../src/authCapture/shared/constants";
-import { computePayerAgnosticPaymentInfoHash } from "../../../src/authCapture/shared/nonce";
-import type { PaymentInfoStruct } from "../../../src/authCapture/shared/types";
+} from "../../../src/authCapture/constants";
+import { computePayerAgnosticPaymentInfoHash } from "../../../src/authCapture/nonce";
+import type { PaymentInfoStruct } from "../../../src/authCapture/types";
 
-describe("AuthCaptureFacilitatorScheme", () => {
+describe("AuthCaptureEvmScheme", () => {
   const createMockSigner = () => ({
     getAddresses: () => ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
     readContract: vi.fn().mockResolvedValue(BigInt("1000000000")),
@@ -130,7 +129,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
   describe("settle — autoCapture routing", () => {
     it("should default to authorize when autoCapture is absent", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(
@@ -139,7 +138,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should call charge when autoCapture is true", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, autoCapture: true },
@@ -152,7 +151,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should call authorize when autoCapture is false", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, autoCapture: false },
@@ -168,7 +167,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
   describe("settle — target address", () => {
     it("should target the canonical AuthCaptureEscrow address when captureAuthorizer is an EOA", async () => {
       mockSigner.getCode.mockResolvedValue("0x");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(
@@ -178,7 +177,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should route authorize × eip3009 × contract via the captureAuthorizer with the literal escrow ABI and 4 args", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
 
       const call = mockSigner.writeContract.mock.calls[0][0];
@@ -191,7 +190,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should route charge × eip3009 × contract via the captureAuthorizer with the 6-arg ABI", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, autoCapture: true },
@@ -213,7 +212,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should route authorize × permit2 × contract via the captureAuthorizer with the permit2 collector", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, assetTransferMethod: "permit2" as const },
@@ -230,7 +229,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should route charge × permit2 × contract via the captureAuthorizer with 6 args + permit2 collector", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: {
@@ -251,7 +250,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should route simulateSettle through the captureAuthorizer contract with ESCROW_ABI + errors", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.verify(buildEip3009Payload(), mockRequirements);
 
       const simulateCall = mockSigner.readContract.mock.calls.find(
@@ -264,7 +263,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should pass EIP3009_TOKEN_COLLECTOR as the tokenCollector arg for eip3009", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
 
       const call = mockSigner.writeContract.mock.calls[0][0];
@@ -272,7 +271,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should pass PERMIT2_TOKEN_COLLECTOR as the tokenCollector arg for permit2", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, assetTransferMethod: "permit2" as const },
@@ -286,7 +285,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
   describe("verify — invariants", () => {
     it("should reject when extra is missing required fields", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const bad = {
         ...mockRequirements,
         extra: { name: "USDC", version: "2" } as unknown as typeof mockRequirements.extra,
@@ -297,7 +296,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when refundDeadline is not after captureDeadline", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const bad = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, refundDeadline: captureDeadline - 1 },
@@ -308,7 +307,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when payload method does not match assetTransferMethod", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, assetTransferMethod: "permit2" as const },
@@ -319,7 +318,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when EIP-3009 payload.to is not the canonical collector", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       payload.payload.authorization.to =
         "0x9999999999999999999999999999999999999999" as `0x${string}`;
@@ -329,7 +328,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when Permit2 payload.spender is not the canonical collector", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, assetTransferMethod: "permit2" as const },
@@ -343,7 +342,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when Permit2 token does not match requirements.asset", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, assetTransferMethod: "permit2" as const },
@@ -357,7 +356,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when authorization.value does not match requirements.amount", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       payload.payload.authorization.value = "999999";
       const result = await scheme.verify(payload, mockRequirements);
@@ -366,7 +365,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when EIP-3009 validBefore is in the past", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       payload.payload.authorization.validBefore = String(Math.floor(Date.now() / 1000) - 60);
       const result = await scheme.verify(payload, mockRequirements);
@@ -375,7 +374,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when EIP-3009 validAfter is in the future", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       payload.payload.authorization.validAfter = String(Math.floor(Date.now() / 1000) + 3600);
       const result = await scheme.verify(payload, mockRequirements);
@@ -384,7 +383,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject unsupported assetTransferMethod", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: {
@@ -398,7 +397,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when payload.accepted.network differs from requirements.network", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       payload.accepted = { ...payload.accepted, network: "eip155:8453" };
       const result = await scheme.verify(payload, mockRequirements);
@@ -408,7 +407,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
     it("should reject invalid signature", async () => {
       mockSigner.verifyTypedData.mockResolvedValueOnce(false);
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("invalid_authCapture_signature");
@@ -421,7 +420,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(new Error("execution reverted"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("simulation_failed");
@@ -432,7 +431,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(new Error("execution reverted"))
         .mockResolvedValueOnce(BigInt("1")); // balance < amount
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("insufficient_balance");
@@ -442,7 +441,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       // maxTimeoutSeconds = 60s, but captureDeadline only 5s in the future →
       // preApprovalExpiry (now + 60) > captureDeadline. Mirrors the on-chain
       // _validatePayment ordering check.
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const tightCaptureDeadline = Math.floor(Date.now() / 1000) + 30;
       const reqs = {
         ...mockRequirements,
@@ -495,7 +494,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
   describe("verify — nonce binding (regression for payer-agnostic-hash design)", () => {
     it("should reject when salt is mutated after signing", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const payload = buildEip3009Payload();
       // Tamper with salt — wire nonce was computed against SALT, not this new value
       payload.payload.salt =
@@ -506,7 +505,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when extra.captureAuthorizer is mutated after signing", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const tampered = {
         ...mockRequirements,
         extra: {
@@ -520,7 +519,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should reject when requirements.amount is mutated after signing (Permit2)", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         amount: "999999",
@@ -561,7 +560,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("AfterPreApprovalExpiry"))
         .mockResolvedValueOnce(BigInt("1000000000")); // balanceOf — sufficient
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("authorization_expired");
@@ -572,7 +571,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("PaymentAlreadyCollected"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("payment_already_collected");
@@ -583,7 +582,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("FeeBpsOutOfRange"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("fee_bps_out_of_range");
@@ -594,7 +593,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("InvalidFeeReceiver"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("invalid_fee_receiver");
@@ -605,7 +604,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("TokenCollectionFailed"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("token_collection_failed");
@@ -616,7 +615,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(buildRevertError("SomeUnmappedError"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("simulation_failed");
@@ -627,7 +626,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
       mockSigner.readContract
         .mockRejectedValueOnce(new Error("RPC went sideways"))
         .mockResolvedValueOnce(BigInt("1000000000"));
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("simulation_failed");
@@ -636,7 +635,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
   describe("settle — charge fee args (ABI 6-arg correctness)", () => {
     it("should pass feeBps and feeReceiver as args[4] and args[5] for charge", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
         extra: { ...mockRequirements.extra, autoCapture: true },
@@ -652,7 +651,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
     });
 
     it("should pass 4 args for authorize (no feeBps/feeReceiver)", async () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
       const call = mockSigner.writeContract.mock.calls[0][0];
       expect(call.functionName).toBe("authorize");
@@ -662,7 +661,7 @@ describe("AuthCaptureFacilitatorScheme", () => {
 
   describe("getExtra", () => {
     it("should return undefined — escrow + tokenCollector are constants, not advertised", () => {
-      const scheme = new AuthCaptureFacilitatorScheme(mockSigner);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
       expect(scheme.getExtra("eip155:8453")).toBeUndefined();
     });
   });

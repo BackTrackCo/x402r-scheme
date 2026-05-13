@@ -5,10 +5,10 @@ export type {
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from "./shared/types";
+} from "./types";
 export {
   isAuthCaptureExtra,
   isAuthCapturePayload,
   isEip3009Payload,
   isPermit2Payload,
-} from "./shared/types";
+} from "./types";

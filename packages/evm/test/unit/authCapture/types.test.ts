@@ -4,7 +4,7 @@ import {
   isAuthCapturePayload,
   isEip3009Payload,
   isPermit2Payload,
-} from "../../../src/authCapture/shared/types";
+} from "../../../src/authCapture/types";
 
 describe("type guards", () => {
   const FUTURE = Math.floor(Date.now() / 1000) + 86400;
