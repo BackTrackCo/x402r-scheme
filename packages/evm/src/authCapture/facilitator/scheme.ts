@@ -348,9 +348,11 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
           ] as const)
         : ([tuple, amount, tokenCollector, collectorData] as const)
 
+    const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer)
+
     try {
       const txHash = await this.signer.writeContract({
-        address: AUTH_CAPTURE_ESCROW_ADDRESS,
+        address: settleTarget,
         abi: ESCROW_ABI,
         functionName,
         args,
@@ -422,9 +424,11 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
           ] as const)
         : ([tuple, amount, tokenCollector, collectorData] as const)
 
+    const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer)
+
     try {
       await this.signer.readContract({
-        address: AUTH_CAPTURE_ESCROW_ADDRESS,
+        address: settleTarget,
         abi: ESCROW_ABI_WITH_ERRORS,
         functionName,
         args,
@@ -433,6 +437,30 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
     } catch (err) {
       return decodeRevertReason(err)
     }
+  }
+
+  /**
+   * Resolves the on-chain target for `authorize`/`charge` per the spec.
+   *
+   * The authCapture-evm spec (`scheme_authCapture_evm.md`, summary) says the
+   * facilitator may call `AuthCaptureEscrow.authorize()`/`.charge()` "either
+   * directly or through a smart contract set as the captureAuthorizer". The
+   * direct path requires `captureAuthorizer == facilitator EOA` because the
+   * escrow gates these methods on `msg.sender == paymentInfo.operator`. The
+   * contract path delegates: the facilitator calls the captureAuthorizer
+   * (which must expose ABI-compatible `authorize`/`charge`), and that
+   * contract is the `msg.sender` at the escrow.
+   *
+   * Detection: probe `getCode(captureAuthorizer)`. Empty (or `0x`) ⇒ EOA ⇒
+   * call escrow directly. Non-empty ⇒ contract ⇒ call the captureAuthorizer
+   * with the same ABI signature.
+   */
+  private async resolveSettleTarget(
+    captureAuthorizer: `0x${string}`,
+  ): Promise<`0x${string}`> {
+    const code = await this.signer.getCode({ address: captureAuthorizer })
+    if (!code || code === '0x') return AUTH_CAPTURE_ESCROW_ADDRESS
+    return captureAuthorizer
   }
 }
 
