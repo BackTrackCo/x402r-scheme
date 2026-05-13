@@ -11,32 +11,32 @@ import type {
   PaymentPayloadResult,
   PaymentRequirements,
   SchemeNetworkClient,
-} from '@x402/core/types'
-import type { ClientEvmSigner } from '@x402/evm'
-import { hexToBigInt } from 'viem'
+} from "@x402/core/types";
+import type { ClientEvmSigner } from "@x402/evm";
+import { hexToBigInt } from "viem";
 import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from '../shared/constants'
+} from "../shared/constants";
 import {
   computePayerAgnosticPaymentInfoHash,
   generateSalt,
   signERC3009,
   signPermit2,
-} from '../shared/nonce'
+} from "../shared/nonce";
 import type {
   AuthCaptureExtra,
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from '../shared/types'
-import { parseChainId } from '../shared/utils'
+} from "../shared/types";
+import { parseChainId } from "../shared/utils";
 
 /**
  * AuthCapture Client Scheme - implements x402's SchemeNetworkClient
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkClient {
-  readonly scheme = 'authCapture'
+  readonly scheme = "authCapture";
 
   constructor(private readonly signer: ClientEvmSigner) {}
 
@@ -46,52 +46,52 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
     _context?: PaymentPayloadContext,
   ): Promise<PaymentPayloadResult> {
     if (x402Version !== 2) {
-      throw new Error(`Unsupported x402Version: ${x402Version}. Only version 2 is supported.`)
+      throw new Error(`Unsupported x402Version: ${x402Version}. Only version 2 is supported.`);
     }
 
-    const extra = requirements.extra as unknown as AuthCaptureExtra
+    const extra = requirements.extra as unknown as AuthCaptureExtra;
 
     // Validate required EIP-712 token-domain parameters
     if (!extra.name) {
       throw new Error(
         `EIP-712 domain parameter 'name' is required in payment requirements for asset ${requirements.asset}`,
-      )
+      );
     }
     if (!extra.version) {
       throw new Error(
         `EIP-712 domain parameter 'version' is required in payment requirements for asset ${requirements.asset}`,
-      )
+      );
     }
     if (!extra.captureAuthorizer) {
-      throw new Error(`'captureAuthorizer' is required in payment requirements extra`)
+      throw new Error(`'captureAuthorizer' is required in payment requirements extra`);
     }
     if (!extra.feeRecipient) {
-      throw new Error(`'feeRecipient' is required in payment requirements extra`)
+      throw new Error(`'feeRecipient' is required in payment requirements extra`);
     }
-    if (typeof extra.captureDeadline !== 'number') {
-      throw new Error(`'captureDeadline' is required in payment requirements extra`)
+    if (typeof extra.captureDeadline !== "number") {
+      throw new Error(`'captureDeadline' is required in payment requirements extra`);
     }
-    if (typeof extra.refundDeadline !== 'number') {
-      throw new Error(`'refundDeadline' is required in payment requirements extra`)
+    if (typeof extra.refundDeadline !== "number") {
+      throw new Error(`'refundDeadline' is required in payment requirements extra`);
     }
-    if (typeof extra.minFeeBps !== 'number') {
-      throw new Error(`'minFeeBps' is required in payment requirements extra`)
+    if (typeof extra.minFeeBps !== "number") {
+      throw new Error(`'minFeeBps' is required in payment requirements extra`);
     }
-    if (typeof extra.maxFeeBps !== 'number') {
-      throw new Error(`'maxFeeBps' is required in payment requirements extra`)
+    if (typeof extra.maxFeeBps !== "number") {
+      throw new Error(`'maxFeeBps' is required in payment requirements extra`);
     }
-    if (typeof requirements.maxTimeoutSeconds !== 'number') {
+    if (typeof requirements.maxTimeoutSeconds !== "number") {
       throw new Error(
         `'maxTimeoutSeconds' is required in PaymentRequirements (used to derive preApprovalExpiry)`,
-      )
+      );
     }
 
-    const chainId = parseChainId(requirements.network)
-    const maxAmount = requirements.amount
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    const preApprovalExpiry = nowSeconds + requirements.maxTimeoutSeconds
-    const salt = generateSalt()
-    const assetTransferMethod = extra.assetTransferMethod ?? 'eip3009'
+    const chainId = parseChainId(requirements.network);
+    const maxAmount = requirements.amount;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const preApprovalExpiry = nowSeconds + requirements.maxTimeoutSeconds;
+    const salt = generateSalt();
+    const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
 
     // Build the canonical PaymentInfo struct (Solidity field names — do not rename).
     const paymentInfo: PaymentInfoStruct = {
@@ -107,13 +107,13 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
       maxFeeBps: extra.maxFeeBps,
       feeReceiver: extra.feeRecipient,
       salt,
-    }
+    };
 
     // Payer-agnostic PaymentInfo hash — used as ERC-3009 nonce or Permit2 nonce.
-    const nonce = computePayerAgnosticPaymentInfoHash(chainId, paymentInfo)
+    const nonce = computePayerAgnosticPaymentInfoHash(chainId, paymentInfo);
 
-    if (assetTransferMethod === 'permit2') {
-      const permit2Authorization: Permit2Payload['permit2Authorization'] = {
+    if (assetTransferMethod === "permit2") {
+      const permit2Authorization: Permit2Payload["permit2Authorization"] = {
         from: this.signer.address,
         permitted: {
           token: requirements.asset as `0x${string}`,
@@ -122,29 +122,29 @@ export class AuthCaptureEvmScheme implements SchemeNetworkClient {
         spender: PERMIT2_TOKEN_COLLECTOR_ADDRESS,
         nonce: hexToBigInt(nonce).toString(),
         deadline: String(preApprovalExpiry),
-      }
-      const signature = await signPermit2(this.signer, permit2Authorization, chainId)
-      const payload: Permit2Payload = { permit2Authorization, signature, salt }
-      return { x402Version, payload: payload as unknown as Record<string, unknown> }
+      };
+      const signature = await signPermit2(this.signer, permit2Authorization, chainId);
+      const payload: Permit2Payload = { permit2Authorization, signature, salt };
+      return { x402Version, payload: payload as unknown as Record<string, unknown> };
     }
 
     // Default: EIP-3009 ReceiveWithAuthorization to the canonical EIP-3009 token collector.
-    const authorization: Eip3009Payload['authorization'] = {
+    const authorization: Eip3009Payload["authorization"] = {
       from: this.signer.address,
       to: EIP3009_TOKEN_COLLECTOR_ADDRESS,
       value: maxAmount,
-      validAfter: '0',
+      validAfter: "0",
       validBefore: String(preApprovalExpiry),
       nonce,
-    }
+    };
     const signature = await signERC3009(
       this.signer,
       authorization,
       extra,
       requirements.asset as `0x${string}`,
       chainId,
-    )
-    const payload: Eip3009Payload = { authorization, signature, salt }
-    return { x402Version, payload: payload as unknown as Record<string, unknown> }
+    );
+    const payload: Eip3009Payload = { authorization, signature, salt };
+    return { x402Version, payload: payload as unknown as Record<string, unknown> };
   }
 }

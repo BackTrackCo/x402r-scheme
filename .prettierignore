@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Spec files are vendored from the upstream merged spec (x402-foundation/x402)
+# and must stay byte-for-byte aligned. Markdown table alignment in particular
+# would diverge if prettier collapsed the padded columns.
+specs/

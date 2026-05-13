@@ -1,9 +1,9 @@
-import type { Network } from '@x402/core/types'
-import { x402ResourceServer } from '@x402/core/server'
-import { AuthCaptureServerScheme } from './scheme'
+import type { Network } from "@x402/core/types";
+import { x402ResourceServer } from "@x402/core/server";
+import { AuthCaptureServerScheme } from "./scheme";
 
 export interface EvmResourceServerConfig {
-  networks?: Network | Network[]
+  networks?: Network | Network[];
 }
 
 /**
@@ -21,14 +21,14 @@ export function registerAuthCaptureEvmScheme(
   server: x402ResourceServer,
   config: EvmResourceServerConfig = {},
 ): x402ResourceServer {
-  const scheme = new AuthCaptureServerScheme()
+  const scheme = new AuthCaptureServerScheme();
   const networks = config.networks
     ? Array.isArray(config.networks)
       ? config.networks
       : [config.networks]
-    : ['eip155:*' as Network]
+    : ["eip155:*" as Network];
   for (const network of networks) {
-    server.register(network, scheme)
+    server.register(network, scheme);
   }
-  return server
+  return server;
 }

@@ -1,13 +1,13 @@
-import type { ResourceServerExtension, PaymentRequiredContext } from '@x402/core/types'
-import { ATTESTATION_KEY } from './types.js'
+import type { ResourceServerExtension, PaymentRequiredContext } from "@x402/core/types";
+import { ATTESTATION_KEY } from "./types.js";
 
-export type ErrorHandler = (error: unknown) => void
+export type ErrorHandler = (error: unknown) => void;
 
 export interface AttestationExtensionOptions {
   /** Extension key (default: 'attestation'). Use a custom key to support multiple attestors. */
-  key?: string
+  key?: string;
   /** Custom error handler. Defaults to `console.warn`. */
-  onError?: ErrorHandler
+  onError?: ErrorHandler;
 }
 
 /**
@@ -40,9 +40,9 @@ export function createAttestationExtension(
   attestorUrl: string,
   options?: AttestationExtensionOptions,
 ): ResourceServerExtension {
-  const key = options?.key ?? ATTESTATION_KEY
+  const key = options?.key ?? ATTESTATION_KEY;
   const errorHandler: ErrorHandler =
-    options?.onError ?? ((err) => console.warn('[attestation] identity fetch failed:', err))
+    options?.onError ?? (err => console.warn("[attestation] identity fetch failed:", err));
 
   return {
     key,
@@ -54,21 +54,21 @@ export function createAttestationExtension(
       try {
         // eslint-disable-next-line no-undef
         const res = await fetch(`${attestorUrl}/attest/identity`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             requirements: context.requirements,
             resource: context.resourceInfo,
             declaration,
           }),
-        })
+        });
         if (!res.ok) {
           errorHandler(
             new Error(`[attestation:${key}] ${attestorUrl}: ${res.status} ${res.statusText}`),
-          )
-          return undefined
+          );
+          return undefined;
         }
-        return { info: { identity: await res.json() } }
+        return { info: { identity: await res.json() } };
       } catch (err) {
         errorHandler(
           new Error(
@@ -77,11 +77,11 @@ export function createAttestationExtension(
               cause: err,
             },
           ),
-        )
-        return undefined
+        );
+        return undefined;
       }
     },
-  }
+  };
 }
 
 /**
@@ -93,5 +93,5 @@ export function createAttestationExtension(
 export function declareAttestationExtension(
   key: string = ATTESTATION_KEY,
 ): Record<string, Record<string, unknown>> {
-  return { [key]: {} }
+  return { [key]: {} };
 }

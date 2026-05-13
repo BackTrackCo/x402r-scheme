@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from "vitest/config";
 
 // Integration-test config: opt-in via `pnpm test:integration`. Spawns a local
 // anvil instance forked from Base Sepolia, then runs happy-path settle
@@ -10,10 +10,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     globals: false,
-    environment: 'node',
-    include: ['test/integrations/**/*.test.ts'],
-    globalSetup: ['./test/integrations/anvil-setup.ts'],
+    environment: "node",
+    include: ["test/integrations/**/*.test.ts"],
+    globalSetup: ["./test/integrations/anvil-setup.ts"],
     testTimeout: 60_000,
     hookTimeout: 60_000,
   },
-})
+});

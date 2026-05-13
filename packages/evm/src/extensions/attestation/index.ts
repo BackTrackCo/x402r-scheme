@@ -3,5 +3,5 @@ export {
   declareAttestationExtension,
   type AttestationExtensionOptions,
   type ErrorHandler,
-} from './server.js'
-export { ATTESTATION_KEY } from './types.js'
+} from "./server.js";
+export { ATTESTATION_KEY } from "./types.js";

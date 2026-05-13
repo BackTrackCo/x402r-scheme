@@ -2,24 +2,24 @@
  * Nonce computation, salt generation, and signing helpers.
  */
 
-import { encodeAbiParameters, getAddress, keccak256, toHex, zeroAddress } from 'viem'
-import type { ClientEvmSigner } from '@x402/evm'
+import { encodeAbiParameters, getAddress, keccak256, toHex, zeroAddress } from "viem";
+import type { ClientEvmSigner } from "@x402/evm";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   PERMIT2_ADDRESS,
   PERMIT2_TRANSFER_FROM_TYPES,
   RECEIVE_AUTHORIZATION_TYPES,
-} from './constants'
-import type { AuthCaptureExtra, Eip3009Payload, PaymentInfoStruct, Permit2Payload } from './types'
+} from "./constants";
+import type { AuthCaptureExtra, Eip3009Payload, PaymentInfoStruct, Permit2Payload } from "./types";
 
 /**
  * PaymentInfo typehash — must match AuthCaptureEscrow.PAYMENT_INFO_TYPEHASH.
  */
 const PAYMENT_INFO_TYPEHASH = keccak256(
   new TextEncoder().encode(
-    'PaymentInfo(address operator,address payer,address receiver,address token,uint120 maxAmount,uint48 preApprovalExpiry,uint48 authorizationExpiry,uint48 refundExpiry,uint16 minFeeBps,uint16 maxFeeBps,address feeReceiver,uint256 salt)',
+    "PaymentInfo(address operator,address payer,address receiver,address token,uint120 maxAmount,uint48 preApprovalExpiry,uint48 authorizationExpiry,uint48 refundExpiry,uint16 minFeeBps,uint16 maxFeeBps,address feeReceiver,uint256 salt)",
   ),
-)
+);
 
 /**
  * Compute the payer-agnostic PaymentInfo hash. Used as the ERC-3009 nonce
@@ -35,19 +35,19 @@ export function computePayerAgnosticPaymentInfoHash(
 ): `0x${string}` {
   const paymentInfoEncoded = encodeAbiParameters(
     [
-      { name: 'typehash', type: 'bytes32' },
-      { name: 'operator', type: 'address' },
-      { name: 'payer', type: 'address' },
-      { name: 'receiver', type: 'address' },
-      { name: 'token', type: 'address' },
-      { name: 'maxAmount', type: 'uint120' },
-      { name: 'preApprovalExpiry', type: 'uint48' },
-      { name: 'authorizationExpiry', type: 'uint48' },
-      { name: 'refundExpiry', type: 'uint48' },
-      { name: 'minFeeBps', type: 'uint16' },
-      { name: 'maxFeeBps', type: 'uint16' },
-      { name: 'feeReceiver', type: 'address' },
-      { name: 'salt', type: 'uint256' },
+      { name: "typehash", type: "bytes32" },
+      { name: "operator", type: "address" },
+      { name: "payer", type: "address" },
+      { name: "receiver", type: "address" },
+      { name: "token", type: "address" },
+      { name: "maxAmount", type: "uint120" },
+      { name: "preApprovalExpiry", type: "uint48" },
+      { name: "authorizationExpiry", type: "uint48" },
+      { name: "refundExpiry", type: "uint48" },
+      { name: "minFeeBps", type: "uint16" },
+      { name: "maxFeeBps", type: "uint16" },
+      { name: "feeReceiver", type: "address" },
+      { name: "salt", type: "uint256" },
     ],
     [
       PAYMENT_INFO_TYPEHASH,
@@ -64,19 +64,19 @@ export function computePayerAgnosticPaymentInfoHash(
       paymentInfo.feeReceiver,
       BigInt(paymentInfo.salt),
     ],
-  )
-  const paymentInfoHash = keccak256(paymentInfoEncoded)
+  );
+  const paymentInfoHash = keccak256(paymentInfoEncoded);
 
   const outerEncoded = encodeAbiParameters(
     [
-      { name: 'chainId', type: 'uint256' },
-      { name: 'escrow', type: 'address' },
-      { name: 'paymentInfoHash', type: 'bytes32' },
+      { name: "chainId", type: "uint256" },
+      { name: "escrow", type: "address" },
+      { name: "paymentInfoHash", type: "bytes32" },
     ],
     [BigInt(chainId), AUTH_CAPTURE_ESCROW_ADDRESS, paymentInfoHash],
-  )
+  );
 
-  return keccak256(outerEncoded)
+  return keccak256(outerEncoded);
 }
 
 /**
@@ -86,7 +86,7 @@ export function computePayerAgnosticPaymentInfoHash(
  */
 export async function signERC3009(
   signer: ClientEvmSigner,
-  authorization: Eip3009Payload['authorization'],
+  authorization: Eip3009Payload["authorization"],
   extra: AuthCaptureExtra,
   tokenAddress: `0x${string}`,
   chainId: number,
@@ -96,7 +96,7 @@ export async function signERC3009(
     version: extra.version,
     chainId,
     verifyingContract: getAddress(tokenAddress),
-  }
+  };
 
   const message = {
     from: getAddress(authorization.from),
@@ -105,14 +105,14 @@ export async function signERC3009(
     validAfter: BigInt(authorization.validAfter),
     validBefore: BigInt(authorization.validBefore),
     nonce: authorization.nonce,
-  }
+  };
 
   return signer.signTypedData({
     domain,
     types: RECEIVE_AUTHORIZATION_TYPES,
-    primaryType: 'ReceiveWithAuthorization',
+    primaryType: "ReceiveWithAuthorization",
     message,
-  })
+  });
 }
 
 /**
@@ -121,15 +121,15 @@ export async function signERC3009(
 export async function verifyERC3009Signature(
   signer: {
     verifyTypedData: (_args: {
-      address: `0x${string}`
-      domain: Record<string, unknown>
-      types: Record<string, unknown>
-      primaryType: string
-      message: Record<string, unknown>
-      signature: `0x${string}`
-    }) => Promise<boolean>
+      address: `0x${string}`;
+      domain: Record<string, unknown>;
+      types: Record<string, unknown>;
+      primaryType: string;
+      message: Record<string, unknown>;
+      signature: `0x${string}`;
+    }) => Promise<boolean>;
   },
-  authorization: Eip3009Payload['authorization'],
+  authorization: Eip3009Payload["authorization"],
   signature: `0x${string}`,
   extra: AuthCaptureExtra & { chainId: number },
   tokenAddress: `0x${string}`,
@@ -139,7 +139,7 @@ export async function verifyERC3009Signature(
     version: extra.version,
     chainId: extra.chainId,
     verifyingContract: getAddress(tokenAddress),
-  }
+  };
 
   const message = {
     from: getAddress(authorization.from),
@@ -148,19 +148,19 @@ export async function verifyERC3009Signature(
     validAfter: BigInt(authorization.validAfter),
     validBefore: BigInt(authorization.validBefore),
     nonce: authorization.nonce,
-  }
+  };
 
   try {
     return await signer.verifyTypedData({
       address: getAddress(authorization.from),
       domain,
       types: RECEIVE_AUTHORIZATION_TYPES,
-      primaryType: 'ReceiveWithAuthorization',
+      primaryType: "ReceiveWithAuthorization",
       message,
       signature,
-    })
+    });
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -171,14 +171,14 @@ export async function verifyERC3009Signature(
  */
 export async function signPermit2(
   signer: ClientEvmSigner,
-  permit: Permit2Payload['permit2Authorization'],
+  permit: Permit2Payload["permit2Authorization"],
   chainId: number,
 ): Promise<`0x${string}`> {
   const domain = {
-    name: 'Permit2',
+    name: "Permit2",
     chainId,
     verifyingContract: PERMIT2_ADDRESS,
-  }
+  };
 
   const message = {
     permitted: {
@@ -188,14 +188,14 @@ export async function signPermit2(
     spender: getAddress(permit.spender),
     nonce: BigInt(permit.nonce),
     deadline: BigInt(permit.deadline),
-  }
+  };
 
   return signer.signTypedData({
     domain,
     types: PERMIT2_TRANSFER_FROM_TYPES,
-    primaryType: 'PermitTransferFrom',
+    primaryType: "PermitTransferFrom",
     message,
-  })
+  });
 }
 
 /**
@@ -204,23 +204,23 @@ export async function signPermit2(
 export async function verifyPermit2Signature(
   signer: {
     verifyTypedData: (_args: {
-      address: `0x${string}`
-      domain: Record<string, unknown>
-      types: Record<string, unknown>
-      primaryType: string
-      message: Record<string, unknown>
-      signature: `0x${string}`
-    }) => Promise<boolean>
+      address: `0x${string}`;
+      domain: Record<string, unknown>;
+      types: Record<string, unknown>;
+      primaryType: string;
+      message: Record<string, unknown>;
+      signature: `0x${string}`;
+    }) => Promise<boolean>;
   },
-  permit: Permit2Payload['permit2Authorization'],
+  permit: Permit2Payload["permit2Authorization"],
   signature: `0x${string}`,
   chainId: number,
 ): Promise<boolean> {
   const domain = {
-    name: 'Permit2',
+    name: "Permit2",
     chainId,
     verifyingContract: PERMIT2_ADDRESS,
-  }
+  };
 
   const message = {
     permitted: {
@@ -230,19 +230,19 @@ export async function verifyPermit2Signature(
     spender: getAddress(permit.spender),
     nonce: BigInt(permit.nonce),
     deadline: BigInt(permit.deadline),
-  }
+  };
 
   try {
     return await signer.verifyTypedData({
       address: getAddress(permit.from),
       domain,
       types: PERMIT2_TRANSFER_FROM_TYPES,
-      primaryType: 'PermitTransferFrom',
+      primaryType: "PermitTransferFrom",
       message,
       signature,
-    })
+    });
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -253,7 +253,7 @@ export async function verifyPermit2Signature(
  * the same salt would collide across payers.
  */
 export function generateSalt(): `0x${string}` {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  return toHex(bytes)
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return toHex(bytes);
 }
