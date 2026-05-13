@@ -9,6 +9,8 @@ import { AuthCaptureFacilitatorScheme } from '../../../src/authCapture/facilitat
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
+  ESCROW_ABI,
+  ESCROW_ERRORS_ABI,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from '../../../src/authCapture/shared/constants'
 import { computePayerAgnosticPaymentInfoHash } from '../../../src/authCapture/shared/nonce'
@@ -22,7 +24,7 @@ describe('AuthCaptureFacilitatorScheme', () => {
     verifyTypedData: vi.fn().mockResolvedValue(true),
     sendTransaction: vi.fn(),
     waitForTransactionReceipt: vi.fn().mockResolvedValue({ status: 'success' }),
-    getCode: vi.fn(),
+    getCode: vi.fn().mockResolvedValue('0x'),
   })
 
   let mockSigner: ReturnType<typeof createMockSigner>
@@ -173,17 +175,78 @@ describe('AuthCaptureFacilitatorScheme', () => {
       )
     })
 
-    it('should target the captureAuthorizer when it is a contract', async () => {
+    it('should route authorize × eip3009 × contract via the captureAuthorizer with the literal escrow ABI and 4 args', async () => {
       mockSigner.getCode.mockResolvedValue('0x6080604052')
       const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
       await scheme.settle(buildEip3009Payload(), mockRequirements)
 
-      expect(mockSigner.writeContract).toHaveBeenCalledWith(
-        expect.objectContaining({ address: CAPTURE_AUTHORIZER }),
-      )
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.address).toBe(CAPTURE_AUTHORIZER)
+      expect(call.functionName).toBe('authorize')
+      expect(call.abi).toBe(ESCROW_ABI)
+      expect(call.args).toHaveLength(4)
+      expect(call.args[2]).toBe(EIP3009_TOKEN_COLLECTOR_ADDRESS)
     })
 
-    it('should also route simulateSettle through the captureAuthorizer contract', async () => {
+    it('should route charge × eip3009 × contract via the captureAuthorizer with the 6-arg ABI', async () => {
+      mockSigner.getCode.mockResolvedValue('0x6080604052')
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, autoCapture: true },
+      }
+      await scheme.settle(buildEip3009Payload(), reqs)
+
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.address).toBe(CAPTURE_AUTHORIZER)
+      expect(call.functionName).toBe('charge')
+      expect(call.abi).toBe(ESCROW_ABI)
+      expect(call.args).toHaveLength(6)
+      expect(call.args[2]).toBe(EIP3009_TOKEN_COLLECTOR_ADDRESS)
+      // 6-arg charge tail: [..., feeBps, feeReceiver]
+      expect(call.args[4]).toBeDefined()
+      expect(call.args[5]).toBeDefined()
+    })
+
+    it('should route authorize × permit2 × contract via the captureAuthorizer with the permit2 collector', async () => {
+      mockSigner.getCode.mockResolvedValue('0x6080604052')
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, assetTransferMethod: 'permit2' as const },
+      }
+      await scheme.settle(buildPermit2Payload(), reqs)
+
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.address).toBe(CAPTURE_AUTHORIZER)
+      expect(call.functionName).toBe('authorize')
+      expect(call.abi).toBe(ESCROW_ABI)
+      expect(call.args).toHaveLength(4)
+      expect(call.args[2]).toBe(PERMIT2_TOKEN_COLLECTOR_ADDRESS)
+    })
+
+    it('should route charge × permit2 × contract via the captureAuthorizer with 6 args + permit2 collector', async () => {
+      mockSigner.getCode.mockResolvedValue('0x6080604052')
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          assetTransferMethod: 'permit2' as const,
+          autoCapture: true,
+        },
+      }
+      await scheme.settle(buildPermit2Payload(), reqs)
+
+      const call = mockSigner.writeContract.mock.calls[0][0]
+      expect(call.address).toBe(CAPTURE_AUTHORIZER)
+      expect(call.functionName).toBe('charge')
+      expect(call.abi).toBe(ESCROW_ABI)
+      expect(call.args).toHaveLength(6)
+      expect(call.args[2]).toBe(PERMIT2_TOKEN_COLLECTOR_ADDRESS)
+    })
+
+    it('should route simulateSettle through the captureAuthorizer contract with ESCROW_ABI + errors', async () => {
       mockSigner.getCode.mockResolvedValue('0x6080604052')
       const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
       await scheme.verify(buildEip3009Payload(), mockRequirements)
@@ -192,7 +255,9 @@ describe('AuthCaptureFacilitatorScheme', () => {
         (c) => c[0].functionName === 'authorize' || c[0].functionName === 'charge',
       )
       expect(simulateCall).toBeDefined()
-      expect(simulateCall![0].address).toBe(CAPTURE_AUTHORIZER)
+      const call = simulateCall![0]
+      expect(call.address).toBe(CAPTURE_AUTHORIZER)
+      expect(call.abi).toHaveLength(ESCROW_ABI.length + ESCROW_ERRORS_ABI.length)
     })
 
     it('should pass EIP3009_TOKEN_COLLECTOR as the tokenCollector arg for eip3009', async () => {
