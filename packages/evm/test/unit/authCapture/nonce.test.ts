@@ -3,8 +3,8 @@ import { zeroAddress } from "viem";
 import {
   computePayerAgnosticPaymentInfoHash,
   generateSalt,
-} from "../../../src/authCapture/shared/nonce";
-import type { PaymentInfoStruct } from "../../../src/authCapture/shared/types";
+} from "../../../src/authCapture/nonce";
+import type { PaymentInfoStruct } from "../../../src/authCapture/types";
 
 describe("nonce utilities", () => {
   describe("computePayerAgnosticPaymentInfoHash", () => {

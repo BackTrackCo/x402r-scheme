@@ -17,20 +17,20 @@ import { hexToBigInt } from "viem";
 import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../shared/constants";
+} from "../constants";
 import {
   computePayerAgnosticPaymentInfoHash,
   generateSalt,
   signERC3009,
   signPermit2,
-} from "../shared/nonce";
+} from "../nonce";
 import type {
   AuthCaptureExtra,
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from "../shared/types";
-import { parseChainId } from "../shared/utils";
+} from "../types";
+import { parseChainId } from "../utils";
 
 /**
  * AuthCapture Client Scheme - implements x402's SchemeNetworkClient

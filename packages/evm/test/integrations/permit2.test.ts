@@ -34,8 +34,8 @@ import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   ESCROW_VIEW_ABI,
   PERMIT2_ADDRESS,
-} from "../../src/authCapture/shared/constants";
-import type { PaymentInfoStruct, Permit2Payload } from "../../src/authCapture/shared/types";
+} from "../../src/authCapture/constants";
+import type { PaymentInfoStruct, Permit2Payload } from "../../src/authCapture/types";
 
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
 const BALANCE_SLOT = 9n;

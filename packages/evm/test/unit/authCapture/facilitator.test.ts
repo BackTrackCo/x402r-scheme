@@ -12,9 +12,9 @@ import {
   ESCROW_ABI,
   ESCROW_ERRORS_ABI,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../../../src/authCapture/shared/constants";
-import { computePayerAgnosticPaymentInfoHash } from "../../../src/authCapture/shared/nonce";
-import type { PaymentInfoStruct } from "../../../src/authCapture/shared/types";
+} from "../../../src/authCapture/constants";
+import { computePayerAgnosticPaymentInfoHash } from "../../../src/authCapture/nonce";
+import type { PaymentInfoStruct } from "../../../src/authCapture/types";
 
 describe("AuthCaptureFacilitatorScheme", () => {
   const createMockSigner = () => ({

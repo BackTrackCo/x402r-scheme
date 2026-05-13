@@ -35,26 +35,26 @@ import {
   ESCROW_ERRORS_ABI,
   ESCROW_ERROR_TO_INVALID_REASON,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "../shared/constants";
+} from "../constants";
 import {
   computePayerAgnosticPaymentInfoHash,
   verifyERC3009Signature,
   verifyPermit2Signature,
-} from "../shared/nonce";
+} from "../nonce";
 import {
   isAuthCaptureExtra,
   isAuthCapturePayload,
   isEip3009Payload,
   isPermit2Payload,
-} from "../shared/types";
+} from "../types";
 import type {
   AuthCaptureExtra,
   AuthCapturePayload,
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from "../shared/types";
-import { parseChainId } from "../shared/utils";
+} from "../types";
+import { parseChainId } from "../utils";
 
 /**
  * Reconstruct the on-chain PaymentInfo struct from a verified payload + extra.
