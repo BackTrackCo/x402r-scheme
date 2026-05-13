@@ -163,13 +163,36 @@ describe('AuthCaptureFacilitatorScheme', () => {
   })
 
   describe('settle — target address', () => {
-    it('should target the canonical AuthCaptureEscrow address', async () => {
+    it('should target the canonical AuthCaptureEscrow address when captureAuthorizer is an EOA', async () => {
+      mockSigner.getCode.mockResolvedValue('0x')
       const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
       await scheme.settle(buildEip3009Payload(), mockRequirements)
 
       expect(mockSigner.writeContract).toHaveBeenCalledWith(
         expect.objectContaining({ address: AUTH_CAPTURE_ESCROW_ADDRESS }),
       )
+    })
+
+    it('should target the captureAuthorizer when it is a contract', async () => {
+      mockSigner.getCode.mockResolvedValue('0x6080604052')
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      await scheme.settle(buildEip3009Payload(), mockRequirements)
+
+      expect(mockSigner.writeContract).toHaveBeenCalledWith(
+        expect.objectContaining({ address: CAPTURE_AUTHORIZER }),
+      )
+    })
+
+    it('should also route simulateSettle through the captureAuthorizer contract', async () => {
+      mockSigner.getCode.mockResolvedValue('0x6080604052')
+      const scheme = new AuthCaptureFacilitatorScheme(mockSigner)
+      await scheme.verify(buildEip3009Payload(), mockRequirements)
+
+      const simulateCall = mockSigner.readContract.mock.calls.find(
+        (c) => c[0].functionName === 'authorize' || c[0].functionName === 'charge',
+      )
+      expect(simulateCall).toBeDefined()
+      expect(simulateCall![0].address).toBe(CAPTURE_AUTHORIZER)
     })
 
     it('should pass EIP3009_TOKEN_COLLECTOR as the tokenCollector arg for eip3009', async () => {
