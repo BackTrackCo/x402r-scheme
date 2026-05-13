@@ -455,9 +455,7 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
    * call escrow directly. Non-empty ⇒ contract ⇒ call the captureAuthorizer
    * with the same ABI signature.
    */
-  private async resolveSettleTarget(
-    captureAuthorizer: `0x${string}`,
-  ): Promise<`0x${string}`> {
+  private async resolveSettleTarget(captureAuthorizer: `0x${string}`): Promise<`0x${string}`> {
     const code = await this.signer.getCode({ address: captureAuthorizer })
     if (!code || code === '0x') return AUTH_CAPTURE_ESCROW_ADDRESS
     return captureAuthorizer
