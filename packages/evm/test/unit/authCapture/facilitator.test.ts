@@ -6,11 +6,10 @@ import {
   hexToBigInt,
 } from "viem";
 import { AuthCaptureFacilitatorScheme } from "../../../src/authCapture/facilitator/scheme";
+import { ESCROW_ABI, ESCROW_ERRORS_ABI } from "../../../src/authCapture/abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
-  ESCROW_ABI,
-  ESCROW_ERRORS_ABI,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from "../../../src/authCapture/constants";
 import { computePayerAgnosticPaymentInfoHash } from "../../../src/authCapture/nonce";

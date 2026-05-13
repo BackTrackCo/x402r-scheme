@@ -37,10 +37,8 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { AuthCaptureEvmScheme } from "../../src/authCapture/client/scheme";
 import { AuthCaptureFacilitatorScheme } from "../../src/authCapture/facilitator/scheme";
-import {
-  AUTH_CAPTURE_ESCROW_ADDRESS,
-  ESCROW_VIEW_ABI,
-} from "../../src/authCapture/constants";
+import { ESCROW_VIEW_ABI } from "../../src/authCapture/abi";
+import { AUTH_CAPTURE_ESCROW_ADDRESS } from "../../src/authCapture/constants";
 import type { Eip3009Payload, PaymentInfoStruct } from "../../src/authCapture/types";
 
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;

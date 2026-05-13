@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { zeroAddress } from "viem";
-import {
-  computePayerAgnosticPaymentInfoHash,
-  generateSalt,
-} from "../../../src/authCapture/nonce";
+import { computePayerAgnosticPaymentInfoHash, generateSalt } from "../../../src/authCapture/nonce";
 import type { PaymentInfoStruct } from "../../../src/authCapture/types";
 
 describe("nonce utilities", () => {

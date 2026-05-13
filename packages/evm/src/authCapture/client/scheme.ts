@@ -25,12 +25,7 @@ import {
   signERC3009,
   signPermit2,
 } from "../nonce";
-import type {
-  AuthCaptureExtra,
-  Eip3009Payload,
-  PaymentInfoStruct,
-  Permit2Payload,
-} from "../types";
+import type { AuthCaptureExtra, Eip3009Payload, PaymentInfoStruct, Permit2Payload } from "../types";
 import { parseChainId } from "../utils";
 
 /**
