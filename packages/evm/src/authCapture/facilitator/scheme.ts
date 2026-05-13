@@ -29,6 +29,7 @@ import {
 } from "viem";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
+  AUTH_CAPTURE_SCHEME,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   ERC20_BALANCE_OF_ABI,
   ESCROW_ABI,
@@ -102,7 +103,7 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
  *  - 'permit2'           → Permit2 PermitTransferFrom, PERMIT2_TOKEN_COLLECTOR
  */
 export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
-  readonly scheme = "authCapture";
+  readonly scheme = AUTH_CAPTURE_SCHEME;
   readonly caipFamily = "eip155:*";
 
   constructor(private signer: FacilitatorEvmSigner) {}
@@ -130,7 +131,10 @@ export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
       ? wirePayload.authorization.from
       : (wirePayload as Permit2Payload).permit2Authorization.from;
 
-    if (payload.accepted.scheme !== "authCapture" || requirements.scheme !== "authCapture") {
+    if (
+      payload.accepted.scheme !== AUTH_CAPTURE_SCHEME ||
+      requirements.scheme !== AUTH_CAPTURE_SCHEME
+    ) {
       return { isValid: false, invalidReason: "unsupported_scheme", payer };
     }
 

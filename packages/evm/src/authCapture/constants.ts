@@ -1,3 +1,6 @@
+// Scheme identifier for the authCapture payment scheme.
+export const AUTH_CAPTURE_SCHEME = "authCapture" as const;
+
 // Canonical AuthCaptureEscrow + token collector deployments from
 // base/commerce-payments (https://github.com/base/commerce-payments). These are
 // the audited, live addresses listed in the upstream README — the source of

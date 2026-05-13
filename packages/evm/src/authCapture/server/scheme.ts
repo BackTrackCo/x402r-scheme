@@ -14,6 +14,7 @@ import type {
   Price,
   SchemeNetworkServer,
 } from "@x402/core/types";
+import { AUTH_CAPTURE_SCHEME } from "../constants";
 
 /**
  * Asset info including EIP-712 domain parameters per network. Each entry is the
@@ -164,7 +165,7 @@ function convertToTokenAmount(decimalAmount: string, decimals: number): string {
  * Implements x402's SchemeNetworkServer interface.
  */
 export class AuthCaptureServerScheme implements SchemeNetworkServer {
-  readonly scheme = "authCapture";
+  readonly scheme = AUTH_CAPTURE_SCHEME;
   private moneyParsers: MoneyParser[] = [];
 
   /**

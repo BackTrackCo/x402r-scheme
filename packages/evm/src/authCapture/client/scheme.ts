@@ -15,6 +15,7 @@ import type {
 import type { ClientEvmSigner } from "@x402/evm";
 import { hexToBigInt } from "viem";
 import {
+  AUTH_CAPTURE_SCHEME,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from "../constants";
@@ -36,7 +37,7 @@ import { parseChainId } from "../utils";
  * AuthCapture Client Scheme - implements x402's SchemeNetworkClient
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkClient {
-  readonly scheme = "authCapture";
+  readonly scheme = AUTH_CAPTURE_SCHEME;
 
   constructor(private readonly signer: ClientEvmSigner) {}
 
