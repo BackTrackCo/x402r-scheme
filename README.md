@@ -19,11 +19,11 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 ### Client
 
 ```typescript
-import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/client'
-import { x402Client } from '@x402/core/client'
+import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from "@x402r/evm/authCapture/client";
+import { x402Client } from "@x402/core/client";
 
-const client = new x402Client()
-registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
+const client = new x402Client();
+registerAuthCaptureEvmScheme(client, { signer, networks: "eip155:84532" });
 ```
 
 ### Server
@@ -32,11 +32,11 @@ registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
 import {
   AuthCaptureServerScheme,
   registerAuthCaptureEvmScheme,
-} from '@x402r/evm/authCapture/server'
-import { x402ResourceServer } from '@x402/core/server'
+} from "@x402r/evm/authCapture/server";
+import { x402ResourceServer } from "@x402/core/server";
 
-const server = new x402ResourceServer(facilitatorConfig)
-registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
+const server = new x402ResourceServer(facilitatorConfig);
+registerAuthCaptureEvmScheme(server, { networks: "eip155:84532" });
 ```
 
 ### Facilitator
@@ -44,14 +44,14 @@ registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
 The authCapture scheme integrates with x402's facilitator via `registerAuthCaptureEvmScheme()`, using the same `FacilitatorEvmSigner` as x402's exact scheme:
 
 ```typescript
-import { x402Facilitator } from '@x402/core/facilitator'
-import { toFacilitatorEvmSigner } from '@x402/evm'
-import { registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/facilitator'
+import { x402Facilitator } from "@x402/core/facilitator";
+import { toFacilitatorEvmSigner } from "@x402/evm";
+import { registerAuthCaptureEvmScheme } from "@x402r/evm/authCapture/facilitator";
 
-const evmSigner = toFacilitatorEvmSigner({ address, ...clients })
+const evmSigner = toFacilitatorEvmSigner({ address, ...clients });
 
-const facilitator = new x402Facilitator()
-registerAuthCaptureEvmScheme(facilitator, { signer: evmSigner, networks: 'eip155:84532' })
+const facilitator = new x402Facilitator();
+registerAuthCaptureEvmScheme(facilitator, { signer: evmSigner, networks: "eip155:84532" });
 ```
 
 ## Development

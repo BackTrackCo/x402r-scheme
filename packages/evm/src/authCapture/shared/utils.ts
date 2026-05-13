@@ -4,13 +4,13 @@
  * @returns The chain ID as a number
  */
 export function parseChainId(network: string): number {
-  const parts = network.split(':')
-  if (parts.length !== 2 || parts[0] !== 'eip155') {
-    throw new Error(`Invalid network format: ${network}. Expected 'eip155:<chainId>'`)
+  const parts = network.split(":");
+  if (parts.length !== 2 || parts[0] !== "eip155") {
+    throw new Error(`Invalid network format: ${network}. Expected 'eip155:<chainId>'`);
   }
-  const chainId = parseInt(parts[1], 10)
+  const chainId = parseInt(parts[1], 10);
   if (isNaN(chainId)) {
-    throw new Error(`Invalid chainId in network: ${network}`)
+    throw new Error(`Invalid chainId in network: ${network}`);
   }
-  return chainId
+  return chainId;
 }

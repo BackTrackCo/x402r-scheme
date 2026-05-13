@@ -1,11 +1,11 @@
-import type { Network } from '@x402/core/types'
-import type { FacilitatorEvmSigner } from '@x402/evm'
-import { x402Facilitator } from '@x402/core/facilitator'
-import { AuthCaptureFacilitatorScheme } from './scheme'
+import type { Network } from "@x402/core/types";
+import type { FacilitatorEvmSigner } from "@x402/evm";
+import { x402Facilitator } from "@x402/core/facilitator";
+import { AuthCaptureFacilitatorScheme } from "./scheme";
 
 export interface EvmFacilitatorConfig {
-  signer: FacilitatorEvmSigner
-  networks: Network | Network[]
+  signer: FacilitatorEvmSigner;
+  networks: Network | Network[];
 }
 
 /**
@@ -28,6 +28,6 @@ export function registerAuthCaptureEvmScheme(
   facilitator: x402Facilitator,
   config: EvmFacilitatorConfig,
 ): x402Facilitator {
-  facilitator.register(config.networks, new AuthCaptureFacilitatorScheme(config.signer))
-  return facilitator
+  facilitator.register(config.networks, new AuthCaptureFacilitatorScheme(config.signer));
+  return facilitator;
 }

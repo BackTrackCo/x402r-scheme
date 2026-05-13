@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from "vitest/config";
 
 // Default config: unit tests only. Integration tests live under
 // test/integrations and run against a local anvil instance forked from Base
@@ -7,11 +7,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     globals: false,
-    environment: 'node',
-    include: ['test/unit/**/*.test.ts'],
+    environment: "node",
+    include: ["test/unit/**/*.test.ts"],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      provider: "v8",
+      reporter: ["text", "json", "html"],
     },
   },
-})
+});

@@ -13,13 +13,13 @@ npm install @x402r/evm
 ### Client — Create payment payloads
 
 ```typescript
-import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/client'
-import { x402Client } from '@x402/core/client'
+import { AuthCaptureEvmScheme, registerAuthCaptureEvmScheme } from "@x402r/evm/authCapture/client";
+import { x402Client } from "@x402/core/client";
 
-const client = new x402Client()
-registerAuthCaptureEvmScheme(client, { signer })
+const client = new x402Client();
+registerAuthCaptureEvmScheme(client, { signer });
 // or with specific networks:
-registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(client, { signer, networks: "eip155:84532" });
 ```
 
 ### Server — Register with x402 resource server
@@ -28,13 +28,13 @@ registerAuthCaptureEvmScheme(client, { signer, networks: 'eip155:84532' })
 import {
   AuthCaptureServerScheme,
   registerAuthCaptureEvmScheme,
-} from '@x402r/evm/authCapture/server'
-import { x402ResourceServer } from '@x402/core/server'
+} from "@x402r/evm/authCapture/server";
+import { x402ResourceServer } from "@x402/core/server";
 
-const server = new x402ResourceServer(facilitatorConfig)
-registerAuthCaptureEvmScheme(server)
+const server = new x402ResourceServer(facilitatorConfig);
+registerAuthCaptureEvmScheme(server);
 // or with specific networks:
-registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
+registerAuthCaptureEvmScheme(server, { networks: "eip155:84532" });
 ```
 
 ### Facilitator — Verify and settle payments
@@ -43,11 +43,11 @@ registerAuthCaptureEvmScheme(server, { networks: 'eip155:84532' })
 import {
   AuthCaptureFacilitatorScheme,
   registerAuthCaptureEvmScheme,
-} from '@x402r/evm/authCapture/facilitator'
-import { x402Facilitator } from '@x402/core/facilitator'
+} from "@x402r/evm/authCapture/facilitator";
+import { x402Facilitator } from "@x402/core/facilitator";
 
-const facilitator = new x402Facilitator()
-registerAuthCaptureEvmScheme(facilitator, { signer, networks: 'eip155:84532' })
+const facilitator = new x402Facilitator();
+registerAuthCaptureEvmScheme(facilitator, { signer, networks: "eip155:84532" });
 ```
 
 ## Exports
@@ -68,12 +68,12 @@ Integration tests spawn a local anvil instance forked from Base Sepolia and exer
 
 Required env:
 
-| Var                       | Purpose                                                             | Default                                                                   |
-| :------------------------ | :------------------------------------------------------------------ | :------------------------------------------------------------------------ |
-| `BASE_SEPOLIA_RPC_URL`    | Upstream RPC anvil forks from. Any working Base Sepolia endpoint.   | _required_ — fork tests skip cleanly if unset                             |
-| `ANVIL_BIN`               | Path to the `anvil` binary.                                         | `anvil` (must be on `PATH`; install via [Foundry](https://getfoundry.sh)) |
-| `BASE_SEPOLIA_FORK_BLOCK` | Pin the fork to a specific block (recommended for reproducibility). | _unset_ — uses chain head                                                 |
-| `ANVIL_VERBOSE`           | If set, anvil's stdout/stderr is inherited (default: silenced).     | _unset_                                                                   |
+| Var | Purpose | Default |
+| :-- | :-- | :-- |
+| `BASE_SEPOLIA_RPC_URL` | Upstream RPC anvil forks from. Any working Base Sepolia endpoint. | _required_ — fork tests skip cleanly if unset |
+| `ANVIL_BIN` | Path to the `anvil` binary. | `anvil` (must be on `PATH`; install via [Foundry](https://getfoundry.sh)) |
+| `BASE_SEPOLIA_FORK_BLOCK` | Pin the fork to a specific block (recommended for reproducibility). | _unset_ — uses chain head |
+| `ANVIL_VERBOSE` | If set, anvil's stdout/stderr is inherited (default: silenced). | _unset_ |
 
 ## Links
 
