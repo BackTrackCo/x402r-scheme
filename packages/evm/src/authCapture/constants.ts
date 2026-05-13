@@ -46,29 +46,3 @@ export const PERMIT2_TRANSFER_FROM_TYPES = {
     { name: "amount", type: "uint256" },
   ],
 } as const;
-
-/**
- * Map an AuthCaptureEscrow custom-error name (decoded by viem from a
- * ContractFunctionRevertedError) to a stable `invalidReason` string. Anything
- * unmapped falls through to the generic `simulation_failed` so verify() never
- * leaks raw selectors to callers.
- */
-export const ESCROW_ERROR_TO_INVALID_REASON: Record<string, string> = {
-  AfterPreApprovalExpiry: "authorization_expired",
-  InvalidExpiries: "invalid_deadline_ordering",
-  ExceedsMaxAmount: "amount_mismatch",
-  PaymentAlreadyCollected: "payment_already_collected",
-  TokenCollectionFailed: "token_collection_failed",
-  InvalidCollectorForOperation: "invalid_collector",
-  InvalidSender: "invalid_capture_authorizer",
-  ZeroAmount: "amount_mismatch",
-  AmountOverflow: "amount_overflow",
-  FeeBpsOverflow: "invalid_fee_bps",
-  InvalidFeeBpsRange: "invalid_fee_bps_range",
-  FeeBpsOutOfRange: "fee_bps_out_of_range",
-  ZeroFeeReceiver: "zero_fee_receiver",
-  InvalidFeeReceiver: "invalid_fee_receiver",
-  AfterAuthorizationExpiry: "capture_deadline_expired",
-  InsufficientAuthorization: "insufficient_authorization",
-  ZeroAuthorization: "zero_authorization",
-};
