@@ -1,6 +1,6 @@
 import type { Network } from "@x402/core/types";
 import { x402ResourceServer } from "@x402/core/server";
-import { AuthCaptureServerScheme } from "./scheme";
+import { AuthCaptureEvmScheme } from "./scheme";
 
 export interface EvmResourceServerConfig {
   networks?: Network | Network[];
@@ -21,7 +21,7 @@ export function registerAuthCaptureEvmScheme(
   server: x402ResourceServer,
   config: EvmResourceServerConfig = {},
 ): x402ResourceServer {
-  const scheme = new AuthCaptureServerScheme();
+  const scheme = new AuthCaptureEvmScheme();
   const networks = config.networks
     ? Array.isArray(config.networks)
       ? config.networks

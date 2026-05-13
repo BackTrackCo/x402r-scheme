@@ -122,7 +122,7 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
  *  - 'eip3009' (default) → ERC-3009 ReceiveWithAuthorization, EIP3009_TOKEN_COLLECTOR
  *  - 'permit2'           → Permit2 PermitTransferFrom, PERMIT2_TOKEN_COLLECTOR
  */
-export class AuthCaptureFacilitatorScheme implements SchemeNetworkFacilitator {
+export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
   readonly scheme = AUTH_CAPTURE_SCHEME;
   readonly caipFamily = "eip155:*";
 

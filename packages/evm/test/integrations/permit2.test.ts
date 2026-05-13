@@ -28,8 +28,8 @@ import {
 } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { AuthCaptureEvmScheme } from "../../src/authCapture/client/scheme";
-import { AuthCaptureFacilitatorScheme } from "../../src/authCapture/facilitator/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/authCapture/client/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/authCapture/facilitator/scheme";
 import { ESCROW_VIEW_ABI } from "../../src/authCapture/abi";
 import { AUTH_CAPTURE_ESCROW_ADDRESS, PERMIT2_ADDRESS } from "../../src/authCapture/constants";
 import type { PaymentInfoStruct, Permit2Payload } from "../../src/authCapture/types";
@@ -176,9 +176,9 @@ describe("fork — Permit2 settle against canonical AuthCaptureEscrow", () => {
   }
 
   it("settles authorize() via Permit2 collector", async () => {
-    const client = new AuthCaptureEvmScheme(clientSigner);
-    const facilitator = new AuthCaptureFacilitatorScheme(
-      facilitatorSigner as unknown as Parameters<typeof AuthCaptureFacilitatorScheme>[0],
+    const client = new AuthCaptureEvmClient(clientSigner);
+    const facilitator = new AuthCaptureEvmFacilitator(
+      facilitatorSigner as unknown as Parameters<typeof AuthCaptureEvmFacilitator>[0],
     );
 
     const requirements = buildRequirements(false);
@@ -209,9 +209,9 @@ describe("fork — Permit2 settle against canonical AuthCaptureEscrow", () => {
   });
 
   it("settles charge() via Permit2 collector (autoCapture + permit2 combo)", async () => {
-    const client = new AuthCaptureEvmScheme(clientSigner);
-    const facilitator = new AuthCaptureFacilitatorScheme(
-      facilitatorSigner as unknown as Parameters<typeof AuthCaptureFacilitatorScheme>[0],
+    const client = new AuthCaptureEvmClient(clientSigner);
+    const facilitator = new AuthCaptureEvmFacilitator(
+      facilitatorSigner as unknown as Parameters<typeof AuthCaptureEvmFacilitator>[0],
     );
 
     const requirements = buildRequirements(true);

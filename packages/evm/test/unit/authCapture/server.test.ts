@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { AuthCaptureServerScheme } from "../../../src/authCapture/server/index";
+import { AuthCaptureEvmScheme } from "../../../src/authCapture/server/index";
 
 const BASE_SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
-describe("AuthCaptureServerScheme", () => {
+describe("AuthCaptureEvmScheme", () => {
   describe("parsePrice", () => {
     it("should parse dollar amounts with default decimals (6 for USDC)", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1.00", "eip155:84532");
 
       expect(result.amount).toBe("1000000");
@@ -15,7 +15,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should parse amounts without dollar sign", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("0.50", "eip155:84532");
 
       expect(result.amount).toBe("500000");
@@ -23,35 +23,35 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should parse small amounts correctly", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$0.01", "eip155:84532");
 
       expect(result.amount).toBe("10000");
     });
 
     it("should parse large amounts correctly", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1000.00", "eip155:84532");
 
       expect(result.amount).toBe("1000000000");
     });
 
     it("should handle amounts with commas", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1,000.50", "eip155:84532");
 
       expect(result.amount).toBe("1000500000");
     });
 
     it("should handle zero amounts", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$0.00", "eip155:84532");
 
       expect(result.amount).toBe("0");
     });
 
     it("should accept numeric price", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice(0.01, "eip155:84532");
 
       expect(result.amount).toBe("10000");
@@ -60,14 +60,14 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should return extra with name and version for Base mainnet", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1.00", "eip155:8453");
 
       expect(result.extra).toEqual({ name: "USD Coin", version: "2" });
     });
 
     it("should pass through AssetAmount objects with extra", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice(
         { asset: "0xCustomToken", amount: "42000", extra: { name: "Custom", version: "1" } },
         "eip155:84532",
@@ -79,7 +79,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should pass through AssetAmount objects without extra", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice(
         { asset: "0xCustomToken", amount: "42000" },
         "eip155:84532",
@@ -91,21 +91,21 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should throw when AssetAmount has no asset", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       await expect(
         scheme.parsePrice({ asset: "", amount: "42000" }, "eip155:84532"),
       ).rejects.toThrow("Asset address must be specified");
     });
 
     it("should throw for unsupported network", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       await expect(scheme.parsePrice("$1.00", "eip155:99999")).rejects.toThrow(
         "No USDC address configured for network",
       );
     });
 
     it("should resolve BSC default to Binance-Peg USDC without setting assetTransferMethod", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1.00", "eip155:56");
 
       expect(result.asset).toBe("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
@@ -115,7 +115,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should resolve Tempo default to pathUSD without setting assetTransferMethod", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       const result = await scheme.parsePrice("$1.00", "eip155:4217");
 
       expect(result.asset).toBe("0x20c0000000000000000000000000000000000000");
@@ -124,7 +124,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should never inject assetTransferMethod (merchant decides)", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       for (const network of ["eip155:8453", "eip155:56", "eip155:4217"] as const) {
         const result = await scheme.parsePrice("$1.00", network);
         expect(result.extra).not.toHaveProperty("assetTransferMethod");
@@ -134,7 +134,7 @@ describe("AuthCaptureServerScheme", () => {
 
   describe("registerMoneyParser", () => {
     it("should use custom parser when it returns a result", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       scheme.registerMoneyParser(async (amount, _network) => ({
         asset: "0xCustomToken",
         amount: String(amount * 1e18),
@@ -149,7 +149,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should fall through to default when custom parser returns null", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       scheme.registerMoneyParser(async () => null);
 
       const result = await scheme.parsePrice("$1.00", "eip155:84532");
@@ -160,7 +160,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should try parsers in registration order", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
 
       // First parser returns null
       scheme.registerMoneyParser(async () => null);
@@ -181,7 +181,7 @@ describe("AuthCaptureServerScheme", () => {
 
   describe("enhancePaymentRequirements", () => {
     it("should merge extra fields from supportedKind", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
 
       const requirements = {
         scheme: "authCapture",
@@ -212,7 +212,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should preserve existing extra fields from requirements", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
 
       const requirements = {
         scheme: "authCapture",
@@ -244,7 +244,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should let requirements extra override supportedKind extra", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
 
       const requirements = {
         scheme: "authCapture",
@@ -274,7 +274,7 @@ describe("AuthCaptureServerScheme", () => {
     });
 
     it("should preserve all original requirement fields", async () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
 
       const requirements = {
         scheme: "authCapture",
@@ -304,7 +304,7 @@ describe("AuthCaptureServerScheme", () => {
 
   describe("scheme property", () => {
     it('should have scheme set to "authCapture"', () => {
-      const scheme = new AuthCaptureServerScheme();
+      const scheme = new AuthCaptureEvmScheme();
       expect(scheme.scheme).toBe("authCapture");
     });
   });
