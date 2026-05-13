@@ -203,9 +203,11 @@ describe('AuthCaptureFacilitatorScheme', () => {
       expect(call.abi).toBe(ESCROW_ABI)
       expect(call.args).toHaveLength(6)
       expect(call.args[2]).toBe(EIP3009_TOKEN_COLLECTOR_ADDRESS)
-      // 6-arg charge tail: [..., feeBps, feeReceiver]
-      expect(call.args[4]).toBeDefined()
-      expect(call.args[5]).toBeDefined()
+      // 6-arg charge tail: [..., feeBps, feeReceiver] — exact values mirror
+      // the EOA-path 'charge fee args' test so the contract path is
+      // independently complete, not just transitive on shared args-build code.
+      expect(call.args[4]).toBe(0)
+      expect(call.args[5]).toBe(FEE_RECIPIENT)
     })
 
     it('should route authorize × permit2 × contract via the captureAuthorizer with the permit2 collector', async () => {
