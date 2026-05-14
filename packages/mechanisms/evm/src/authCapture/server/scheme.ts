@@ -145,9 +145,15 @@ const ASSET_INFO: Record<
 };
 
 /**
- * Convert decimal amount to token units using string-based conversion
- * (e.g., 0.10 -> 100000 for 6-decimal tokens)
- * Avoids floating-point precision issues from BigInt(Math.round(...))
+ * Convert a decimal amount string to its base-units token representation via
+ * string manipulation. Avoids the floating-point rounding errors that arise
+ * from `BigInt(Math.round(amount * 10 ** decimals))` on large or precise
+ * inputs. Example: `"0.10"` with `decimals=6` → `"100000"`.
+ *
+ * @param decimalAmount - Decimal amount expressed as a string (e.g. `"0.10"`).
+ * @param decimals - Token decimals (USDC = 6, most ERC-20s = 18).
+ * @returns The amount in base units as a string.
+ * @throws If `decimalAmount` does not parse as a number.
  */
 function convertToTokenAmount(decimalAmount: string, decimals: number): string {
   const amount = parseFloat(decimalAmount);
@@ -161,22 +167,23 @@ function convertToTokenAmount(decimalAmount: string, decimals: number): string {
 }
 
 /**
- * Server scheme - handles price parsing and requirement enhancement.
- * Implements x402's SchemeNetworkServer interface.
+ * Server-side implementation of the authCapture scheme: maps merchant-friendly
+ * prices (`"$0.01"`, decimal numbers, or pre-built `AssetAmount`) to the
+ * stablecoin asset + base-unit amount needed in `PaymentRequirements`, and
+ * merges facilitator-advertised `extra` fields into the published
+ * requirements. Implements `SchemeNetworkServer`.
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   readonly scheme = AUTH_CAPTURE_SCHEME;
   private moneyParsers: MoneyParser[] = [];
 
   /**
-   * Register a custom money parser in the parser chain.
-   * Multiple parsers can be registered — they will be tried in registration order.
-   * Each parser receives a decimal amount (e.g., 1.50 for $1.50).
-   * If a parser returns null, the next parser in the chain will be tried.
-   * The default parser (USDC) is always the final fallback.
+   * Add a custom money parser to the chain. Parsers run in registration order;
+   * the first one to return a non-null `AssetAmount` wins. If every parser
+   * returns null, the default network-stablecoin conversion is used.
    *
-   * @param parser - Custom function to convert amount to AssetAmount (or null to skip)
-   * @returns The server instance for chaining
+   * @param parser - Function that maps a decimal amount to an `AssetAmount`, or `null` to defer.
+   * @returns This server scheme instance, for fluent chaining.
    */
   registerMoneyParser(parser: MoneyParser): AuthCaptureEvmScheme {
     this.moneyParsers.push(parser);
@@ -184,12 +191,14 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   }
 
   /**
-   * Parse a price into an x402 AssetAmount.
+   * Translate a merchant-supplied `Price` into a fully-resolved `AssetAmount`.
+   * Pass-through for `AssetAmount` inputs (with required `asset` validation);
+   * otherwise normalizes the input to a decimal, then runs the registered
+   * money parser chain, falling back to the default stablecoin for the network.
    *
-   * Accepts x402's Price type:
-   * - string: "$0.01", "0.01", "10000"
-   * - number: 0.01
-   * - AssetAmount: { asset: "0x...", amount: "10000" }
+   * @param price - `"$0.01"` / `0.01` / `{ asset, amount }`.
+   * @param network - CAIP-2 network identifier used for default-asset lookup.
+   * @returns The resolved `AssetAmount` containing token address and base units.
    */
   async parsePrice(price: Price, network: Network): Promise<AssetAmount> {
     // If already an AssetAmount, pass through with validation
@@ -220,7 +229,47 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   }
 
   /**
-   * Parse Money (string | number) to a decimal number.
+   * Merge facilitator-advertised `extra` (from `/supported`) into the
+   * merchant's payment requirements, with the merchant's own `extra` taking
+   * precedence on collisions. Lets authCapture wire-level fields (e.g., a
+   * facilitator-injected `captureAuthorizer` default) flow into requirements
+   * automatically while still allowing the merchant to override.
+   *
+   * @param requirements - The merchant-authored payment requirements.
+   * @param supportedKind - The facilitator's advertised support entry for this scheme/network.
+   * @param supportedKind.x402Version - Protocol version the facilitator advertises.
+   * @param supportedKind.scheme - Scheme identifier (`"authCapture"`).
+   * @param supportedKind.network - CAIP-2 network identifier.
+   * @param supportedKind.extra - Facilitator-injected `extra` fields (lowest priority on collision).
+   * @param _ - Unused list of facilitator extensions (interface compatibility).
+   * @returns Enhanced `PaymentRequirements` with merged `extra`.
+   */
+  async enhancePaymentRequirements(
+    requirements: PaymentRequirements,
+    supportedKind: {
+      x402Version: number;
+      scheme: string;
+      network: Network;
+      extra?: Record<string, unknown>;
+    },
+    _: string[],
+  ): Promise<PaymentRequirements> {
+    return {
+      ...requirements,
+      extra: {
+        ...supportedKind.extra,
+        ...requirements.extra,
+      },
+    };
+  }
+
+  /**
+   * Normalize a `Price` (string or number) to a decimal `number`. Strips `$`
+   * and `,` formatting characters from strings before parsing.
+   *
+   * @param money - Decimal money expressed as a number or formatted string.
+   * @returns The parsed decimal amount.
+   * @throws If the string does not parse as a number.
    */
   private parseMoneyToDecimal(money: string | number): number {
     if (typeof money === "number") {
@@ -235,10 +284,16 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   }
 
   /**
-   * Default money conversion — converts decimal amount to the default stablecoin on the network.
-   * Returns just the EIP-712 domain (`name` / `version`) in `extra`. The merchant
-   * is responsible for setting `assetTransferMethod` if the chosen token doesn't
-   * support the spec default (`"eip3009"`).
+   * Fall-through converter: resolves a decimal amount against the default
+   * stablecoin registered for the network in `ASSET_INFO`. Returns only the
+   * EIP-712 token-domain fields (`name` / `version`) in `extra`; the merchant
+   * is responsible for selecting `assetTransferMethod` when the chosen token
+   * does not support the spec default (`"eip3009"`).
+   *
+   * @param amount - Decimal amount in the token's display units.
+   * @param network - CAIP-2 network identifier.
+   * @returns Resolved `AssetAmount` with the network's default stablecoin.
+   * @throws If no default stablecoin is configured for `network`.
    */
   private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
     const assetInfo = ASSET_INFO[network];
@@ -254,32 +309,6 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
       extra: {
         name: assetInfo.name,
         version: assetInfo.version,
-      },
-    };
-  }
-
-  /**
-   * Enhance payment requirements with facilitator's extra fields.
-   *
-   * Merges supportedKind.extra (from facilitator's /supported endpoint) into
-   * the requirements, so authCapture addresses flow from facilitator → merchant
-   * requirements automatically.
-   */
-  async enhancePaymentRequirements(
-    requirements: PaymentRequirements,
-    supportedKind: {
-      x402Version: number;
-      scheme: string;
-      network: Network;
-      extra?: Record<string, unknown>;
-    },
-    _facilitatorExtensions: string[],
-  ): Promise<PaymentRequirements> {
-    return {
-      ...requirements,
-      extra: {
-        ...supportedKind.extra,
-        ...requirements.extra,
       },
     };
   }

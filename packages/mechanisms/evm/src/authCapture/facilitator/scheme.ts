@@ -78,11 +78,19 @@ import type {
 import { parseChainId } from "../utils";
 
 /**
- * Reconstruct the on-chain PaymentInfo struct from a verified payload + extra.
- * Inputs that come from the wire: payer (payload), salt (payload), and the
- * canonical extra fields (captureAuthorizer/captureDeadline/refundDeadline/
- * feeRecipient/maxFeeBps/minFeeBps). Top-level requirements provide
- * receiver/token/maxAmount.
+ * Reconstruct the on-chain PaymentInfo struct from the inputs the facilitator
+ * has after verifying a wire payload. Wire-only inputs: `payer` and `salt`
+ * (both from the payload). `preApprovalExpiry` is computed by the caller from
+ * the payload (ERC-3009 `validBefore` or Permit2 `deadline`). The remaining
+ * fields come from `requirements` (receiver/token/maxAmount) and
+ * `requirements.extra` (capture/refund deadlines, fee policy, captureAuthorizer).
+ *
+ * @param payer - Address recovered from the wire payload's signature.
+ * @param preApprovalExpiry - Pre-approval expiry in Unix seconds (from the wire payload).
+ * @param salt - 32-byte salt from the wire payload.
+ * @param requirements - The payment requirements published by the server.
+ * @param extra - The validated `AuthCaptureExtra` subset of `requirements.extra`.
+ * @returns A PaymentInfo struct ready to hand to the escrow contract.
  */
 function reconstructPaymentInfo(
   payer: `0x${string}`,
@@ -107,6 +115,13 @@ function reconstructPaymentInfo(
   };
 }
 
+/**
+ * Convert a JS-side PaymentInfo struct (string `maxAmount` and `salt`) into
+ * the bigint-typed form viem expects when encoding the on-chain tuple.
+ *
+ * @param p - PaymentInfo with string-form numeric fields.
+ * @returns The same struct with `maxAmount` and `salt` coerced to bigint.
+ */
 function paymentInfoToContractTuple(p: PaymentInfoStruct) {
   return { ...p, maxAmount: BigInt(p.maxAmount), salt: BigInt(p.salt) };
 }
@@ -126,22 +141,57 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
   readonly scheme = AUTH_CAPTURE_SCHEME;
   readonly caipFamily = "eip155:*";
 
+  /**
+   * Construct a facilitator-side authCapture scheme bound to a specific signer.
+   *
+   * @param signer - Facilitator signer with on-chain read + write capability.
+   */
   constructor(private signer: FacilitatorEvmSigner) {}
 
-  getSigners(_network: string): string[] {
+  /**
+   * Return the EOA address(es) this facilitator submits transactions from.
+   * Advertised via `/supported` so merchants can decide whether to set
+   * `extra.captureAuthorizer = facilitator-EOA` for the EOA-captureAuthorizer
+   * path.
+   *
+   * @param _ - Unused network argument (interface compatibility).
+   * @returns The facilitator's submitter address(es) on this network.
+   */
+  getSigners(_: string): string[] {
     return [...this.signer.getAddresses()];
   }
 
-  // No facilitator-injected extras: all wire-format addresses are constants and
-  // captureAuthorizer/feeRecipient/deadlines are merchant-set.
-  getExtra(_network: string): Record<string, unknown> | undefined {
+  /**
+   * Facilitator-injected `extra` fields for `/supported`. authCapture injects
+   * none — every wire-format address is a universal canonical constant, and
+   * `captureAuthorizer`, `feeRecipient`, and the deadlines are merchant-set
+   * per request.
+   *
+   * @param _ - Unused network argument (interface compatibility).
+   * @returns Always `undefined`.
+   */
+  getExtra(_: string): Record<string, unknown> | undefined {
     return undefined;
   }
 
+  /**
+   * Verify a payment payload against the published requirements without
+   * touching state. Performs envelope shape checks, scheme/network agreement,
+   * `extra` validation, deadline-ordering invariants, per-method field checks
+   * (collector address, token, amount), signature verification (with
+   * EIP-6492 unwrap), nonce binding to the payer-agnostic PaymentInfo hash,
+   * and an on-chain `simulateContract` of `authorize` / `charge` so typed
+   * escrow reverts surface as stable invalidReason strings.
+   *
+   * @param payload - The wire payload from the payer.
+   * @param requirements - The server's published payment requirements.
+   * @param _ - Unused FacilitatorContext (interface compatibility).
+   * @returns A `VerifyResponse` with `isValid` and, on failure, a stable `invalidReason`.
+   */
   async verify(
     payload: PaymentPayload,
     requirements: PaymentRequirements,
-    _context?: FacilitatorContext,
+    _?: FacilitatorContext,
   ): Promise<VerifyResponse> {
     if (!isAuthCapturePayload(payload.payload)) {
       return { isValid: false, invalidReason: ErrInvalidPayloadFormat };
@@ -321,10 +371,24 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     return { isValid: true, payer };
   }
 
+  /**
+   * Verify-then-settle. Re-runs `verify()` against the payload, then submits
+   * `authorize` (two-phase, default) or `charge` (single-shot, when
+   * `extra.autoCapture === true`) to the escrow contract. If the merchant has
+   * set `captureAuthorizer` to a smart contract, the call is routed through
+   * that contract instead of directly to the escrow (see `resolveSettleTarget`).
+   * Waits for the transaction receipt with a 60-second timeout.
+   *
+   * @param payload - The wire payload from the payer.
+   * @param requirements - The server's published payment requirements.
+   * @param _ - Unused FacilitatorContext (interface compatibility).
+   * @returns A `SettleResponse` with `success`, the transaction hash (on
+   *          success), and a stable `errorReason` (on failure).
+   */
   async settle(
     payload: PaymentPayload,
     requirements: PaymentRequirements,
-    _context?: FacilitatorContext,
+    _?: FacilitatorContext,
   ): Promise<SettleResponse> {
     const verification = await this.verify(payload, requirements);
     if (!verification.isValid) {
@@ -416,21 +480,27 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
   }
 
   /**
-   * Simulate the settle call via eth_call. Returns 'ok' on success or a
-   * stable invalidReason string on failure.
+   * Simulate the settle call via `eth_call` and translate the result to a
+   * stable wire-level reason. Returns `"ok"` on simulated success; on revert
+   * viem walks the error chain for `ContractFunctionRevertedError` and decodes
+   * the custom-error name against `ESCROW_ABI + ESCROW_ERRORS_ABI`. Known
+   * errors map to typed reasons via `ESCROW_ERROR_TO_INVALID_REASON`; anything
+   * unmapped (e.g. token-collector reverts like a consumed ERC-3009 nonce)
+   * falls through to `simulation_failed`.
    *
-   * On revert, viem walks the error chain for ContractFunctionRevertedError
-   * and decodes the custom-error name against ESCROW_ABI + ESCROW_ERRORS_ABI.
-   * Known errors map to typed reasons via ESCROW_ERROR_TO_INVALID_REASON;
-   * anything unmapped (e.g. token-collector reverts like consumed ERC-3009
-   * nonce) falls through to the generic 'simulation_failed'.
+   * @param paymentInfo - The reconstructed PaymentInfo struct.
+   * @param amount - Settle amount in token base units.
+   * @param wirePayload - The payer's wire payload.
+   * @param extra - Validated `AuthCaptureExtra` from `requirements.extra`.
+   * @param _ - Unused payer address (interface compatibility).
+   * @returns `"ok"` on simulated success, or a stable `invalidReason` string.
    */
   private async simulateSettle(
     paymentInfo: PaymentInfoStruct,
     amount: bigint,
     wirePayload: AuthCapturePayload,
     extra: AuthCaptureExtra,
-    _payer: `0x${string}`,
+    _: `0x${string}`,
   ): Promise<"ok" | string> {
     const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
     const { tokenCollector, collectorData } = unpackForSettle(wirePayload, assetTransferMethod);
@@ -463,11 +533,24 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     }
   }
 
-  // Spec (scheme_authCapture_evm.md): facilitator calls authorize/charge
-  // "either directly or through a smart contract set as the captureAuthorizer".
-  // EOA captureAuthorizer ⇒ call escrow directly; contract ⇒ call the
-  // captureAuthorizer (which MUST expose the literal `authorize`/`charge`
-  // escrow selectors and forward to escrow) so it becomes msg.sender there.
+  /**
+   * Resolve the on-chain target for an `authorize`/`charge` call per spec.
+   * Per `scheme_authCapture_evm.md`, the facilitator may call escrow `"either
+   * directly or through a smart contract set as the captureAuthorizer"`.
+   * Probes `getCode(captureAuthorizer)`:
+   *
+   * - **EOA** (empty or `0x` bytecode) → call the canonical escrow directly.
+   *   The escrow's `onlySender(paymentInfo.operator)` gate is satisfied
+   *   because the facilitator's tx `msg.sender` equals the captureAuthorizer
+   *   EOA.
+   * - **Contract** (non-empty bytecode) → call the captureAuthorizer
+   *   contract, which MUST expose the literal `authorize`/`charge` escrow
+   *   selectors and forward to escrow. The contract becomes `msg.sender` at
+   *   the escrow, satisfying the gate.
+   *
+   * @param captureAuthorizer - Address from `extra.captureAuthorizer`.
+   * @returns The address to target with the settle write/simulate.
+   */
   private async resolveSettleTarget(captureAuthorizer: `0x${string}`): Promise<`0x${string}`> {
     const code = await this.signer.getCode({ address: captureAuthorizer });
     if (!code || code === "0x") return AUTH_CAPTURE_ESCROW_ADDRESS;
@@ -480,8 +563,13 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
 const ESCROW_ABI_WITH_ERRORS = [...ESCROW_ABI, ...ESCROW_ERRORS_ABI] as const;
 
 /**
- * Walk a viem error chain to find a decoded custom-error name and map it to
- * a stable invalidReason. Returns 'simulation_failed' for unknown reverts.
+ * Walk a viem error chain looking for a decoded custom-error name, then map
+ * known names to a stable `invalidReason` via `ESCROW_ERROR_TO_INVALID_REASON`.
+ * Anything unmapped returns `ErrSimulationFailed` so the wire never leaks raw
+ * selectors.
+ *
+ * @param err - The error thrown by `readContract` / `simulateContract`.
+ * @returns A stable wire-level `invalidReason` string.
  */
 function decodeRevertReason(err: unknown): string {
   if (err instanceof BaseError) {
@@ -499,9 +587,16 @@ function decodeRevertReason(err: unknown): string {
 }
 
 /**
- * Unpack the per-method settle inputs (token collector address + collectorData
- * encoding). EIP-3009 collectors take the full ReceiveWithAuthorization signature
- * directly; Permit2 collectors take the encoded permit signature.
+ * Unpack the per-method inputs the escrow needs at settle time: the token
+ * collector address (canonical, per method) and the `collectorData` blob the
+ * collector parses. EIP-3009 collectors take the raw ReceiveWithAuthorization
+ * signature directly. Permit2 collectors take the signature ABI-encoded as
+ * `bytes` (the collector itself reconstructs the PermitTransferFrom struct
+ * from PaymentInfo, using the deterministic nonce + payer).
+ *
+ * @param wirePayload - The verified wire payload (EIP-3009 or Permit2 shape).
+ * @param assetTransferMethod - Which envelope the payload uses.
+ * @returns `preApprovalExpiry`, `amount`, `tokenCollector`, and `collectorData` ready for the escrow call.
  */
 function unpackForSettle(
   wirePayload: AuthCapturePayload,

@@ -1,5 +1,6 @@
 /**
  * Parse chainId from CAIP-2 network identifier
+ *
  * @param network - CAIP-2 network identifier (e.g., 'eip155:84532')
  * @returns The chain ID as a number
  */

@@ -9,6 +9,19 @@
     "url": "https://github.com/BackTrackCo/x402r-scheme.git",
     "directory": "packages/mechanisms/evm"
   },
+  "keywords": [
+    "x402",
+    "x402r",
+    "payment",
+    "protocol",
+    "evm",
+    "ethereum",
+    "authCapture",
+    "refund"
+  ],
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
       "import": {
@@ -66,7 +79,6 @@
   },
   "files": [
     "dist",
-    "src",
     "README.md"
   ],
   "scripts": {
@@ -88,6 +100,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.29.1",
+    "@typescript-eslint/parser": "^8.29.1",
+    "eslint": "^9.24.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsdoc": "^50.6.9",
+    "eslint-plugin-prettier": "^5.2.6",
+    "prettier": "3.5.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"

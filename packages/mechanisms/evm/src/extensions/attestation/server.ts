@@ -26,8 +26,9 @@ export interface AttestationExtensionOptions {
  * sign its responses (e.g., EIP-712) and the client must verify those
  * signatures against a known attestor address.
  *
- * @param attestorUrl - Base URL of the attestor service
- * @param options - Optional configuration
+ * @param attestorUrl - Base URL of the attestor service.
+ * @param options - Optional configuration (`key`, `onError`).
+ * @returns A `ResourceServerExtension` that enriches 402 responses with attestor identity.
  *
  * @example
  * ```ts
@@ -52,7 +53,6 @@ export function createAttestationExtension(
       context: PaymentRequiredContext,
     ) => {
       try {
-        // eslint-disable-next-line no-undef
         const res = await fetch(`${attestorUrl}/attest/identity`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -85,10 +85,11 @@ export function createAttestationExtension(
 }
 
 /**
- * Declare the attestation extension on a route.
- * Only routes with this declaration will include attestation data.
+ * Declare the attestation extension on a route. Only routes with this
+ * declaration emit attestation data in their 402 response.
  *
- * @param key - Extension key (must match the key passed to createAttestationExtension)
+ * @param key - Extension key (must match the one passed to `createAttestationExtension`).
+ * @returns A `route.extensions` record that opts the route into attestation.
  */
 export function declareAttestationExtension(
   key: string = ATTESTATION_KEY,
