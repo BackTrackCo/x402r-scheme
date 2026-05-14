@@ -17,14 +17,18 @@
 
 import type { Address } from "@solana/kit";
 
-/** AuthCapture extra fields living in `PaymentRequirements.extra`. */
+/**
+ * AuthCapture extra fields living in `PaymentRequirements.extra`.
+ *
+ * The escrow and collector program IDs are NOT carried here; they are canonical
+ * per cluster and resolved by both client and facilitator from
+ * `requirements.network` via the SDK pin table in `../shared/constants.ts`.
+ * This mirrors how the EVM scheme resolves the escrow/collector addresses from
+ * canonical universal constants rather than wire fields.
+ */
 export interface AuthCaptureSvmExtra {
   /** Facilitator-supplied feePayer for the partial tx. SVM exact-scheme parity. */
   feePayer: Address;
-  /** Auth-capture-escrow program ID for the cluster. */
-  escrowProgramId: Address;
-  /** Token collector program ID. The pilot ships only `spl-token-collector`. */
-  collectorProgramId: Address;
   /** Pubkey authorized to call authorize/capture/void/refund/charge on the
    *  escrow. Committed on-chain as `paymentInfo.operator`. May be a wallet,
    *  a multisig, or a PDA of any external program. */
@@ -52,8 +56,6 @@ export function isAuthCaptureSvmExtra(value: unknown): value is AuthCaptureSvmEx
   const v = value as Record<string, unknown>;
   return (
     typeof v.feePayer === "string" &&
-    typeof v.escrowProgramId === "string" &&
-    typeof v.collectorProgramId === "string" &&
     typeof v.captureAuthorizer === "string" &&
     typeof v.feeRecipient === "string" &&
     typeof v.captureDeadline === "number" &&

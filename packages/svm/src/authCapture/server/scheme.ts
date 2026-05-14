@@ -1,7 +1,9 @@
 /**
  * AuthCapture (SVM) server scheme. Parses prices, enhances payment
- * requirements with SVM-specific extras (`feePayer`, `escrowProgramId`,
- * `collectorProgramId`, `protocolFeeBps`, `protocolFeeReceiver`).
+ * requirements with SVM-specific extras (`feePayer`, `captureAuthorizer`,
+ * deadlines, fee policy, `protocolFeeBps`, `protocolFeeReceiver`). The escrow
+ * and collector program IDs are canonical per cluster and resolved by clients
+ * and facilitators from `requirements.network`, not carried on the wire.
  *
  * Mirrors EVM `AuthCaptureServerScheme` shape so a merchant can swap
  * `eip155:*` ↔ `solana:*` and the rest of their integration is unchanged.

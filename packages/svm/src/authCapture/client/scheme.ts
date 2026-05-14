@@ -4,8 +4,10 @@
  * Builds a partial-signed Solana transaction whose inner instruction is
  * `auth_capture_escrow::authorize` or `auth_capture_escrow::charge`. Direct
  * port of the EVM commerce-payments flow: client signs an authorization,
- * facilitator submits to escrow. The escrow CPIs into the configured
- * `ITokenCollector` for the actual SPL transfer.
+ * facilitator submits to escrow. The escrow CPIs into the canonical
+ * `spl-token-collector` for the cluster for the actual SPL transfer. Escrow
+ * and collector program IDs are resolved from `requirements.network` via the
+ * SDK pin table — not from `extra`.
  *
  * The captureAuthorizer (= `paymentInfo.operator`) must sign at the partial-tx
  * level (typically the facilitator co-signs as both feePayer and operator
@@ -87,13 +89,8 @@ export class AuthCaptureSvmScheme implements SchemeNetworkClient {
     }
 
     const cluster = parseSvmCluster(requirements.network);
-    const expected = PROGRAM_IDS[cluster];
-    if (extra.escrowProgramId !== expected.authCaptureEscrow) {
-      throw new Error(`extra.escrowProgramId mismatch for ${cluster}`);
-    }
-    if (extra.collectorProgramId !== expected.splTokenCollector) {
-      throw new Error(`extra.collectorProgramId mismatch for ${cluster}`);
-    }
+    const { authCaptureEscrow: escrowProgramId, splTokenCollector: collectorProgramId } =
+      PROGRAM_IDS[cluster];
 
     const rpc = createRpcClient(
       requirements.network as `${string}:${string}`,
@@ -122,8 +119,8 @@ export class AuthCaptureSvmScheme implements SchemeNetworkClient {
     };
 
     const piHash = paymentInfoHash(paymentInfo);
-    const [paymentStatePda] = await findPaymentStatePda(extra.escrowProgramId, piHash);
-    const [protocolFeeConfigPda] = await findProtocolFeeConfigPda(extra.escrowProgramId);
+    const [paymentStatePda] = await findPaymentStatePda(escrowProgramId, piHash);
+    const [protocolFeeConfigPda] = await findProtocolFeeConfigPda(escrowProgramId);
 
     const ataDerivations = await this.deriveAtas(extra, paymentInfo, paymentStatePda, requirements);
 
@@ -134,7 +131,8 @@ export class AuthCaptureSvmScheme implements SchemeNetworkClient {
           amount,
           splits: this.buildChargeSplits(amount, paymentInfo, extra),
           collectorData: new Uint8Array(),
-          extra,
+          escrowProgramId,
+          collectorProgramId,
           accounts: {
             operator: extra.captureAuthorizer,
             paymentStatePda,
@@ -156,7 +154,8 @@ export class AuthCaptureSvmScheme implements SchemeNetworkClient {
           paymentInfo,
           amount,
           collectorData: new Uint8Array(),
-          extra,
+          escrowProgramId,
+          collectorProgramId,
           accounts: {
             operator: extra.captureAuthorizer,
             paymentStatePda,

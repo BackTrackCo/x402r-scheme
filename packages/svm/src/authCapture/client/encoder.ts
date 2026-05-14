@@ -18,7 +18,7 @@ import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 
 import { ESCROW_IX_DISC } from "../shared/constants";
 import { encodePaymentInfo } from "../shared/nonce";
-import type { AuthCaptureSvmExtra, PaymentInfoSvm, SplitEntry } from "../shared/types";
+import type { PaymentInfoSvm, SplitEntry } from "../shared/types";
 
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111" as Address;
 const ASSOC_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address;
@@ -48,7 +48,8 @@ export function encodeEscrowAuthorizeIx(args: {
   paymentInfo: PaymentInfoSvm;
   amount: bigint;
   collectorData: Uint8Array;
-  extra: AuthCaptureSvmExtra;
+  escrowProgramId: Address;
+  collectorProgramId: Address;
   accounts: AuthorizeAccs;
 }): Instruction {
   const data = concat([
@@ -68,7 +69,7 @@ export function encodeEscrowAuthorizeIx(args: {
     meta(a.vaultAta, true, false),
     meta(a.mint, false, false),
     meta(a.rentPayer, true, true),
-    meta(args.extra.collectorProgramId, false, false),
+    meta(args.collectorProgramId, false, false),
     meta(TOKEN_PROGRAM_ADDRESS, false, false),
     meta(ASSOC_TOKEN_PROGRAM_ID, false, false),
     meta(SYSTEM_PROGRAM_ID, false, false),
@@ -81,7 +82,7 @@ export function encodeEscrowAuthorizeIx(args: {
   ];
 
   return {
-    programAddress: args.extra.escrowProgramId,
+    programAddress: args.escrowProgramId,
     accounts,
     data,
   };
@@ -93,7 +94,8 @@ export function encodeEscrowChargeIx(args: {
   amount: bigint;
   splits: SplitEntry[];
   collectorData: Uint8Array;
-  extra: AuthCaptureSvmExtra;
+  escrowProgramId: Address;
+  collectorProgramId: Address;
   accounts: ChargeAccs;
 }): Instruction {
   const data = concat([
@@ -119,7 +121,7 @@ export function encodeEscrowChargeIx(args: {
     meta(a.protocolFeeConfigPda, false, false),
     meta(a.mint, false, false),
     meta(a.rentPayer, true, true),
-    meta(args.extra.collectorProgramId, false, false),
+    meta(args.collectorProgramId, false, false),
     meta(TOKEN_PROGRAM_ADDRESS, false, false),
     meta(ASSOC_TOKEN_PROGRAM_ID, false, false),
     meta(SYSTEM_PROGRAM_ID, false, false),
@@ -132,7 +134,7 @@ export function encodeEscrowChargeIx(args: {
   ];
 
   return {
-    programAddress: args.extra.escrowProgramId,
+    programAddress: args.escrowProgramId,
     accounts,
     data,
   };

@@ -80,13 +80,7 @@ export class AuthCaptureSvmFacilitatorScheme implements SchemeNetworkFacilitator
     const wirePayload = payload.payload as AuthCaptureSvmPayload;
 
     const cluster = parseSvmCluster(requirements.network);
-    const expected = PROGRAM_IDS[cluster];
-    if (
-      extra.escrowProgramId !== expected.authCaptureEscrow ||
-      extra.collectorProgramId !== expected.splTokenCollector
-    ) {
-      return { isValid: false, invalidReason: "program_id_mismatch", payer: "" };
-    }
+    const { authCaptureEscrow: escrowProgramId } = PROGRAM_IDS[cluster];
 
     const signerAddresses = this.signer.getAddresses().map(a => a.toString());
     if (!signerAddresses.includes(extra.feePayer)) {
@@ -123,7 +117,7 @@ export class AuthCaptureSvmFacilitatorScheme implements SchemeNetworkFacilitator
     }
 
     const inner = instructions[2];
-    if (inner.programAddress.toString() !== extra.escrowProgramId) {
+    if (inner.programAddress.toString() !== escrowProgramId) {
       return { isValid: false, invalidReason: "wrong_program_id", payer: "" };
     }
 
