@@ -15,7 +15,7 @@ This scheme facilitates payments of an SPL token where funds can be held in escr
 The protocol flow for `authCapture` on Solana is client-driven. The initial settlement instruction is selected by `extra.autoCapture`: `false` (default) locks funds in escrow for later capture; `true` settles atomically.
 
 1.  **Client** makes a request to a **Resource Server**.
-2.  **Resource Server** responds with a payment required signal containing `PaymentRequired`. The `extra` field in the requirements carries the `feePayer` (typically the facilitator), the `escrowProgramId` and `collectorProgramId`, the `captureAuthorizer` authorized to capture/void/refund, the deadlines, and the fee policy.
+2.  **Resource Server** responds with a payment required signal containing `PaymentRequired`. The `extra` field in the requirements carries the `feePayer` (typically the facilitator), the `captureAuthorizer` authorized to capture/void/refund, the deadlines, and the fee policy. The escrow and collector program IDs are canonical per cluster and resolved from `requirements.network` by the SDK; they are not carried on the wire.
 3.  **Client** creates a Solana transaction whose only meaningful inner instruction is `auth_capture_escrow::authorize` (when `autoCapture: false`) or `auth_capture_escrow::charge` (when `autoCapture: true`). The instruction data Borsh-encodes a `PaymentInfo` struct that binds every payment parameter, including a fresh client-generated 32-byte salt.
 4.  **Client** signs the transaction with their wallet. This results in a partially-signed transaction (the facilitator's signature as `feePayer`, and the captureAuthorizer's signature as `paymentInfo.operator`, are still missing).
 5.  **Client** serializes the partially-signed transaction and encodes it as a Base64 string.
@@ -25,7 +25,7 @@ The protocol flow for `authCapture` on Solana is client-driven. The initial sett
 9.  **Facilitator** returns a `VerifyResponse` to the **Resource Server**.
 10. **Resource Server**, upon successful verification, forwards the payload to the facilitator's `/settle` endpoint.
 11. **Facilitator Server** provides its signatures as `feePayer` (and as `captureAuthorizer` if it is also the captureAuthorizer) and submits the now fully-signed transaction.
-12. The escrow CPIs into the configured `ITokenCollector` to move funds (payer ATA → vault for `authorize`, vault → splits for `charge`). For `charge`, distribution to receiver / protocol-fee / operator-fee ATAs happens in the same instruction.
+12. The escrow CPIs into the canonical `spl-token-collector` for the cluster to move funds (payer ATA → vault for `authorize`, vault → splits for `charge`). For `charge`, distribution to receiver / protocol-fee / operator-fee ATAs happens in the same instruction.
 13. Upon successful on-chain settlement, the **Facilitator Server** responds with a `SettlementResponse` to the **Resource Server**.
 14. **Resource Server** grants the **Client** access to the resource in its response.
 
@@ -45,8 +45,6 @@ In addition to the standard x402 `PaymentRequirements` fields, the `authCapture`
   "maxTimeoutSeconds": 60,
   "extra": {
     "feePayer": "FacilitatorFeePayerPubkey...",
-    "escrowProgramId": "AuthCaptureEscrowProgramIdForCluster...",
-    "collectorProgramId": "SplTokenCollectorProgramIdForCluster...",
     "captureAuthorizer": "CaptureAuthorizerPubkey...",
     "captureDeadline": 1740758554,
     "refundDeadline": 1741276954,
@@ -62,8 +60,6 @@ In addition to the standard x402 `PaymentRequirements` fields, the `authCapture`
 
 - `asset`: The public key of the token mint.
 - `extra.feePayer`: The public key of the account that will pay for the transaction fees. Typically the facilitator's public key.
-- `extra.escrowProgramId`: The `auth-capture-escrow` program ID for the cluster.
-- `extra.collectorProgramId`: The `ITokenCollector` program ID. The pilot ships `spl-token-collector`.
 - `extra.captureAuthorizer`: The public key authorized to call `authorize`, `capture`, `void`, `refund`, or `charge`. Committed on-chain as `paymentInfo.operator`. In x402's facilitator-submits flow this is typically the facilitator itself.
 - `extra.captureDeadline`: Absolute Unix seconds. The captureAuthorizer must capture before this time. Committed on-chain as `paymentInfo.authorization_expiry`. After this passes, the payer can call `reclaim`.
 - `extra.refundDeadline`: Absolute Unix seconds. Refunds are allowed until this time. Committed on-chain as `paymentInfo.refund_expiry`. MUST satisfy `refundDeadline >= captureDeadline`.
@@ -106,8 +102,6 @@ Full `PaymentPayload` object:
     "maxTimeoutSeconds": 60,
     "extra": {
       "feePayer": "FacilitatorFeePayerPubkey...",
-      "escrowProgramId": "AuthCaptureEscrowProgramIdForCluster...",
-      "collectorProgramId": "SplTokenCollectorProgramIdForCluster...",
       "captureAuthorizer": "CaptureAuthorizerPubkey...",
       "captureDeadline": 1740758554,
       "refundDeadline": 1741276954,
@@ -156,7 +150,7 @@ A facilitator verifying an `authCapture`-scheme SVM payment MUST enforce all of 
 
 2. Inner program identity
 
-- The inner instruction's `programAddress` MUST equal `extra.escrowProgramId`.
+- The inner instruction's `programAddress` MUST equal the canonical `AUTH_CAPTURE_ESCROW_PROGRAM_ID` for `requirements.network` (resolved from the per-cluster pin table).
 
 3. Fee payer (facilitator) safety
 
@@ -191,6 +185,12 @@ A facilitator verifying an `authCapture`-scheme SVM payment MUST enforce all of 
 - The facilitator MUST sign the transaction as `feePayer`, simulate it, and reject on simulation failure.
 
 These checks are security-critical to ensure the fee payer cannot be tricked into transferring their own funds or sponsoring unintended actions. Implementations MAY introduce stricter limits (e.g., lower compute price caps) but MUST NOT relax the above constraints.
+
+## Canonical Program IDs
+
+SVM program IDs are keypair-derived, so the `auth-capture-escrow` and `spl-token-collector` programs have different IDs per cluster (mainnet-beta, devnet). The canonical IDs are pinned in the SDK keyed by `requirements.network` (`solana:<cluster-genesis-hash>`). They are not transmitted on the wire; clients and facilitators resolve them from `requirements.network`. This mirrors how the EVM scheme resolves the escrow and token-collector addresses from canonical universal constants rather than wire fields.
+
+`PaymentRequirements` is therefore SDK-version-coupled per cluster: a deploy of new canonical program IDs requires an SDK pin-table update.
 
 ## `ITokenCollector` Interface
 
