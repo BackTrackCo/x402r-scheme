@@ -16,7 +16,7 @@
     "@x402r/evm": "workspace:*",
     "dotenv": "^16.4.7",
     "express": "^4.19.2",
-    "viem": "^2.45.0"
+    "viem": "^2.48.11"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
