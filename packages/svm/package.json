@@ -1,0 +1,90 @@
+{
+  "name": "@x402r/svm",
+  "version": "0.2.0",
+  "description": "AuthCapture payment scheme for x402 on Solana (pilot, unaudited)",
+  "license": "MIT",
+  "author": "x402r",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BackTrackCo/x402r-scheme.git",
+    "directory": "packages/svm"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.mts",
+        "default": "./dist/esm/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./authCapture/client": {
+      "import": {
+        "types": "./dist/esm/authCapture/client/index.d.mts",
+        "default": "./dist/esm/authCapture/client/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/authCapture/client/index.d.ts",
+        "default": "./dist/cjs/authCapture/client/index.js"
+      }
+    },
+    "./authCapture/server": {
+      "import": {
+        "types": "./dist/esm/authCapture/server/index.d.mts",
+        "default": "./dist/esm/authCapture/server/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/authCapture/server/index.d.ts",
+        "default": "./dist/cjs/authCapture/server/index.js"
+      }
+    },
+    "./authCapture/facilitator": {
+      "import": {
+        "types": "./dist/esm/authCapture/facilitator/index.d.mts",
+        "default": "./dist/esm/authCapture/facilitator/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/authCapture/facilitator/index.d.ts",
+        "default": "./dist/cjs/authCapture/facilitator/index.js"
+      }
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint .",
+    "format": "prettier -c .prettierrc --write \"**/*.{ts,js,cjs,json,md}\"",
+    "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\""
+  },
+  "peerDependencies": {
+    "@x402/core": "^2.4.0",
+    "@x402/svm": "^2.5.0",
+    "@solana/kit": ">=5.1.0"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.5.0",
+    "@solana-program/compute-budget": "^0.11.0",
+    "@solana-program/token": "^0.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}
