@@ -40,7 +40,12 @@ export interface AuthCaptureExtra {
 }
 
 /**
- * Type guard for AuthCaptureExtra.
+ * Type guard for AuthCaptureExtra. Checks the structural shape an authCapture
+ * scheme requires inside `PaymentRequirements.extra`: every spec-mandated
+ * required field present with the right primitive type.
+ *
+ * @param value - Candidate object from `requirements.extra`.
+ * @returns True if `value` has every required AuthCaptureExtra field.
  */
 export function isAuthCaptureExtra(value: unknown): value is AuthCaptureExtra {
   if (typeof value !== "object" || value === null) return false;
@@ -72,7 +77,12 @@ export interface Eip3009Payload {
 }
 
 /**
- * Type guard for Eip3009Payload.
+ * Type guard for an EIP-3009-shaped authCapture payload. Checks for an
+ * `authorization` object plus the required `signature` and `salt` fields;
+ * field-level validation happens later in `verify()`.
+ *
+ * @param value - Candidate payment payload from the wire.
+ * @returns True if `value` has the EIP-3009 envelope shape.
  */
 export function isEip3009Payload(value: unknown): value is Eip3009Payload {
   if (typeof value !== "object" || value === null) return false;
@@ -103,7 +113,12 @@ export interface Permit2Payload {
 }
 
 /**
- * Type guard for Permit2Payload.
+ * Type guard for a Permit2-shaped authCapture payload. Checks for the
+ * `permit2Authorization` envelope (with `from`, `spender`, `nonce`,
+ * `deadline`, `permitted`) plus the required `signature` and `salt` fields.
+ *
+ * @param value - Candidate payment payload from the wire.
+ * @returns True if `value` has the Permit2 envelope shape.
  */
 export function isPermit2Payload(value: unknown): value is Permit2Payload {
   if (typeof value !== "object" || value === null) return false;
@@ -125,7 +140,11 @@ export function isPermit2Payload(value: unknown): value is Permit2Payload {
 export type AuthCapturePayload = Eip3009Payload | Permit2Payload;
 
 /**
- * Type guard for any authCapture payload (EIP-3009 or Permit2).
+ * Type guard for any authCapture payload. Returns true if `value` matches
+ * either the EIP-3009 envelope or the Permit2 envelope.
+ *
+ * @param value - Candidate payment payload from the wire.
+ * @returns True if `value` is a valid authCapture envelope of either shape.
  */
 export function isAuthCapturePayload(value: unknown): value is AuthCapturePayload {
   return isEip3009Payload(value) || isPermit2Payload(value);

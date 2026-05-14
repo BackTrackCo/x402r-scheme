@@ -22,12 +22,19 @@ const PAYMENT_INFO_TYPEHASH = keccak256(
 );
 
 /**
- * Compute the payer-agnostic PaymentInfo hash. Used as the ERC-3009 nonce
- * (bytes32) and as the Permit2 nonce (uint256). Payer is zeroed so the same
- * hash can be reconstructed by the facilitator regardless of who pays.
+ * Compute the payer-agnostic PaymentInfo hash that authCapture uses as both
+ * the ERC-3009 nonce (`bytes32`) and the Permit2 nonce (`uint256`, via the
+ * same 32 bytes interpreted as an integer). The payer field is zeroed before
+ * hashing so the facilitator can reconstruct the same hash on the verify side
+ * without knowing payer identity in advance.
  *
- * Freshness is the responsibility of `paymentInfo.salt` — generate a new salt
- * per signing call (see `generateSalt`).
+ * Freshness comes from `paymentInfo.salt`; generate a new salt per signing
+ * call via `generateSalt`. Identical extras + same salt would collide across
+ * payers.
+ *
+ * @param chainId - EVM chain id; binds the hash to a specific chain.
+ * @param paymentInfo - The reconstructed PaymentInfo struct (canonical Solidity field names).
+ * @returns The 32-byte hash to use as the nonce on the wire.
  */
 export function computePayerAgnosticPaymentInfoHash(
   chainId: number,
@@ -80,9 +87,17 @@ export function computePayerAgnosticPaymentInfoHash(
 }
 
 /**
- * Sign ERC-3009 ReceiveWithAuthorization. The token's EIP-712 domain (name,
- * version) comes from `extra` because it varies per asset (e.g. "USDC" on
- * Sepolia, "USD Coin" on mainnet).
+ * Sign an ERC-3009 `ReceiveWithAuthorization` over the supplied authorization
+ * fields. The EIP-712 domain is bound to the **token contract** (not the
+ * escrow), so the token's `name` and `version` come from `extra` because they
+ * vary per asset (e.g. `"USDC"` on Sepolia vs `"USD Coin"` on mainnet).
+ *
+ * @param signer - Client signer with `signTypedData`.
+ * @param authorization - The ERC-3009 authorization to sign.
+ * @param extra - Carries the token EIP-712 domain `name` + `version`.
+ * @param tokenAddress - Address of the token contract (verifyingContract in the domain).
+ * @param chainId - EVM chain id (chainId in the domain).
+ * @returns The 65-byte ECDSA signature (or EIP-1271 / EIP-6492 envelope, depending on the signer).
  */
 export async function signERC3009(
   signer: ClientEvmSigner,
@@ -116,7 +131,19 @@ export async function signERC3009(
 }
 
 /**
- * Verify ERC-3009 ReceiveWithAuthorization signature.
+ * Verify an ERC-3009 `ReceiveWithAuthorization` signature against the supplied
+ * authorization fields. Mirrors `signERC3009`: the EIP-712 domain is bound to
+ * the **token contract**, with `name`/`version` from `extra`. Wraps errors
+ * (smart-wallet `isValidSignature` reverts, EIP-6492 issues) and returns false
+ * rather than throwing.
+ *
+ * @param signer - Facilitator-side verifier with `verifyTypedData`.
+ * @param signer.verifyTypedData - Method that recovers and validates the typed-data signature.
+ * @param authorization - The ERC-3009 authorization to verify.
+ * @param signature - The signature blob from the payer.
+ * @param extra - Carries the token EIP-712 domain `name`, `version`, and the chain id.
+ * @param tokenAddress - Address of the token contract (verifyingContract in the domain).
+ * @returns True if the signature recovers to `authorization.from`; false on any error.
  */
 export async function verifyERC3009Signature(
   signer: {
@@ -165,9 +192,16 @@ export async function verifyERC3009Signature(
 }
 
 /**
- * Sign Permit2 PermitTransferFrom. No witness — the deterministic nonce
- * (payer-agnostic PaymentInfo hash) cryptographically binds all payment
- * parameters including the merchant address.
+ * Sign a Permit2 `PermitTransferFrom` over the supplied permit fields. Domain
+ * is bound to the canonical Permit2 contract. No witness struct is needed —
+ * the deterministic nonce (the payer-agnostic PaymentInfo hash, packed into
+ * uint256) cryptographically binds all payment parameters including receiver,
+ * amount, and deadlines.
+ *
+ * @param signer - Client signer with `signTypedData`.
+ * @param permit - The Permit2 PermitTransferFrom message to sign.
+ * @param chainId - EVM chain id (chainId in the Permit2 domain).
+ * @returns The 65-byte ECDSA signature (or EIP-1271 / EIP-6492 envelope, depending on the signer).
  */
 export async function signPermit2(
   signer: ClientEvmSigner,
@@ -199,7 +233,16 @@ export async function signPermit2(
 }
 
 /**
- * Verify Permit2 PermitTransferFrom signature.
+ * Verify a Permit2 `PermitTransferFrom` signature against the supplied permit
+ * fields. Mirrors `signPermit2`: domain bound to the canonical Permit2
+ * contract. Wraps errors and returns false rather than throwing.
+ *
+ * @param signer - Facilitator-side verifier with `verifyTypedData`.
+ * @param signer.verifyTypedData - Method that recovers and validates the typed-data signature.
+ * @param permit - The Permit2 PermitTransferFrom message to verify.
+ * @param signature - The signature blob from the payer.
+ * @param chainId - EVM chain id (chainId in the Permit2 domain).
+ * @returns True if the signature recovers to `permit.from`; false on any error.
  */
 export async function verifyPermit2Signature(
   signer: {
@@ -251,6 +294,8 @@ export async function verifyPermit2Signature(
  * per signing request — never reuse across requests. Freshness is required
  * because the nonce derivation zeroes the payer field; identical extras with
  * the same salt would collide across payers.
+ *
+ * @returns A new 32-byte salt as a `0x`-prefixed hex string.
  */
 export function generateSalt(): `0x${string}` {
   const bytes = new Uint8Array(32);

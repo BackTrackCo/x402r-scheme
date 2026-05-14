@@ -29,17 +29,38 @@ import type { AuthCaptureExtra, Eip3009Payload, PaymentInfoStruct, Permit2Payloa
 import { parseChainId } from "../utils";
 
 /**
- * AuthCapture Client Scheme - implements x402's SchemeNetworkClient
+ * Client-side implementation of the authCapture scheme: derives the canonical
+ * payer-agnostic PaymentInfo hash, signs an ERC-3009 ReceiveWithAuthorization
+ * (default) or a Permit2 PermitTransferFrom against it, and returns a wire
+ * payload the facilitator can settle. Implements `SchemeNetworkClient`.
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkClient {
   readonly scheme = AUTH_CAPTURE_SCHEME;
 
+  /**
+   * Construct a client-side authCapture scheme bound to a specific signer.
+   *
+   * @param signer - Client-side signer that exposes `address` and `signTypedData`.
+   */
   constructor(private readonly signer: ClientEvmSigner) {}
 
+  /**
+   * Build and sign an authCapture payment payload for the given requirements.
+   * Validates all spec-mandated `extra` fields and the asset-transfer method
+   * (default `eip3009`, alternative `permit2`), reconstructs the on-chain
+   * PaymentInfo struct, computes its payer-agnostic hash, and returns the
+   * signed wire payload.
+   *
+   * @param x402Version - Wire protocol version; only `2` is supported.
+   * @param requirements - Resource server's payment requirements (includes scheme `extra`).
+   * @param _ - Unused FacilitatorContext (interface compatibility).
+   * @returns The signed wire payload tagged with the x402 protocol version.
+   * @throws If `x402Version !== 2` or any required `extra` field is missing.
+   */
   async createPaymentPayload(
     x402Version: number,
     requirements: PaymentRequirements,
-    _context?: PaymentPayloadContext,
+    _?: PaymentPayloadContext,
   ): Promise<PaymentPayloadResult> {
     if (x402Version !== 2) {
       throw new Error(`Unsupported x402Version: ${x402Version}. Only version 2 is supported.`);
