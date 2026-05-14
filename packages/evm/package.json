@@ -9,6 +9,19 @@
     "url": "https://github.com/BackTrackCo/x402r-scheme.git",
     "directory": "packages/evm"
   },
+  "keywords": [
+    "x402",
+    "x402r",
+    "payment",
+    "protocol",
+    "evm",
+    "ethereum",
+    "authCapture",
+    "refund"
+  ],
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
       "import": {
@@ -66,7 +79,6 @@
   },
   "files": [
     "dist",
-    "src",
     "README.md"
   ],
   "scripts": {
