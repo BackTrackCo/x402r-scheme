@@ -4,7 +4,7 @@ AuthCapture payment scheme for x402 using Base Commerce Payments.
 
 ## Packages
 
-- **[@x402r/evm](./packages/evm)** - AuthCapture scheme implementation for EVM chains
+- **[@x402r/evm](./packages/mechanisms/evm)** - AuthCapture scheme implementation for EVM chains
 
 ## Installation
 

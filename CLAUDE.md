@@ -10,7 +10,7 @@ pnpm build / pnpm test / pnpm format
 
 ## Structure
 
-Single package `@x402r/evm` at `packages/evm/`:
+Single package `@x402r/evm` at `packages/mechanisms/evm/`:
 
 ```
 authCapture/client      → createPaymentPayload()
