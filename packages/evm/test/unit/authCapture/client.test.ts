@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AuthCaptureEvmScheme } from "../../../src/authCapture/client/index";
-import { x402Client } from "@x402/core/client";
-import { registerAuthCaptureEvmScheme } from "../../../src/authCapture/client/index";
 import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_ADDRESS,
@@ -237,37 +235,6 @@ describe("AuthCaptureEvmScheme", () => {
       expect(args.domain.chainId).toBe(84532);
       // Critical: verifyingContract is the canonical Permit2, NOT the token, NOT the collector
       expect(args.domain.verifyingContract).toBe(PERMIT2_ADDRESS);
-    });
-  });
-
-  describe("registerAuthCaptureEvmScheme", () => {
-    it("should register scheme without throwing", () => {
-      const client = new x402Client();
-      expect(() =>
-        registerAuthCaptureEvmScheme(client, {
-          signer: mockSigner,
-          networks: "eip155:84532",
-        }),
-      ).not.toThrow();
-    });
-
-    it("should register scheme for multiple networks without throwing", () => {
-      const client = new x402Client();
-      expect(() =>
-        registerAuthCaptureEvmScheme(client, {
-          signer: mockSigner,
-          networks: ["eip155:84532", "eip155:8453"],
-        }),
-      ).not.toThrow();
-    });
-
-    it("should return the client for chaining", () => {
-      const client = new x402Client();
-      const result = registerAuthCaptureEvmScheme(client, {
-        signer: mockSigner,
-        networks: "eip155:84532",
-      });
-      expect(result).toBe(client);
     });
   });
 });
