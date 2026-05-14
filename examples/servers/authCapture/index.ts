@@ -3,21 +3,22 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { config } from "dotenv";
 import express from "express";
+import { isAddress, zeroAddress } from "viem";
 
 config();
 
 const NETWORK = "eip155:84532" as const;
-const PORT = Number(process.env.PORT || "4021");
+const PORT = Number(process.env.PORT?.trim() || "4021");
 
-const evmAddress = process.env.EVM_ADDRESS as `0x${string}` | undefined;
-const captureAuthorizer = process.env.CAPTURE_AUTHORIZER as `0x${string}` | undefined;
-const facilitatorUrl = process.env.FACILITATOR_URL;
+const evmAddress = process.env.EVM_ADDRESS?.trim() as `0x${string}` | undefined;
+const captureAuthorizer = process.env.CAPTURE_AUTHORIZER?.trim() as `0x${string}` | undefined;
+const facilitatorUrl = process.env.FACILITATOR_URL?.trim();
 
-if (!evmAddress || !/^0x[0-9a-fA-F]{40}$/.test(evmAddress)) {
-  console.error("Missing or invalid EVM_ADDRESS (checksummed 20-byte hex, 0x-prefixed)");
+if (!evmAddress || !isAddress(evmAddress)) {
+  console.error("Missing or invalid EVM_ADDRESS");
   process.exit(1);
 }
-if (!captureAuthorizer || !/^0x[0-9a-fA-F]{40}$/.test(captureAuthorizer)) {
+if (!captureAuthorizer || !isAddress(captureAuthorizer)) {
   console.error("Missing or invalid CAPTURE_AUTHORIZER");
   process.exit(1);
 }
@@ -54,7 +55,10 @@ app.use(
             captureAuthorizer,
             captureDeadline,
             refundDeadline,
-            feeRecipient: captureAuthorizer,
+            // address(0) lets the captureAuthorizer pick any non-zero fee
+            // recipient at capture/charge time (deferred selection, per spec).
+            // Production setups can pin a specific receiver instead.
+            feeRecipient: zeroAddress,
             minFeeBps: 0,
             maxFeeBps: 100,
             name: "USDC",

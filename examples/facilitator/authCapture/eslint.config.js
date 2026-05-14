@@ -16,6 +16,7 @@ export default [
       ecmaVersion: 2020,
       globals: {
         process: "readonly",
+        console: "readonly",
         __dirname: "readonly",
         module: "readonly",
         require: "readonly",

@@ -7,28 +7,27 @@ import {
   VerifyResponse,
 } from "@x402/core/types";
 import { toFacilitatorEvmSigner } from "@x402/evm";
-import dotenv from "dotenv";
+import { config } from "dotenv";
 import express from "express";
 import { createWalletClient, http, nonceManager, publicActions } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
-dotenv.config();
+config();
 
-const PORT = Number(process.env.PORT || "4022");
+const PORT = Number(process.env.PORT?.trim() || "4022");
 const NETWORK = "eip155:84532" as const;
-const evmRpcUrl = process.env.EVM_RPC_URL ?? "https://sepolia.base.org";
+const evmRpcUrl = process.env.EVM_RPC_URL?.trim() || "https://sepolia.base.org";
+const evmPrivateKey = process.env.EVM_PRIVATE_KEY?.trim() as `0x${string}` | undefined;
 
-if (!process.env.EVM_PRIVATE_KEY) {
+if (!evmPrivateKey) {
   console.error("EVM_PRIVATE_KEY environment variable is required");
   process.exit(1);
 }
 
-const evmAccount = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`, {
-  nonceManager,
-});
+const evmAccount = privateKeyToAccount(evmPrivateKey, { nonceManager });
 
-console.info(`EVM Facilitator account: ${evmAccount.address}`);
+console.log(`EVM Facilitator account: ${evmAccount.address}`);
 
 const viemClient = createWalletClient({
   account: evmAccount,

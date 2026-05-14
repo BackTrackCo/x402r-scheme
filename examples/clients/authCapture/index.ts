@@ -5,10 +5,16 @@ import { privateKeyToAccount } from "viem/accounts";
 
 config();
 
-const evmPrivateKey = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
-const baseURL = process.env.RESOURCE_SERVER_URL || "http://localhost:4021";
-const endpointPath = process.env.ENDPOINT_PATH || "/weather";
+const evmPrivateKeyRaw = process.env.EVM_PRIVATE_KEY?.trim();
+const baseURL = process.env.RESOURCE_SERVER_URL?.trim() || "http://localhost:4021";
+const endpointPath = process.env.ENDPOINT_PATH?.trim() || "/weather";
 const url = `${baseURL}${endpointPath}`;
+
+if (!evmPrivateKeyRaw) {
+  console.error("EVM_PRIVATE_KEY environment variable is required");
+  process.exit(1);
+}
+const evmPrivateKey = evmPrivateKeyRaw as `0x${string}`;
 
 /**
  * Runs a single paid request against an authCapture-protected endpoint.
@@ -21,11 +27,6 @@ const url = `${baseURL}${endpointPath}`;
  * @returns Resolves after the request completes and the payment response is logged.
  */
 async function main(): Promise<void> {
-  if (!evmPrivateKey) {
-    console.error("EVM_PRIVATE_KEY environment variable is required");
-    process.exit(1);
-  }
-
   const evmAccount = privateKeyToAccount(evmPrivateKey);
 
   const client = new x402Client();

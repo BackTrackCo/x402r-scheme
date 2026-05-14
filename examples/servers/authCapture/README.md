@@ -9,7 +9,7 @@ Express resource server protected by the [authCapture](../../../specs/schemes/au
 - Node.js v20+, pnpm v10
 - A running [authCapture facilitator](../../facilitator/authCapture)
 - An EVM address to receive payments (`EVM_ADDRESS`)
-- The address that holds capture authority (`CAPTURE_AUTHORIZER`). Per [spec](../../../specs/schemes/authCapture/scheme_authCapture_evm.md), in a facilitator-submits flow this must be **either the facilitator's EOA** (so the facilitator's transaction passes the escrow's `onlySender(paymentInfo.operator)` gate) **or a smart contract** that forwards calls to the escrow (the contract then becomes `msg.sender` at escrow). The SDK auto-detects which via `getCode`. An arbitrary EOA different from the facilitator's submitter will fail with `invalid_capture_authorizer`.
+- The address that holds capture authority (`CAPTURE_AUTHORIZER`). Per [spec](../../../specs/schemes/authCapture/scheme_authCapture_evm.md), in a facilitator-submits flow this must be **either the facilitator's EOA** (so the facilitator's transaction passes the escrow's `onlySender(paymentInfo.operator)` gate) **or a smart contract** that forwards calls to the escrow (the contract then becomes `msg.sender` at escrow). The SDK auto-detects which via `getCode`. If neither condition holds (e.g., an unrelated EOA), the escrow's `onlySender` gate reverts with `InvalidSender` during the facilitator's verify-step simulation, which the SDK maps to `invalid_capture_authorizer` on the `VerifyResponse`.
 
 ## Setup
 
