@@ -138,6 +138,15 @@ facilitator.register("eip155:84532", new AuthCaptureEvmScheme(evmSigner));
 
 `settle` re-verifies then submits `authorize` (two-phase) or `charge` (single-shot) to the escrow contract, or — if the `captureAuthorizer` is a smart contract — routes the call through that contract (auto-detected, see below).
 
+## Supported Networks
+
+| Network      | CAIP-2 ID      |
+| ------------ | -------------- |
+| Base Mainnet | `eip155:8453`  |
+| Base Sepolia | `eip155:84532` |
+
+Requires the canonical `AuthCaptureEscrow` and EIP-3009 / Permit2 token collectors deployed at universal CREATE2 addresses on the target network. The constants live in [`./constants.ts`](./constants.ts).
+
 ## Settle Paths
 
 | `autoCapture` | Contract call | Settlement semantics |
@@ -167,20 +176,13 @@ The SDK auto-detects which path applies via `getCode(captureAuthorizer)`: empty 
 
 If neither condition holds (e.g., an unrelated EOA), the escrow's `onlySender` gate reverts with `InvalidSender` during the verify-step simulation, which the SDK maps to `invalid_capture_authorizer` on the `VerifyResponse`.
 
-## Supported Networks
-
-Both the `AuthCaptureEscrow` and the canonical EIP-3009 / Permit2 token collectors are deployed via universal CREATE2 to the same addresses on every supported chain. As of writing: **Base** (`eip155:8453`) and **Base Sepolia** (`eip155:84532`). The constants live in [`./constants.ts`](./constants.ts).
-
 ## Examples
 
-| Role | Example |
-| --- | --- |
-| Client | [`examples/clients/authCapture`](../../../../../examples/clients/authCapture) |
-| Server | [`examples/servers/authCapture`](../../../../../examples/servers/authCapture) |
-| Facilitator | [`examples/facilitator/authCapture`](../../../../../examples/facilitator/authCapture) |
+- [Client example](../../../../../examples/clients/authCapture)
+- [Server example](../../../../../examples/servers/authCapture)
+- [Facilitator example](../../../../../examples/facilitator/authCapture)
 
 ## See Also
 
 - [Scheme specification](https://github.com/x402-foundation/x402/blob/main/specs/schemes/authCapture/scheme_authCapture_evm.md)
 - [`AuthCaptureEscrow` contract](https://github.com/base/commerce-payments)
-- [`@x402r/evm` package README](../../README.md)
