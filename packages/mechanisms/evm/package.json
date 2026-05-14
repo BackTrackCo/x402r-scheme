@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/BackTrackCo/x402r-scheme.git",
-    "directory": "packages/evm"
+    "directory": "packages/mechanisms/evm"
   },
   "keywords": [
     "x402",
@@ -106,7 +106,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jsdoc": "^50.6.9",
     "eslint-plugin-prettier": "^5.2.6",
-    "prettier": "^3.4.0",
+    "prettier": "3.5.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"
