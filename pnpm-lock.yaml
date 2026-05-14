@@ -30,13 +30,13 @@ importers:
   examples/clients/authCapture:
     dependencies:
       '@x402/core':
-        specifier: ^2.4.0
-        version: 2.8.0
+        specifier: ^2.12.0
+        version: 2.12.0
       '@x402/evm':
-        specifier: ^2.0.0
-        version: 2.3.0(typescript@5.9.3)
+        specifier: ^2.12.0
+        version: 2.12.0(typescript@5.9.3)
       '@x402/fetch':
-        specifier: ^2.0.0
+        specifier: ^2.12.0
         version: 2.12.0
       '@x402r/evm':
         specifier: workspace:*
@@ -45,8 +45,8 @@ importers:
         specifier: ^16.4.7
         version: 16.6.1
       viem:
-        specifier: ^2.0.0
-        version: 2.45.0(typescript@5.9.3)(zod@3.25.76)
+        specifier: ^2.45.0
+        version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -82,11 +82,11 @@ importers:
   examples/facilitator/authCapture:
     dependencies:
       '@x402/core':
-        specifier: ^2.4.0
-        version: 2.8.0
+        specifier: ^2.12.0
+        version: 2.12.0
       '@x402/evm':
-        specifier: ^2.0.0
-        version: 2.3.0(typescript@5.9.3)
+        specifier: ^2.12.0
+        version: 2.12.0(typescript@5.9.3)
       '@x402r/evm':
         specifier: workspace:*
         version: link:../../../packages/evm
@@ -97,8 +97,8 @@ importers:
         specifier: ^4.19.2
         version: 4.22.2
       viem:
-        specifier: ^2.0.0
-        version: 2.45.0(typescript@5.9.3)(zod@3.25.76)
+        specifier: ^2.45.0
+        version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
     devDependencies:
       '@types/express':
         specifier: ^4.17.21
@@ -137,13 +137,13 @@ importers:
   examples/servers/authCapture:
     dependencies:
       '@x402/core':
-        specifier: ^2.4.0
-        version: 2.8.0
+        specifier: ^2.12.0
+        version: 2.12.0
       '@x402/evm':
-        specifier: ^2.0.0
-        version: 2.3.0(typescript@5.9.3)
+        specifier: ^2.12.0
+        version: 2.12.0(typescript@5.9.3)
       '@x402/express':
-        specifier: ^2.0.0
+        specifier: ^2.12.0
         version: 2.12.0(express@4.22.2)(typescript@5.9.3)
       '@x402r/evm':
         specifier: workspace:*
@@ -155,8 +155,8 @@ importers:
         specifier: ^4.19.2
         version: 4.22.2
       viem:
-        specifier: ^2.0.0
-        version: 2.45.0(typescript@5.9.3)(zod@3.25.76)
+        specifier: ^2.45.0
+        version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
     devDependencies:
       '@types/express':
         specifier: ^4.17.21
@@ -766,6 +766,9 @@ packages:
 
   '@x402/core@2.8.0':
     resolution: {integrity: sha512-ppsvSzyWzlqG+26dcNzOXo/YLaHreWc3lmdv9W81mEhLDWMdPpiGyRjSUyO9BQFuQJMQppvqA7ujUbLE/EaDkg==}
+
+  '@x402/evm@2.12.0':
+    resolution: {integrity: sha512-kZUoHPVdBS8wlTg5K1eoh/1V0+5n9ABGRPC5DOQwRlkAwIrAFOEi2pQE+jgvOx0iM5ib2xj9gJjpldRbasX12w==}
 
   '@x402/evm@2.3.0':
     resolution: {integrity: sha512-VzjS5k0EiQQ8+MKVMth1/tHgeAW2j2LRi/JLqKd1UVRe8X2tkcgItvRnZzX6kSrlta8e3iKngVu9GMKIIkrI8Q==}
@@ -2715,10 +2718,20 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
+  '@x402/evm@2.12.0(typescript@5.9.3)':
+    dependencies:
+      '@x402/core': 2.12.0
+      viem: 2.48.11(typescript@5.9.3)(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
   '@x402/evm@2.3.0(typescript@5.9.3)':
     dependencies:
       '@x402/core': 2.3.0
-      viem: 2.45.0(typescript@5.9.3)(zod@3.25.76)
+      viem: 2.48.11(typescript@5.9.3)(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - bufferutil
