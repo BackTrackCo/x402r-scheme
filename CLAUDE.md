@@ -13,10 +13,10 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/mechanisms/evm/`:
 
 ```
-authCapture/client      → createPaymentPayload()
-authCapture/server      → AuthCaptureServerScheme
-authCapture/facilitator → Settlement and verification
-authCapture/shared      → types, constants, nonce + signing helpers
+authCapture/client      → AuthCaptureEvmScheme (createPaymentPayload)
+authCapture/server      → AuthCaptureEvmScheme (parsePrice, enhancePaymentRequirements)
+authCapture/facilitator → AuthCaptureEvmScheme (verify, settle) + errors.ts
+authCapture/{types,constants,abi,nonce,utils}.ts → cross-layer code at scheme root
 ```
 
 ## Dependencies
