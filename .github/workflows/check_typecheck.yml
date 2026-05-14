@@ -17,4 +17,5 @@ jobs:
       - name: Ensure typecheck
         run: |
           pnpm install --frozen-lockfile
+          pnpm --filter @x402r/evm build
           pnpm typecheck
