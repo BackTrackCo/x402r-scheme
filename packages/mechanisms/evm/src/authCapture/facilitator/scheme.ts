@@ -20,13 +20,7 @@ import type {
   VerifyResponse,
 } from "@x402/core/types";
 import type { FacilitatorEvmSigner } from "@x402/evm";
-import {
-  BaseError,
-  ContractFunctionRevertedError,
-  encodeAbiParameters,
-  hexToBigInt,
-  parseErc6492Signature,
-} from "viem";
+import { BaseError, ContractFunctionRevertedError, hexToBigInt, parseErc6492Signature } from "viem";
 import { ERC20_BALANCE_OF_ABI, ESCROW_ABI, ESCROW_ERRORS_ABI } from "../abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
@@ -521,12 +515,20 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer);
 
     try {
+      // Simulate as the facilitator EOA so escrow's `onlySender(operator)` gate
+      // is evaluated against the same `msg.sender` that the real settle tx will
+      // have (EOA path: facilitator EOA; contract path: captureAuthorizer
+      // contract, which forwards as itself). viem's underlying readContract
+      // accepts `account`, but the FacilitatorEvmSigner type in @x402/evm
+      // doesn't declare it yet (pending upstream signer-type update in
+      // https://github.com/x402-foundation/x402/pull/2308).
       await this.signer.readContract({
         address: settleTarget,
         abi: ESCROW_ABI_WITH_ERRORS,
         functionName,
         args,
-      });
+        account: this.signer.getAddresses()[0],
+      } as Parameters<typeof this.signer.readContract>[0]);
       return "ok";
     } catch (err) {
       return decodeRevertReason(err);
@@ -617,12 +619,14 @@ function unpackForSettle(
     };
   }
   const p = wirePayload as Permit2Payload;
-  // Permit2 collector expects the raw signature; the collector itself reconstructs
-  // the PermitTransferFrom struct from PaymentInfo (deterministic nonce + payer).
+  // Permit2 collector expects the raw 65-byte signature; the collector itself
+  // reconstructs the PermitTransferFrom struct from PaymentInfo (deterministic
+  // nonce + payer). Don't ABI-wrap — Permit2 checks `signature.length == 65`
+  // directly and rejects a wrapped blob with `InvalidSignatureLength()`.
   return {
     preApprovalExpiry: Number(p.permit2Authorization.deadline),
     amount: BigInt(p.permit2Authorization.permitted.amount),
     tokenCollector: PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-    collectorData: encodeAbiParameters([{ name: "signature", type: "bytes" }], [p.signature]),
+    collectorData: p.signature,
   };
 }
