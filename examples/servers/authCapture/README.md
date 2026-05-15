@@ -35,7 +35,7 @@ pnpm start
 
 ## Deadlines
 
-The example sets `captureDeadline` and `refundDeadline` once at boot, as absolute Unix seconds 30 / 60 days into the future. Every authorization the server hands out shares the same absolute deadline. Production servers commonly compute these per request via custom middleware so each authorization has a fresh window — out of scope for this minimal demo.
+`AuthCaptureEvmScheme` accepts `captureDeadlineSeconds` and `refundDeadlineSeconds` at construction (defaults: 30d / 60d). The scheme computes `captureDeadline` and `refundDeadline` inside `enhancePaymentRequirements` on every request, so each authorization carries a fresh absolute window relative to the request time. Merchants that need per-request overrides can still set absolute `captureDeadline` / `refundDeadline` on `requirements.extra` directly.
 
 ## Lifecycle beyond authorize
 

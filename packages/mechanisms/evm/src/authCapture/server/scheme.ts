@@ -14,168 +14,58 @@ import type {
   Price,
   SchemeNetworkServer,
 } from "@x402/core/types";
+import { convertToTokenAmount, numberToDecimalString } from "@x402/core/utils";
+import { getDefaultAsset } from "@x402/evm";
 import { AUTH_CAPTURE_SCHEME } from "../constants";
 
-/**
- * Asset info including EIP-712 domain parameters per network. Each entry is the
- * default stablecoin used by `defaultMoneyConversion` when the merchant gives a
- * decimal price like "$1.50".
- *
- * `name` / `version` are the EIP-712 domain used by the ERC-3009
- * `assetTransferMethod`. Whether a token supports ERC-3009 is a token-level
- * capability, not a chain property; merchants whose chosen token lacks
- * `receiveWithAuthorization` (e.g., BSC's Binance-Peg USDC, Tempo's pathUSD)
- * MUST set `assetTransferMethod: "permit2"` in `extra` themselves. The server
- * does not auto-pick a method based on chain. If the wrong method is paired
- * with an incompatible token, the failure surfaces at facilitator simulation.
- */
-const ASSET_INFO: Record<
-  string,
-  {
-    address: string;
-    name: string;
-    version: string;
-    decimals: number;
-  }
-> = {
-  // ----- Mainnets -----
-  // Ethereum
-  "eip155:1": {
-    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Base
-  "eip155:8453": {
-    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Optimism
-  "eip155:10": {
-    address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Arbitrum One
-  "eip155:42161": {
-    address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Polygon
-  "eip155:137": {
-    address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Celo
-  "eip155:42220": {
-    address: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Avalanche C-Chain
-  "eip155:43114": {
-    address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Linea
-  "eip155:59144": {
-    address: "0x176211869cA2b568f2A7D4EE941E073a821EE1ff",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-  // Monad
-  "eip155:143": {
-    address: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
-    name: "USD Coin",
-    version: "2",
-    decimals: 6,
-  },
-
-  // ----- Testnets -----
-  // Ethereum Sepolia
-  "eip155:11155111": {
-    address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-    name: "USDC",
-    version: "2",
-    decimals: 6,
-  },
-  // Base Sepolia
-  "eip155:84532": {
-    address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    name: "USDC",
-    version: "2",
-    decimals: 6,
-  },
-  // Arbitrum Sepolia
-  "eip155:421614": {
-    address: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
-    name: "USDC",
-    version: "2",
-    decimals: 6,
-  },
-
-  // ----- Mainnets where the canonical stable lacks ERC-3009 -----
-  // Merchants on these chains MUST set `assetTransferMethod: "permit2"` themselves.
-  // BNB Smart Chain — Binance-Peg USDC (18 decimals; no `receiveWithAuthorization`).
-  "eip155:56": {
-    address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-    name: "USDC",
-    version: "1",
-    decimals: 18,
-  },
-  // Tempo — pathUSD (TIP-20 predeploy, 6 decimals; no `receiveWithAuthorization`).
-  "eip155:4217": {
-    address: "0x20c0000000000000000000000000000000000000",
-    name: "pathUSD",
-    version: "1",
-    decimals: 6,
-  },
-};
+const DEFAULT_CAPTURE_DEADLINE_SECONDS = 30 * 86400;
+const DEFAULT_REFUND_DEADLINE_SECONDS = 60 * 86400;
 
 /**
- * Convert a decimal amount string to its base-units token representation via
- * string manipulation. Avoids the floating-point rounding errors that arise
- * from `BigInt(Math.round(amount * 10 ** decimals))` on large or precise
- * inputs. Example: `"0.10"` with `decimals=6` → `"100000"`.
- *
- * @param decimalAmount - Decimal amount expressed as a string (e.g. `"0.10"`).
- * @param decimals - Token decimals (USDC = 6, most ERC-20s = 18).
- * @returns The amount in base units as a string.
- * @throws If `decimalAmount` does not parse as a number.
+ * Construction-time options for the authCapture server scheme. Both deadline
+ * offsets default to reasonable production values (30d capture, 60d refund);
+ * merchants who need different envelopes pass overrides here, and merchants
+ * who need per-request control can still set absolute deadlines on
+ * `requirements.extra.captureDeadline` / `refundDeadline` directly.
  */
-function convertToTokenAmount(decimalAmount: string, decimals: number): string {
-  const amount = parseFloat(decimalAmount);
-  if (isNaN(amount)) {
-    throw new Error(`Invalid amount: ${decimalAmount}`);
-  }
-  const [intPart, decPart = ""] = String(amount).split(".");
-  const paddedDec = decPart.padEnd(decimals, "0").slice(0, decimals);
-  const tokenAmount = (intPart + paddedDec).replace(/^0+/, "") || "0";
-  return tokenAmount;
+export interface AuthCaptureServerOptions {
+  /**
+   * Seconds-from-now used to compute `extra.captureDeadline` for each request.
+   * Ignored when the merchant has already set `requirements.extra.captureDeadline`.
+   * Defaults to 30 days.
+   */
+  captureDeadlineSeconds?: number;
+  /**
+   * Seconds-from-now used to compute `extra.refundDeadline` for each request.
+   * Ignored when the merchant has already set `requirements.extra.refundDeadline`.
+   * Defaults to 60 days.
+   */
+  refundDeadlineSeconds?: number;
 }
 
 /**
  * Server-side implementation of the authCapture scheme: maps merchant-friendly
  * prices (`"$0.01"`, decimal numbers, or pre-built `AssetAmount`) to the
- * stablecoin asset + base-unit amount needed in `PaymentRequirements`, and
- * merges facilitator-advertised `extra` fields into the published
- * requirements. Implements `SchemeNetworkServer`.
+ * stablecoin asset + base-unit amount needed in `PaymentRequirements`, computes
+ * per-request capture/refund deadlines, and merges facilitator-advertised
+ * `extra` fields into the published requirements. Implements `SchemeNetworkServer`.
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   readonly scheme = AUTH_CAPTURE_SCHEME;
   private moneyParsers: MoneyParser[] = [];
+  private readonly captureDeadlineSeconds: number;
+  private readonly refundDeadlineSeconds: number;
+
+  /**
+   * Construct an authCapture server scheme.
+   *
+   * @param options - Per-request deadline offsets. See {@link AuthCaptureServerOptions}.
+   */
+  constructor(options: AuthCaptureServerOptions = {}) {
+    this.captureDeadlineSeconds =
+      options.captureDeadlineSeconds ?? DEFAULT_CAPTURE_DEADLINE_SECONDS;
+    this.refundDeadlineSeconds = options.refundDeadlineSeconds ?? DEFAULT_REFUND_DEADLINE_SECONDS;
+  }
 
   /**
    * Add a custom money parser to the chain. Parsers run in registration order;
@@ -201,7 +91,6 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    * @returns The resolved `AssetAmount` containing token address and base units.
    */
   async parsePrice(price: Price, network: Network): Promise<AssetAmount> {
-    // If already an AssetAmount, pass through with validation
     if (typeof price === "object" && price !== null && "amount" in price) {
       if (!price.asset) {
         throw new Error(`Asset address must be specified for AssetAmount on network ${network}`);
@@ -213,10 +102,8 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
       };
     }
 
-    // Parse Money to decimal number
     const numericAmount = this.parseMoneyToDecimal(price);
 
-    // Try each custom money parser in order
     for (const parser of this.moneyParsers) {
       const result = await parser(numericAmount, network);
       if (result !== null) {
@@ -224,16 +111,16 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
       }
     }
 
-    // All custom parsers returned null (or none registered), use default conversion
     return this.defaultMoneyConversion(numericAmount, network);
   }
 
   /**
    * Merge facilitator-advertised `extra` (from `/supported`) into the
-   * merchant's payment requirements, with the merchant's own `extra` taking
-   * precedence on collisions. Lets authCapture wire-level fields (e.g., a
-   * facilitator-injected `captureAuthorizer` default) flow into requirements
-   * automatically while still allowing the merchant to override.
+   * merchant's payment requirements, fill in per-request capture/refund
+   * deadlines from the configured offsets when the merchant has not set them
+   * explicitly, and let the merchant's own `extra` win on collisions. This
+   * runs on every request, so `captureDeadline` / `refundDeadline` track the
+   * current clock instead of being frozen at server start.
    *
    * @param requirements - The merchant-authored payment requirements.
    * @param supportedKind - The facilitator's advertised support entry for this scheme/network.
@@ -242,7 +129,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    * @param supportedKind.network - CAIP-2 network identifier.
    * @param supportedKind.extra - Facilitator-injected `extra` fields (lowest priority on collision).
    * @param _ - Unused list of facilitator extensions (interface compatibility).
-   * @returns Enhanced `PaymentRequirements` with merged `extra`.
+   * @returns Enhanced `PaymentRequirements` with merged `extra` and computed deadlines.
    */
   async enhancePaymentRequirements(
     requirements: PaymentRequirements,
@@ -254,10 +141,13 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
     },
     _: string[],
   ): Promise<PaymentRequirements> {
+    const now = Math.floor(Date.now() / 1000);
     return {
       ...requirements,
       extra: {
         ...supportedKind.extra,
+        captureDeadline: now + this.captureDeadlineSeconds,
+        refundDeadline: now + this.refundDeadlineSeconds,
         ...requirements.extra,
       },
     };
@@ -285,10 +175,10 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
 
   /**
    * Fall-through converter: resolves a decimal amount against the default
-   * stablecoin registered for the network in `ASSET_INFO`. Returns only the
-   * EIP-712 token-domain fields (`name` / `version`) in `extra`; the merchant
-   * is responsible for selecting `assetTransferMethod` when the chosen token
-   * does not support the spec default (`"eip3009"`).
+   * stablecoin registered for the network in `@x402/evm`'s `getDefaultAsset`.
+   * The EIP-712 token-domain fields (`name` / `version`) are included for
+   * tokens used via ERC-3009 or EIP-2612 paths, and `assetTransferMethod` is
+   * propagated for chains whose default token does not support ERC-3009.
    *
    * @param amount - Decimal amount in the token's display units.
    * @param network - CAIP-2 network identifier.
@@ -296,19 +186,20 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    * @throws If no default stablecoin is configured for `network`.
    */
   private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
-    const assetInfo = ASSET_INFO[network];
-    if (!assetInfo) {
-      throw new Error(`No USDC address configured for network: ${network}`);
-    }
-
-    const tokenAmount = convertToTokenAmount(String(amount), assetInfo.decimals);
-
+    const assetInfo = getDefaultAsset(network);
+    const tokenAmount = convertToTokenAmount(numberToDecimalString(amount), assetInfo.decimals);
+    const includeEip712Domain = !assetInfo.assetTransferMethod || assetInfo.supportsEip2612;
     return {
       asset: assetInfo.address,
       amount: tokenAmount,
       extra: {
-        name: assetInfo.name,
-        version: assetInfo.version,
+        ...(includeEip712Domain && {
+          name: assetInfo.name,
+          version: assetInfo.version,
+        }),
+        ...(assetInfo.assetTransferMethod && {
+          assetTransferMethod: assetInfo.assetTransferMethod,
+        }),
       },
     };
   }
