@@ -97,9 +97,11 @@ Either set the deadline windows as relative offsets (recommended) or as absolute
 
 If neither is set for a window, `enhancePaymentRequirements` throws server-side with a message naming the missing field, so misconfiguration surfaces in the merchant's logs immediately rather than as an `invalid_authCapture_extra` 402 to the payer. Capture / refund windows are arbiter policy; pick what your captureAuthorizer actually supports.
 
+The server-side fail-fast also covers the other directly-merchant-set fields (`captureAuthorizer`, `feeRecipient`, `minFeeBps`, `maxFeeBps`); a missing or wrongly-typed value throws at enhance time with a message naming the offending key.
+
 ### Auto-populated by the scheme
 
-`AuthCaptureEvmScheme.parsePrice` resolves decimal prices like `"$0.01"` against `@x402/evm`'s default-asset table and writes `name` / `version` (EIP-712 token domain) and, where the chain's default uses Permit2, `assetTransferMethod: "permit2"` into the resulting `AssetAmount.extra` for you. The middleware merges these into the published `requirements.extra`, so merchants using decimal pricing do not need to set them by hand. Merchants supplying their own `AssetAmount` (custom token) must set these fields themselves on the `AssetAmount.extra`.
+`AuthCaptureEvmScheme.parsePrice` resolves decimal prices like `"$0.01"` against `@x402/evm`'s default-asset table and writes `name` / `version` (EIP-712 token domain) and, where the chain's default uses Permit2, `assetTransferMethod: "permit2"` into the resulting `AssetAmount.extra` for you. The middleware merges these into the published `requirements.extra`, so merchants using decimal pricing do not need to set them by hand. Merchants supplying their own `AssetAmount` (custom token) must set `name` / `version` themselves on the `AssetAmount.extra`; the facilitator's `isAuthCaptureExtra` guard catches the case where they're missing on the wire side (no server-side fail-fast, matching how `batch-settlement` handles its scheme-auto-populated EIP-712 domain fields).
 
 ### Optional `extra` fields
 

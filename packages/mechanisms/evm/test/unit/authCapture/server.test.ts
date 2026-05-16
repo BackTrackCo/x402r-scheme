@@ -541,14 +541,7 @@ describe("AuthCaptureEvmScheme", () => {
       network: "eip155:84532" as const,
     };
 
-    for (const field of [
-      "captureAuthorizer",
-      "feeRecipient",
-      "minFeeBps",
-      "maxFeeBps",
-      "name",
-      "version",
-    ] as const) {
+    for (const field of ["captureAuthorizer", "feeRecipient", "minFeeBps", "maxFeeBps"] as const) {
       it(`should throw when extra.${field} is missing`, async () => {
         const scheme = new AuthCaptureEvmScheme();
         const requirements = {
@@ -609,15 +602,29 @@ describe("AuthCaptureEvmScheme", () => {
       ).rejects.toThrow(/captureDeadlineSeconds.*captureDeadline/);
     });
 
-    it("should include the path-to-fix hint in the name/version error message", async () => {
+    it("should not fail-fast on missing name (auto-populated by parsePrice for decimal pricing; wire-side rejection for AssetAmount path)", async () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
         extra: completeExtra({ name: undefined }),
       };
+      // Merchant uses decimal pricing → name is auto-populated by parsePrice → no need to throw here.
+      // Merchant uses a custom AssetAmount and forgets name → facilitator catches with invalid_authCapture_extra.
+      // Either way enhance does not throw on missing name.
       await expect(
         scheme.enhancePaymentRequirements(requirements, supportedKind, []),
-      ).rejects.toThrow(/decimal pricing|AssetAmount/);
+      ).resolves.not.toThrow();
+    });
+
+    it("should not fail-fast on missing version (same rationale as name)", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({ version: undefined }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).resolves.not.toThrow();
     });
   });
 

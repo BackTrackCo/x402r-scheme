@@ -51,28 +51,35 @@ function resolveOffsetToDeadline(
  * fields whose configuration path is non-obvious. Keeps the merchant from
  * having to dig through docs to find out where the value comes from.
  */
-const AUTH_CAPTURE_EXTRA_FIELD_HINTS: Record<string, string> = {
+const AUTH_CAPTURE_MERCHANT_FIELD_HINTS: Record<string, string> = {
   captureDeadline:
     " Set extra.captureDeadlineSeconds (relative, recommended) or extra.captureDeadline (absolute).",
   refundDeadline:
     " Set extra.refundDeadlineSeconds (relative, recommended) or extra.refundDeadline (absolute).",
-  name: " Use decimal pricing for auto-population from getDefaultAsset, or set name/version on your AssetAmount.extra.",
-  version:
-    " Use decimal pricing for auto-population from getDefaultAsset, or set name/version on your AssetAmount.extra.",
 };
 
 /**
- * Assert that the merged `extra` carries every field the facilitator's
- * `isAuthCaptureExtra` guard requires, so misconfiguration surfaces as a
- * server-side error the merchant will see in their own logs rather than as
- * a downstream `invalid_authCapture_extra` rejection from the facilitator.
- * The set of fields and their expected JS types mirror `isAuthCaptureExtra`
- * exactly; this asserter must be kept in lockstep when that guard changes.
+ * Assert that the merged `extra` carries every field that comes from the
+ * merchant's route config, so a missing or wrongly-typed value surfaces as
+ * a server-side error the merchant will see in their own logs rather than
+ * as a downstream `invalid_authCapture_extra` rejection from the facilitator.
+ *
+ * Asymmetric on purpose, matching upstream `batch-settlement`'s split: this
+ * asserter covers fields the merchant directly sets in `accepts.extra`
+ * (`captureAuthorizer`, deadlines, `feeRecipient`, fee bands), and skips
+ * fields that `parsePrice` auto-populates from `getDefaultAsset` (`name`,
+ * `version`). Those are handled separately:
+ *  - For decimal pricing they're populated automatically and never missing.
+ *  - For custom-AssetAmount pricing the merchant must set them on
+ *    `AssetAmount.extra`; if they forget, the facilitator's
+ *    `isAuthCaptureExtra` guard still rejects at verify time with
+ *    `invalid_authCapture_extra`. That's the right escalation point because
+ *    the merchant has taken explicit control of the asset domain.
  *
  * @param extra - The merged `extra` map about to be returned by `enhancePaymentRequirements`.
- * @throws With a message naming the first missing or wrongly-typed field, plus a path-to-fix hint where relevant.
+ * @throws With a message naming the first missing or wrongly-typed merchant field, plus a path-to-fix hint where relevant.
  */
-function assertAuthCaptureExtraComplete(extra: Record<string, unknown>): void {
+function assertAuthCaptureMerchantExtraComplete(extra: Record<string, unknown>): void {
   const required: Array<[string, "string" | "number"]> = [
     ["captureAuthorizer", "string"],
     ["captureDeadline", "number"],
@@ -80,12 +87,10 @@ function assertAuthCaptureExtraComplete(extra: Record<string, unknown>): void {
     ["feeRecipient", "string"],
     ["minFeeBps", "number"],
     ["maxFeeBps", "number"],
-    ["name", "string"],
-    ["version", "string"],
   ];
   for (const [key, expectedType] of required) {
     if (typeof extra[key] !== expectedType) {
-      const hint = AUTH_CAPTURE_EXTRA_FIELD_HINTS[key] ?? "";
+      const hint = AUTH_CAPTURE_MERCHANT_FIELD_HINTS[key] ?? "";
       throw new Error(`AuthCapture requires extra.${key} (${expectedType}).${hint}`);
     }
   }
@@ -172,11 +177,19 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    *   external commitment) can set `extra.captureDeadline` / `refundDeadline`
    *   directly; those values win over offset-derived ones.
    * - After offset conversion the merged `extra` is validated against the
-   *   facilitator's `isAuthCaptureExtra` requirements; missing or
-   *   wrongly-typed fields throw here at enhance time with a message naming
-   *   the offending key, instead of the merchant only finding out at verify
-   *   time via `invalid_authCapture_extra` in a 402 to a payer. The valid-
-   *   field set is kept in lockstep with the facilitator-side guard.
+   *   merchant-set subset of `isAuthCaptureExtra`: `captureAuthorizer`,
+   *   `captureDeadline`, `refundDeadline`, `feeRecipient`, `minFeeBps`,
+   *   `maxFeeBps`. Missing or wrongly-typed fields throw here so the
+   *   merchant sees the error in their own logs rather than as a 402
+   *   `invalid_authCapture_extra` to a payer. `name` / `version` are
+   *   excluded because `parsePrice` auto-populates them from
+   *   `getDefaultAsset` for decimal pricing; the only path that bypasses
+   *   that is a custom `AssetAmount` where the merchant has explicitly
+   *   taken control of the asset domain, and the facilitator-side
+   *   `isAuthCaptureExtra` rejection at verify time is the right
+   *   escalation point for that case. Matches the asymmetric split
+   *   `batch-settlement` uses (fail-fast on merchant-set fields, leave
+   *   scheme-auto-populated fields to the wire).
    *
    * @param requirements - The merchant-authored payment requirements.
    * @param supportedKind - The facilitator's advertised support entry for this scheme/network.
@@ -218,7 +231,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
       merged.refundDeadline = refundFromOffset;
     }
 
-    assertAuthCaptureExtraComplete(merged);
+    assertAuthCaptureMerchantExtraComplete(merged);
 
     return { ...requirements, extra: merged };
   }
