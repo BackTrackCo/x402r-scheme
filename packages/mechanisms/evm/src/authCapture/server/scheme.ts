@@ -19,73 +19,44 @@ import { getDefaultAsset } from "@x402/evm";
 import { AUTH_CAPTURE_SCHEME } from "../constants";
 
 /**
- * Construction-time options for the authCapture server scheme. Both windows
- * are required: they're arbiter policy (a description-mismatch refund arbiter
- * needs a wildly different envelope from a delivery-confirmation arbiter,
- * and a one-shot AI call wants minutes where a SaaS subscription wants weeks)
- * and the SDK has no business guessing on the merchant's behalf. The values
- * are committed on-chain as `paymentInfo.authorizationExpiry` /
- * `paymentInfo.refundExpiry` and enforced literally by escrow: wrong values
- * mean stuck funds or denied refunds. Merchants who need per-request
- * overrides can still set absolute `captureDeadline` / `refundDeadline` on
- * `requirements.extra` directly.
+ * Validate a relative-offset extras key and resolve it to an absolute Unix
+ * second. Returns `undefined` when the key is absent. Throws on a present-
+ * but-invalid value so the merchant gets a clear error at the layer they
+ * configured it, rather than a downstream facilitator rejection with a
+ * cryptic reason.
+ *
+ * @param extras - Merged `extra` map being assembled for publication.
+ * @param key - The relative-offset key to read (e.g. `"captureDeadlineSeconds"`).
+ * @param now - Unix-second clock value used for the conversion.
+ * @returns Absolute Unix-second deadline, or `undefined` if the key wasn't set.
+ * @throws If `extras[key]` is present but not a finite positive number.
  */
-export interface AuthCaptureServerOptions {
-  /**
-   * Seconds-from-now used to compute `extra.captureDeadline` for each request.
-   * Overridden when the merchant has already set `requirements.extra.captureDeadline`.
-   */
-  captureDeadlineSeconds: number;
-  /**
-   * Seconds-from-now used to compute `extra.refundDeadline` for each request.
-   * Overridden when the merchant has already set `requirements.extra.refundDeadline`.
-   */
-  refundDeadlineSeconds: number;
+function resolveOffsetToDeadline(
+  extras: Record<string, unknown>,
+  key: string,
+  now: number,
+): number | undefined {
+  const raw = extras[key];
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) {
+    throw new Error(
+      `extra.${key} must be a positive finite number of seconds-from-now (got ${String(raw)})`,
+    );
+  }
+  return now + raw;
 }
 
 /**
  * Server-side implementation of the authCapture scheme: maps merchant-friendly
  * prices (`"$0.01"`, decimal numbers, or pre-built `AssetAmount`) to the
- * stablecoin asset + base-unit amount needed in `PaymentRequirements`, computes
- * per-request capture/refund deadlines from merchant-configured windows, and
- * merges facilitator-advertised `extra` fields into the published requirements.
- * Implements `SchemeNetworkServer`.
+ * stablecoin asset + base-unit amount needed in `PaymentRequirements`, resolves
+ * merchant-supplied `*DeadlineSeconds` offsets into per-request absolute
+ * deadlines, and merges facilitator-advertised `extra` fields into the
+ * published requirements. Implements `SchemeNetworkServer`.
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   readonly scheme = AUTH_CAPTURE_SCHEME;
   private moneyParsers: MoneyParser[] = [];
-  private readonly captureDeadlineSeconds: number;
-  private readonly refundDeadlineSeconds: number;
-
-  /**
-   * Construct an authCapture server scheme.
-   *
-   * @param options - Required per-request deadline windows. See {@link AuthCaptureServerOptions}.
-   * @throws If either window is missing, non-positive, or non-finite.
-   */
-  constructor(options: AuthCaptureServerOptions) {
-    if (
-      !options ||
-      typeof options.captureDeadlineSeconds !== "number" ||
-      !Number.isFinite(options.captureDeadlineSeconds) ||
-      options.captureDeadlineSeconds <= 0
-    ) {
-      throw new Error(
-        "AuthCaptureEvmScheme requires `captureDeadlineSeconds` (positive seconds-from-now). This is arbiter policy and has no safe default; configure it explicitly.",
-      );
-    }
-    if (
-      typeof options.refundDeadlineSeconds !== "number" ||
-      !Number.isFinite(options.refundDeadlineSeconds) ||
-      options.refundDeadlineSeconds <= 0
-    ) {
-      throw new Error(
-        "AuthCaptureEvmScheme requires `refundDeadlineSeconds` (positive seconds-from-now). This is arbiter policy and has no safe default; configure it explicitly.",
-      );
-    }
-    this.captureDeadlineSeconds = options.captureDeadlineSeconds;
-    this.refundDeadlineSeconds = options.refundDeadlineSeconds;
-  }
 
   /**
    * Add a custom money parser to the chain. Parsers run in registration order;
@@ -136,11 +107,30 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
 
   /**
    * Merge facilitator-advertised `extra` (from `/supported`) into the
-   * merchant's payment requirements, fill in per-request capture/refund
-   * deadlines from the configured offsets when the merchant has not set them
-   * explicitly, and let the merchant's own `extra` win on collisions. This
-   * runs on every request, so `captureDeadline` / `refundDeadline` track the
-   * current clock instead of being frozen at server start.
+   * merchant's payment requirements and resolve relative deadline offsets
+   * into per-request absolute deadlines.
+   *
+   * authCapture's wire format commits the payer to absolute Unix-second
+   * `captureDeadline` and `refundDeadline` values in the on-chain
+   * `PaymentInfo`. Merchants almost always think in policy terms
+   * ("capture within 30 days, refund within 60 days"), so the server-side
+   * convention is:
+   *
+   * - Merchant sets `extra.captureDeadlineSeconds` / `extra.refundDeadlineSeconds`
+   *   (seconds-from-now relative offsets, matching x402's `maxTimeoutSeconds`
+   *   suffix convention). These are server-side inputs only.
+   * - `enhancePaymentRequirements` runs per request, computes
+   *   `now + offset`, and publishes absolute `captureDeadline` /
+   *   `refundDeadline` (the values the wire-format spec defines). The
+   *   `*Seconds` keys are stripped from the published `extra`.
+   * - Merchants who already have absolute timestamps (e.g., tied to an
+   *   external commitment) can set `extra.captureDeadline` / `refundDeadline`
+   *   directly; those values win over offset-derived ones.
+   * - No deadlines are forced; if a merchant publishes neither relative
+   *   nor absolute, the published `extra` is missing them and the
+   *   facilitator surfaces `invalid_authCapture_extra` at verify time.
+   *   This keeps the scheme honest about arbiter policy living with the
+   *   merchant, not in the SDK.
    *
    * @param requirements - The merchant-authored payment requirements.
    * @param supportedKind - The facilitator's advertised support entry for this scheme/network.
@@ -149,7 +139,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    * @param supportedKind.network - CAIP-2 network identifier.
    * @param supportedKind.extra - Facilitator-injected `extra` fields (lowest priority on collision).
    * @param _ - Unused list of facilitator extensions (interface compatibility).
-   * @returns Enhanced `PaymentRequirements` with merged `extra` and computed deadlines.
+   * @returns Enhanced `PaymentRequirements` with merged `extra` and resolved deadlines.
    */
   async enhancePaymentRequirements(
     requirements: PaymentRequirements,
@@ -161,16 +151,28 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
     },
     _: string[],
   ): Promise<PaymentRequirements> {
-    const now = Math.floor(Date.now() / 1000);
-    return {
-      ...requirements,
-      extra: {
-        ...supportedKind.extra,
-        captureDeadline: now + this.captureDeadlineSeconds,
-        refundDeadline: now + this.refundDeadlineSeconds,
-        ...requirements.extra,
-      },
+    const merged: Record<string, unknown> = {
+      ...supportedKind.extra,
+      ...requirements.extra,
     };
+
+    const now = Math.floor(Date.now() / 1000);
+    const captureFromOffset = resolveOffsetToDeadline(merged, "captureDeadlineSeconds", now);
+    const refundFromOffset = resolveOffsetToDeadline(merged, "refundDeadlineSeconds", now);
+
+    // Strip the server-side-only offset inputs; the wire format only carries absolute deadlines.
+    delete merged.captureDeadlineSeconds;
+    delete merged.refundDeadlineSeconds;
+
+    // Absolute values (if the merchant supplied them directly) win over offset-derived ones.
+    if (captureFromOffset !== undefined && typeof merged.captureDeadline !== "number") {
+      merged.captureDeadline = captureFromOffset;
+    }
+    if (refundFromOffset !== undefined && typeof merged.refundDeadline !== "number") {
+      merged.refundDeadline = refundFromOffset;
+    }
+
+    return { ...requirements, extra: merged };
   }
 
   /**

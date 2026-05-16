@@ -35,7 +35,7 @@ pnpm start
 
 ## Deadlines
 
-`AuthCaptureEvmScheme` requires `captureDeadlineSeconds` and `refundDeadlineSeconds` at construction. These windows are arbiter policy (a description-mismatch refund arbiter needs a wildly different envelope from a delivery-confirmation arbiter, and a one-shot AI call wants minutes where a SaaS subscription wants weeks), so the SDK refuses to guess; the constructor throws if either is missing. The scheme computes `captureDeadline` and `refundDeadline` inside `enhancePaymentRequirements` on every request, so each authorization carries a fresh absolute window relative to the request time. Merchants that need per-request overrides can still set absolute `captureDeadline` / `refundDeadline` on `requirements.extra` directly. This example uses 30d / 60d as illustrative values only; pick what your captureAuthorizer actually supports.
+Capture / refund windows are per-route, set as relative offsets in `extra.captureDeadlineSeconds` and `extra.refundDeadlineSeconds`. The scheme runs `enhancePaymentRequirements` per request, converts each offset to an absolute Unix-second deadline (`now + offset`), and publishes `captureDeadline` / `refundDeadline` (the wire-format values committed in the on-chain `PaymentInfo`). The `*Seconds` keys are stripped from the published `extra`. Merchants that already have absolute timestamps (e.g., tied to an external commitment) can set `extra.captureDeadline` / `refundDeadline` directly; those values take precedence. Windows are arbiter policy: pick what your captureAuthorizer actually supports. This example's 30d / 60d are illustrative only.
 
 ## Lifecycle beyond authorize
 

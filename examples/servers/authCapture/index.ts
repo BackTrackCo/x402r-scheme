@@ -30,10 +30,7 @@ if (!facilitatorUrl) {
 const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const resourceServer = new x402ResourceServer(facilitatorClient).register(
   NETWORK,
-  new AuthCaptureEvmServer({
-    captureDeadlineSeconds: 30 * 86400,
-    refundDeadlineSeconds: 60 * 86400,
-  }),
+  new AuthCaptureEvmServer(),
 );
 
 const app = express();
@@ -49,6 +46,13 @@ app.use(
           payTo: evmAddress,
           extra: {
             captureAuthorizer,
+            // Capture / refund windows are seconds-from-now relative offsets.
+            // The scheme converts them to absolute Unix-second deadlines per
+            // request inside `enhancePaymentRequirements`, so each
+            // authorization carries a fresh window. The values are arbiter
+            // policy: pick what your captureAuthorizer actually supports.
+            captureDeadlineSeconds: 30 * 86400,
+            refundDeadlineSeconds: 60 * 86400,
             // address(0) lets the captureAuthorizer pick any non-zero fee
             // recipient at capture/charge time (deferred selection, per spec).
             // Production setups can pin a specific receiver instead.
