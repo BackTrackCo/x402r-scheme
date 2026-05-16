@@ -47,6 +47,51 @@ function resolveOffsetToDeadline(
 }
 
 /**
+ * Field-specific hint appended to the missing-field error message for
+ * fields whose configuration path is non-obvious. Keeps the merchant from
+ * having to dig through docs to find out where the value comes from.
+ */
+const AUTH_CAPTURE_EXTRA_FIELD_HINTS: Record<string, string> = {
+  captureDeadline:
+    " Set extra.captureDeadlineSeconds (relative, recommended) or extra.captureDeadline (absolute).",
+  refundDeadline:
+    " Set extra.refundDeadlineSeconds (relative, recommended) or extra.refundDeadline (absolute).",
+  name: " Use decimal pricing for auto-population from getDefaultAsset, or set name/version on your AssetAmount.extra.",
+  version:
+    " Use decimal pricing for auto-population from getDefaultAsset, or set name/version on your AssetAmount.extra.",
+};
+
+/**
+ * Assert that the merged `extra` carries every field the facilitator's
+ * `isAuthCaptureExtra` guard requires, so misconfiguration surfaces as a
+ * server-side error the merchant will see in their own logs rather than as
+ * a downstream `invalid_authCapture_extra` rejection from the facilitator.
+ * The set of fields and their expected JS types mirror `isAuthCaptureExtra`
+ * exactly; this asserter must be kept in lockstep when that guard changes.
+ *
+ * @param extra - The merged `extra` map about to be returned by `enhancePaymentRequirements`.
+ * @throws With a message naming the first missing or wrongly-typed field, plus a path-to-fix hint where relevant.
+ */
+function assertAuthCaptureExtraComplete(extra: Record<string, unknown>): void {
+  const required: Array<[string, "string" | "number"]> = [
+    ["captureAuthorizer", "string"],
+    ["captureDeadline", "number"],
+    ["refundDeadline", "number"],
+    ["feeRecipient", "string"],
+    ["minFeeBps", "number"],
+    ["maxFeeBps", "number"],
+    ["name", "string"],
+    ["version", "string"],
+  ];
+  for (const [key, expectedType] of required) {
+    if (typeof extra[key] !== expectedType) {
+      const hint = AUTH_CAPTURE_EXTRA_FIELD_HINTS[key] ?? "";
+      throw new Error(`AuthCapture requires extra.${key} (${expectedType}).${hint}`);
+    }
+  }
+}
+
+/**
  * Server-side implementation of the authCapture scheme: maps merchant-friendly
  * prices (`"$0.01"`, decimal numbers, or pre-built `AssetAmount`) to the
  * stablecoin asset + base-unit amount needed in `PaymentRequirements`, resolves
@@ -126,11 +171,12 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
    * - Merchants who already have absolute timestamps (e.g., tied to an
    *   external commitment) can set `extra.captureDeadline` / `refundDeadline`
    *   directly; those values win over offset-derived ones.
-   * - No deadlines are forced; if a merchant publishes neither relative
-   *   nor absolute, the published `extra` is missing them and the
-   *   facilitator surfaces `invalid_authCapture_extra` at verify time.
-   *   This keeps the scheme honest about arbiter policy living with the
-   *   merchant, not in the SDK.
+   * - After offset conversion the merged `extra` is validated against the
+   *   facilitator's `isAuthCaptureExtra` requirements; missing or
+   *   wrongly-typed fields throw here at enhance time with a message naming
+   *   the offending key, instead of the merchant only finding out at verify
+   *   time via `invalid_authCapture_extra` in a 402 to a payer. The valid-
+   *   field set is kept in lockstep with the facilitator-side guard.
    *
    * @param requirements - The merchant-authored payment requirements.
    * @param supportedKind - The facilitator's advertised support entry for this scheme/network.
@@ -171,6 +217,8 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
     if (refundFromOffset !== undefined && typeof merged.refundDeadline !== "number") {
       merged.refundDeadline = refundFromOffset;
     }
+
+    assertAuthCaptureExtraComplete(merged);
 
     return { ...requirements, extra: merged };
   }

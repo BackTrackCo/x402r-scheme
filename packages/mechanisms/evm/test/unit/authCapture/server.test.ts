@@ -163,6 +163,30 @@ describe("AuthCaptureEvmScheme", () => {
   });
 
   describe("enhancePaymentRequirements", () => {
+    // A complete `extra` carrying every field `isAuthCaptureExtra` requires.
+    // Use this in tests that aren't exercising the fail-fast validation path,
+    // so the assertion against missing-field rejection doesn't fire and the
+    // test can focus on whatever behavior it's actually trying to cover.
+    // Passing `undefined` for a key removes it (vs. spreading, which would
+    // leave a `key: undefined` entry that overrides supportedKind on merge).
+    const completeExtra = (overrides: Record<string, unknown> = {}) => {
+      const out: Record<string, unknown> = {
+        captureAuthorizer: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        captureDeadlineSeconds: 30 * 86400,
+        refundDeadlineSeconds: 60 * 86400,
+        feeRecipient: "0x0000000000000000000000000000000000000000",
+        minFeeBps: 0,
+        maxFeeBps: 100,
+        name: "USDC",
+        version: "2",
+      };
+      for (const [k, v] of Object.entries(overrides)) {
+        if (v === undefined) delete out[k];
+        else out[k] = v;
+      }
+      return out;
+    };
+
     const baseRequirements = {
       scheme: "authCapture",
       network: "eip155:84532" as const,
@@ -170,7 +194,7 @@ describe("AuthCaptureEvmScheme", () => {
       asset: BASE_SEPOLIA_USDC,
       payTo: "0x1234567890123456789012345678901234567890",
       maxTimeoutSeconds: 300,
-      extra: {},
+      extra: completeExtra(),
     };
 
     it("should merge extra fields from supportedKind", async () => {
@@ -187,7 +211,7 @@ describe("AuthCaptureEvmScheme", () => {
 
       const result = await scheme.enhancePaymentRequirements(baseRequirements, supportedKind, []);
 
-      expect(result.extra).toEqual({
+      expect(result.extra).toMatchObject({
         fromSupported1: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         fromSupported2: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       });
@@ -197,7 +221,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { customField: "custom-value" },
+        extra: completeExtra({ customField: "custom-value" }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -208,7 +232,7 @@ describe("AuthCaptureEvmScheme", () => {
 
       const result = await scheme.enhancePaymentRequirements(requirements, supportedKind, []);
 
-      expect(result.extra).toEqual({
+      expect(result.extra).toMatchObject({
         fromSupported: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         customField: "custom-value",
       });
@@ -218,7 +242,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { sharedKey: "0xcccccccccccccccccccccccccccccccccccccccc" },
+        extra: completeExtra({ sharedKey: "0xcccccccccccccccccccccccccccccccccccccccc" }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -249,30 +273,14 @@ describe("AuthCaptureEvmScheme", () => {
       expect(result.payTo).toBe("0x1234567890123456789012345678901234567890");
     });
 
-    it("should leave deadlines absent when neither offsets nor absolute values are provided", async () => {
-      const scheme = new AuthCaptureEvmScheme();
-      const supportedKind = {
-        x402Version: 2,
-        scheme: "authCapture",
-        network: "eip155:84532" as const,
-      };
-
-      const result = await scheme.enhancePaymentRequirements(baseRequirements, supportedKind, []);
-
-      expect(result.extra).not.toHaveProperty("captureDeadline");
-      expect(result.extra).not.toHaveProperty("refundDeadline");
-      expect(result.extra).not.toHaveProperty("captureDeadlineSeconds");
-      expect(result.extra).not.toHaveProperty("refundDeadlineSeconds");
-    });
-
     it("should convert captureDeadlineSeconds and refundDeadlineSeconds to absolute deadlines, stripping the offset keys", async () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: {
+        extra: completeExtra({
           captureDeadlineSeconds: 600,
           refundDeadlineSeconds: 1200,
-        },
+        }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -313,10 +321,11 @@ describe("AuthCaptureEvmScheme", () => {
       // Case 1: absolute capture + relative refund.
       const reqs1 = {
         ...baseRequirements,
-        extra: {
+        extra: completeExtra({
           captureDeadline: 1700000000,
+          captureDeadlineSeconds: undefined,
           refundDeadlineSeconds: 60,
-        },
+        }),
       };
       const before1 = Math.floor(Date.now() / 1000);
       const out1 = await scheme.enhancePaymentRequirements(reqs1, supportedKind, []);
@@ -331,10 +340,11 @@ describe("AuthCaptureEvmScheme", () => {
       // Case 2: relative capture + absolute refund.
       const reqs2 = {
         ...baseRequirements,
-        extra: {
+        extra: completeExtra({
           captureDeadlineSeconds: 60,
+          refundDeadlineSeconds: undefined,
           refundDeadline: 1800000000,
-        },
+        }),
       };
       const before2 = Math.floor(Date.now() / 1000);
       const out2 = await scheme.enhancePaymentRequirements(reqs2, supportedKind, []);
@@ -351,12 +361,12 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: {
+        extra: completeExtra({
           captureDeadlineSeconds: 600,
           refundDeadlineSeconds: 1200,
           captureDeadline: 1700000000,
           refundDeadline: 1800000000,
-        },
+        }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -376,10 +386,10 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: {
+        extra: completeExtra({
           captureDeadlineSeconds: 1,
           refundDeadlineSeconds: 2,
-        },
+        }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -399,7 +409,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { captureDeadlineSeconds: 0 },
+        extra: completeExtra({ captureDeadlineSeconds: 0 }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -416,7 +426,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { refundDeadlineSeconds: -1 },
+        extra: completeExtra({ refundDeadlineSeconds: -1 }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -433,7 +443,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { captureDeadlineSeconds: Number.NaN },
+        extra: completeExtra({ captureDeadlineSeconds: Number.NaN }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -450,7 +460,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
         ...baseRequirements,
-        extra: { captureDeadlineSeconds: "30d" },
+        extra: completeExtra({ captureDeadlineSeconds: "30d" }),
       };
       const supportedKind = {
         x402Version: 2,
@@ -465,6 +475,14 @@ describe("AuthCaptureEvmScheme", () => {
 
     it("should accept offsets from supportedKind.extra (facilitator-injected) when not set in requirements", async () => {
       const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        // Drop the offsets from requirements so supportedKind's offsets are what gets used.
+        extra: completeExtra({
+          captureDeadlineSeconds: undefined,
+          refundDeadlineSeconds: undefined,
+        }),
+      };
       const supportedKind = {
         x402Version: 2,
         scheme: "authCapture",
@@ -476,7 +494,7 @@ describe("AuthCaptureEvmScheme", () => {
       };
 
       const before = Math.floor(Date.now() / 1000);
-      const result = await scheme.enhancePaymentRequirements(baseRequirements, supportedKind, []);
+      const result = await scheme.enhancePaymentRequirements(requirements, supportedKind, []);
       const after = Math.floor(Date.now() / 1000);
 
       const captureDeadline = result.extra?.captureDeadline as number;
@@ -486,6 +504,120 @@ describe("AuthCaptureEvmScheme", () => {
       expect(captureDeadline).toBeLessThanOrEqual(after + 600);
       expect(refundDeadline).toBeGreaterThanOrEqual(before + 1200);
       expect(refundDeadline).toBeLessThanOrEqual(after + 1200);
+    });
+  });
+
+  describe("enhancePaymentRequirements - fail-fast field validation", () => {
+    const completeExtra = (overrides: Record<string, unknown> = {}) => {
+      const out: Record<string, unknown> = {
+        captureAuthorizer: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        captureDeadlineSeconds: 30 * 86400,
+        refundDeadlineSeconds: 60 * 86400,
+        feeRecipient: "0x0000000000000000000000000000000000000000",
+        minFeeBps: 0,
+        maxFeeBps: 100,
+        name: "USDC",
+        version: "2",
+      };
+      for (const [k, v] of Object.entries(overrides)) {
+        if (v === undefined) delete out[k];
+        else out[k] = v;
+      }
+      return out;
+    };
+
+    const baseRequirements = {
+      scheme: "authCapture",
+      network: "eip155:84532" as const,
+      amount: "1000000",
+      asset: BASE_SEPOLIA_USDC,
+      payTo: "0x1234567890123456789012345678901234567890",
+      maxTimeoutSeconds: 300,
+    };
+
+    const supportedKind = {
+      x402Version: 2,
+      scheme: "authCapture",
+      network: "eip155:84532" as const,
+    };
+
+    for (const field of [
+      "captureAuthorizer",
+      "feeRecipient",
+      "minFeeBps",
+      "maxFeeBps",
+      "name",
+      "version",
+    ] as const) {
+      it(`should throw when extra.${field} is missing`, async () => {
+        const scheme = new AuthCaptureEvmScheme();
+        const requirements = {
+          ...baseRequirements,
+          extra: completeExtra({ [field]: undefined }),
+        };
+        await expect(
+          scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+        ).rejects.toThrow(new RegExp(`extra\\.${field}`));
+      });
+    }
+
+    it("should throw when neither captureDeadlineSeconds nor captureDeadline is provided", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({
+          captureDeadlineSeconds: undefined,
+        }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).rejects.toThrow(/extra\.captureDeadline/);
+    });
+
+    it("should throw when neither refundDeadlineSeconds nor refundDeadline is provided", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({
+          refundDeadlineSeconds: undefined,
+        }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).rejects.toThrow(/extra\.refundDeadline/);
+    });
+
+    it("should throw when captureAuthorizer is the wrong type", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({ captureAuthorizer: 42 }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).rejects.toThrow(/captureAuthorizer/);
+    });
+
+    it("should include the path-to-fix hint in the deadline error message", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({ captureDeadlineSeconds: undefined }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).rejects.toThrow(/captureDeadlineSeconds.*captureDeadline/);
+    });
+
+    it("should include the path-to-fix hint in the name/version error message", async () => {
+      const scheme = new AuthCaptureEvmScheme();
+      const requirements = {
+        ...baseRequirements,
+        extra: completeExtra({ name: undefined }),
+      };
+      await expect(
+        scheme.enhancePaymentRequirements(requirements, supportedKind, []),
+      ).rejects.toThrow(/decimal pricing|AssetAmount/);
     });
   });
 

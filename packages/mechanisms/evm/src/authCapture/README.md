@@ -95,7 +95,7 @@ Either set the deadline windows as relative offsets (recommended) or as absolute
 | `captureDeadline` | `uint48` | Absolute Unix seconds. Use this when the deadline is tied to an external commitment (e.g., a delivery date). Wins over `captureDeadlineSeconds` if both are set. |
 | `refundDeadline` | `uint48` | Absolute Unix seconds. Same precedence rule as `captureDeadline`. |
 
-If neither is set for a window the facilitator rejects with `invalid_authCapture_extra` at verify time. Capture / refund windows are arbiter policy; pick what your captureAuthorizer actually supports.
+If neither is set for a window, `enhancePaymentRequirements` throws server-side with a message naming the missing field, so misconfiguration surfaces in the merchant's logs immediately rather than as an `invalid_authCapture_extra` 402 to the payer. Capture / refund windows are arbiter policy; pick what your captureAuthorizer actually supports.
 
 ### Auto-populated by the scheme
 
