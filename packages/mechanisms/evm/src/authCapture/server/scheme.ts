@@ -18,37 +18,38 @@ import { convertToTokenAmount, numberToDecimalString } from "@x402/core/utils";
 import { getDefaultAsset } from "@x402/evm";
 import { AUTH_CAPTURE_SCHEME } from "../constants";
 
-const DEFAULT_CAPTURE_DEADLINE_SECONDS = 30 * 86400;
-const DEFAULT_REFUND_DEADLINE_SECONDS = 60 * 86400;
-
 /**
- * Construction-time options for the authCapture server scheme. Both deadline
- * offsets default to reasonable production values (30d capture, 60d refund);
- * merchants who need different envelopes pass overrides here, and merchants
- * who need per-request control can still set absolute deadlines on
- * `requirements.extra.captureDeadline` / `refundDeadline` directly.
+ * Construction-time options for the authCapture server scheme. Both windows
+ * are required: they're arbiter policy (a description-mismatch refund arbiter
+ * needs a wildly different envelope from a delivery-confirmation arbiter,
+ * and a one-shot AI call wants minutes where a SaaS subscription wants weeks)
+ * and the SDK has no business guessing on the merchant's behalf. The values
+ * are committed on-chain as `paymentInfo.authorizationExpiry` /
+ * `paymentInfo.refundExpiry` and enforced literally by escrow: wrong values
+ * mean stuck funds or denied refunds. Merchants who need per-request
+ * overrides can still set absolute `captureDeadline` / `refundDeadline` on
+ * `requirements.extra` directly.
  */
 export interface AuthCaptureServerOptions {
   /**
    * Seconds-from-now used to compute `extra.captureDeadline` for each request.
-   * Ignored when the merchant has already set `requirements.extra.captureDeadline`.
-   * Defaults to 30 days.
+   * Overridden when the merchant has already set `requirements.extra.captureDeadline`.
    */
-  captureDeadlineSeconds?: number;
+  captureDeadlineSeconds: number;
   /**
    * Seconds-from-now used to compute `extra.refundDeadline` for each request.
-   * Ignored when the merchant has already set `requirements.extra.refundDeadline`.
-   * Defaults to 60 days.
+   * Overridden when the merchant has already set `requirements.extra.refundDeadline`.
    */
-  refundDeadlineSeconds?: number;
+  refundDeadlineSeconds: number;
 }
 
 /**
  * Server-side implementation of the authCapture scheme: maps merchant-friendly
  * prices (`"$0.01"`, decimal numbers, or pre-built `AssetAmount`) to the
  * stablecoin asset + base-unit amount needed in `PaymentRequirements`, computes
- * per-request capture/refund deadlines, and merges facilitator-advertised
- * `extra` fields into the published requirements. Implements `SchemeNetworkServer`.
+ * per-request capture/refund deadlines from merchant-configured windows, and
+ * merges facilitator-advertised `extra` fields into the published requirements.
+ * Implements `SchemeNetworkServer`.
  */
 export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   readonly scheme = AUTH_CAPTURE_SCHEME;
@@ -59,12 +60,31 @@ export class AuthCaptureEvmScheme implements SchemeNetworkServer {
   /**
    * Construct an authCapture server scheme.
    *
-   * @param options - Per-request deadline offsets. See {@link AuthCaptureServerOptions}.
+   * @param options - Required per-request deadline windows. See {@link AuthCaptureServerOptions}.
+   * @throws If either window is missing, non-positive, or non-finite.
    */
-  constructor(options: AuthCaptureServerOptions = {}) {
-    this.captureDeadlineSeconds =
-      options.captureDeadlineSeconds ?? DEFAULT_CAPTURE_DEADLINE_SECONDS;
-    this.refundDeadlineSeconds = options.refundDeadlineSeconds ?? DEFAULT_REFUND_DEADLINE_SECONDS;
+  constructor(options: AuthCaptureServerOptions) {
+    if (
+      !options ||
+      typeof options.captureDeadlineSeconds !== "number" ||
+      !Number.isFinite(options.captureDeadlineSeconds) ||
+      options.captureDeadlineSeconds <= 0
+    ) {
+      throw new Error(
+        "AuthCaptureEvmScheme requires `captureDeadlineSeconds` (positive seconds-from-now). This is arbiter policy and has no safe default; configure it explicitly.",
+      );
+    }
+    if (
+      typeof options.refundDeadlineSeconds !== "number" ||
+      !Number.isFinite(options.refundDeadlineSeconds) ||
+      options.refundDeadlineSeconds <= 0
+    ) {
+      throw new Error(
+        "AuthCaptureEvmScheme requires `refundDeadlineSeconds` (positive seconds-from-now). This is arbiter policy and has no safe default; configure it explicitly.",
+      );
+    }
+    this.captureDeadlineSeconds = options.captureDeadlineSeconds;
+    this.refundDeadlineSeconds = options.refundDeadlineSeconds;
   }
 
   /**
