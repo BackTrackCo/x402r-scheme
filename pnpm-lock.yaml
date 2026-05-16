@@ -195,11 +195,11 @@ importers:
   packages/mechanisms/evm:
     dependencies:
       '@x402/core':
-        specifier: ^2.4.0
-        version: 2.8.0
+        specifier: ^2.11.0
+        version: 2.12.0
       '@x402/evm':
-        specifier: ^2.0.0
-        version: 2.3.0(typescript@5.9.3)
+        specifier: ^2.12.0
+        version: 2.12.0(typescript@5.9.3)
       viem:
         specifier: ^2.48.11
         version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
@@ -782,17 +782,8 @@ packages:
   '@x402/core@2.12.0':
     resolution: {integrity: sha512-dLae9AbZRN/W7GsKe9ngqGsflnP+esE72s0GjmqDZbPihM/tlHCA6UnDdgM0qfOiDOf9iL+mmCs1OyLWpwnGLQ==}
 
-  '@x402/core@2.3.0':
-    resolution: {integrity: sha512-XOSfqZXJMHwBoTFa07MiVr35CaMPoD2hVwncMAQQKr/qfEHmdD4mP3vrcAQvkfIJXVdu/wkpWXTJ5irXy1jn7g==}
-
-  '@x402/core@2.8.0':
-    resolution: {integrity: sha512-ppsvSzyWzlqG+26dcNzOXo/YLaHreWc3lmdv9W81mEhLDWMdPpiGyRjSUyO9BQFuQJMQppvqA7ujUbLE/EaDkg==}
-
   '@x402/evm@2.12.0':
     resolution: {integrity: sha512-kZUoHPVdBS8wlTg5K1eoh/1V0+5n9ABGRPC5DOQwRlkAwIrAFOEi2pQE+jgvOx0iM5ib2xj9gJjpldRbasX12w==}
-
-  '@x402/evm@2.3.0':
-    resolution: {integrity: sha512-VzjS5k0EiQQ8+MKVMth1/tHgeAW2j2LRi/JLqKd1UVRe8X2tkcgItvRnZzX6kSrlta8e3iKngVu9GMKIIkrI8Q==}
 
   '@x402/express@2.12.0':
     resolution: {integrity: sha512-bPc6jpRr4iCh7KRJETK/2/bVTKHy/EeybQd9s+Mz4Ab+C64F1IH20GeW4gyj27dtAd2YgOiFrk8uyxSbZPKhkQ==}
@@ -2720,27 +2711,9 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  '@x402/core@2.3.0':
-    dependencies:
-      zod: 3.25.76
-
-  '@x402/core@2.8.0':
-    dependencies:
-      zod: 3.25.76
-
   '@x402/evm@2.12.0(typescript@5.9.3)':
     dependencies:
       '@x402/core': 2.12.0
-      viem: 2.48.11(typescript@5.9.3)(zod@3.25.76)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-
-  '@x402/evm@2.3.0(typescript@5.9.3)':
-    dependencies:
-      '@x402/core': 2.3.0
       viem: 2.48.11(typescript@5.9.3)(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:

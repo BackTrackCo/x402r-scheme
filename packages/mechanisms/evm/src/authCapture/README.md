@@ -50,8 +50,6 @@ const resourceServer = new x402ResourceServer(facilitator).register(
   new AuthCaptureEvmScheme(),
 );
 
-const now = Math.floor(Date.now() / 1000);
-
 app.use(
   paymentMiddleware(
     {
@@ -63,13 +61,11 @@ app.use(
           payTo: receiverAddress,
           extra: {
             captureAuthorizer, // EOA = facilitator submitter, or contract that forwards to escrow
-            captureDeadline: now + 3600, // absolute Unix seconds
-            refundDeadline: now + 7200,
+            captureDeadlineSeconds: 3600, // seconds-from-now; scheme converts to absolute per request
+            refundDeadlineSeconds: 7200,
             feeRecipient: zeroAddress, // address(0) = captureAuthorizer picks at capture time
             minFeeBps: 0,
             maxFeeBps: 100,
-            name: "USDC", // EIP-712 token-domain name (for ERC-3009 path)
-            version: "2",
           },
         },
         description: "Weather data",
@@ -86,13 +82,26 @@ app.use(
 | Field | Type | Notes |
 | --- | --- | --- |
 | `captureAuthorizer` | `address` | Committed on-chain as `PaymentInfo.operator`. See [captureAuthorizer](#captureauthorizer) below. |
-| `captureDeadline` | `uint48` | Absolute Unix seconds; capture must occur before this. |
-| `refundDeadline` | `uint48` | Absolute Unix seconds; refunds allowed until this. |
 | `feeRecipient` | `address` | `address(0)` lets the captureAuthorizer pick a non-zero recipient at capture/charge time. |
 | `minFeeBps` | `uint16` | Floor on the captureAuthorizer's fee. `0` = no minimum. |
 | `maxFeeBps` | `uint16` | Cap on the captureAuthorizer's fee. |
-| `name` | `string` | EIP-712 token-domain name (e.g., `"USDC"`). Used by the ERC-3009 path. |
-| `version` | `string` | EIP-712 token-domain version (e.g., `"2"`). |
+
+Either set the deadline windows as relative offsets (recommended) or as absolute Unix seconds:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `captureDeadlineSeconds` | `number` | Seconds-from-now. The scheme converts to `captureDeadline` (absolute) inside `enhancePaymentRequirements` per request, then strips this key from the published `extra`. |
+| `refundDeadlineSeconds` | `number` | Seconds-from-now. Converted to `refundDeadline` the same way. |
+| `captureDeadline` | `uint48` | Absolute Unix seconds. Use this when the deadline is tied to an external commitment (e.g., a delivery date). Wins over `captureDeadlineSeconds` if both are set. |
+| `refundDeadline` | `uint48` | Absolute Unix seconds. Same precedence rule as `captureDeadline`. |
+
+If neither is set for a window, `enhancePaymentRequirements` throws server-side with a message naming the missing field, so misconfiguration surfaces in the merchant's logs immediately rather than as an `invalid_authCapture_extra` 402 to the payer. Capture / refund windows are arbiter policy; pick what your captureAuthorizer actually supports.
+
+The server-side fail-fast also covers the other directly-merchant-set fields (`captureAuthorizer`, `feeRecipient`, `minFeeBps`, `maxFeeBps`); a missing or wrongly-typed value throws at enhance time with a message naming the offending key.
+
+### Auto-populated by the scheme
+
+`AuthCaptureEvmScheme.parsePrice` resolves decimal prices like `"$0.01"` against `@x402/evm`'s default-asset table and writes `name` / `version` (EIP-712 token domain) and, where the chain's default uses Permit2, `assetTransferMethod: "permit2"` into the resulting `AssetAmount.extra` for you. The middleware merges these into the published `requirements.extra`, so merchants using decimal pricing do not need to set them by hand. Merchants supplying their own `AssetAmount` (custom token) must set `name` / `version` themselves on the `AssetAmount.extra`; the facilitator's `isAuthCaptureExtra` guard catches the case where they're missing on the wire side (no server-side fail-fast, matching how `batch-settlement` handles its scheme-auto-populated EIP-712 domain fields).
 
 ### Optional `extra` fields
 

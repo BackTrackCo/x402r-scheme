@@ -94,8 +94,8 @@
     "format:check": "prettier -c .prettierrc --check \"**/*.{ts,js,cjs,json,md}\""
   },
   "peerDependencies": {
-    "@x402/core": "^2.4.0",
-    "@x402/evm": "^2.0.0",
+    "@x402/core": "^2.11.0",
+    "@x402/evm": "^2.12.0",
     "viem": "^2.48.11"
   },
   "devDependencies": {
