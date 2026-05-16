@@ -296,6 +296,57 @@ describe("AuthCaptureEvmScheme", () => {
       expect(result.extra).not.toHaveProperty("refundDeadlineSeconds");
     });
 
+    it("should process the capture/refund pair independently when one half is absolute and the other is an offset", async () => {
+      // Asymmetric mix: capture is pinned to an absolute timestamp (e.g., a delivery commit),
+      // refund is a relative window. Each half is converted on its own. If the merchant pairs
+      // an absolute capture in the far future with a tiny refund offset (or vice-versa), the
+      // resulting `(captureDeadline, refundDeadline)` can violate the spec's ordering invariant;
+      // the facilitator rejects with `invalid_deadline_ordering` at verify time, covered by
+      // facilitator.test.ts at "should reject when refundDeadline is not after captureDeadline".
+      const scheme = new AuthCaptureEvmScheme();
+      const supportedKind = {
+        x402Version: 2,
+        scheme: "authCapture",
+        network: "eip155:84532" as const,
+      };
+
+      // Case 1: absolute capture + relative refund.
+      const reqs1 = {
+        ...baseRequirements,
+        extra: {
+          captureDeadline: 1700000000,
+          refundDeadlineSeconds: 60,
+        },
+      };
+      const before1 = Math.floor(Date.now() / 1000);
+      const out1 = await scheme.enhancePaymentRequirements(reqs1, supportedKind, []);
+      const after1 = Math.floor(Date.now() / 1000);
+
+      expect(out1.extra?.captureDeadline).toBe(1700000000);
+      expect(out1.extra?.refundDeadline).toBeGreaterThanOrEqual(before1 + 60);
+      expect(out1.extra?.refundDeadline).toBeLessThanOrEqual(after1 + 60);
+      expect(out1.extra).not.toHaveProperty("captureDeadlineSeconds");
+      expect(out1.extra).not.toHaveProperty("refundDeadlineSeconds");
+
+      // Case 2: relative capture + absolute refund.
+      const reqs2 = {
+        ...baseRequirements,
+        extra: {
+          captureDeadlineSeconds: 60,
+          refundDeadline: 1800000000,
+        },
+      };
+      const before2 = Math.floor(Date.now() / 1000);
+      const out2 = await scheme.enhancePaymentRequirements(reqs2, supportedKind, []);
+      const after2 = Math.floor(Date.now() / 1000);
+
+      expect(out2.extra?.refundDeadline).toBe(1800000000);
+      expect(out2.extra?.captureDeadline).toBeGreaterThanOrEqual(before2 + 60);
+      expect(out2.extra?.captureDeadline).toBeLessThanOrEqual(after2 + 60);
+      expect(out2.extra).not.toHaveProperty("captureDeadlineSeconds");
+      expect(out2.extra).not.toHaveProperty("refundDeadlineSeconds");
+    });
+
     it("should let absolute captureDeadline / refundDeadline win over offsets", async () => {
       const scheme = new AuthCaptureEvmScheme();
       const requirements = {
