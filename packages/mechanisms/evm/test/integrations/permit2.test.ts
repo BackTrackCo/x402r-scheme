@@ -28,11 +28,11 @@ import {
 } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/authCapture/client/scheme";
-import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/authCapture/facilitator/scheme";
-import { ESCROW_VIEW_ABI } from "../../src/authCapture/abi";
-import { AUTH_CAPTURE_ESCROW_ADDRESS, PERMIT2_ADDRESS } from "../../src/authCapture/constants";
-import type { PaymentInfoStruct, Permit2Payload } from "../../src/authCapture/types";
+import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/auth-capture/client/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/auth-capture/facilitator/scheme";
+import { ESCROW_VIEW_ABI } from "../../src/auth-capture/abi";
+import { AUTH_CAPTURE_ESCROW_ADDRESS, PERMIT2_ADDRESS } from "../../src/auth-capture/constants";
+import type { PaymentInfoStruct, Permit2Payload } from "../../src/auth-capture/types";
 
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
 const BALANCE_SLOT = 9n;
@@ -119,7 +119,7 @@ describe("fork — Permit2 settle against canonical AuthCaptureEscrow", () => {
   function buildRequirements(autoCapture: boolean) {
     const now = Math.floor(Date.now() / 1000);
     return {
-      scheme: "authCapture",
+      scheme: "auth-capture",
       network: "eip155:84532",
       amount: oneUsdc.toString(),
       asset: USDC_ADDRESS,
@@ -188,7 +188,7 @@ describe("fork — Permit2 settle against canonical AuthCaptureEscrow", () => {
     const settleResult = await facilitator.settle(
       {
         x402Version: 2,
-        scheme: "authCapture",
+        scheme: "auth-capture",
         resource: { url: "https://example.com", method: "GET" },
         accepted: requirements,
         payload,
@@ -221,7 +221,7 @@ describe("fork — Permit2 settle against canonical AuthCaptureEscrow", () => {
     const settleResult = await facilitator.settle(
       {
         x402Version: 2,
-        scheme: "authCapture",
+        scheme: "auth-capture",
         resource: { url: "https://example.com", method: "GET" },
         accepted: requirements,
         payload,

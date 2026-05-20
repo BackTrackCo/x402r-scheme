@@ -19,7 +19,7 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 ### Client
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/client";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
 import { x402Client } from "@x402/core/client";
 
 const client = new x402Client();
@@ -29,7 +29,7 @@ client.register("eip155:84532", new AuthCaptureEvmScheme(signer));
 ### Server
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/server";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/server";
 import { x402ResourceServer } from "@x402/core/server";
 
 const server = new x402ResourceServer(facilitatorClient);
@@ -38,10 +38,10 @@ server.register("eip155:84532", new AuthCaptureEvmScheme());
 
 ### Facilitator
 
-The authCapture scheme integrates with x402's facilitator using the same `FacilitatorEvmSigner` as x402's exact scheme:
+The auth-capture scheme integrates with x402's facilitator using the same `FacilitatorEvmSigner` as x402's exact scheme:
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/facilitator";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/facilitator";
 import { x402Facilitator } from "@x402/core/facilitator";
 import { toFacilitatorEvmSigner } from "@x402/evm";
 

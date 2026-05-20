@@ -3,9 +3,9 @@ import { defineConfig } from "tsup";
 const baseConfig = {
   entry: {
     index: "src/index.ts",
-    "authCapture/client/index": "src/authCapture/client/index.ts",
-    "authCapture/server/index": "src/authCapture/server/index.ts",
-    "authCapture/facilitator/index": "src/authCapture/facilitator/index.ts",
+    "auth-capture/client/index": "src/auth-capture/client/index.ts",
+    "auth-capture/server/index": "src/auth-capture/server/index.ts",
+    "auth-capture/facilitator/index": "src/auth-capture/facilitator/index.ts",
     "extensions/attestation/index": "src/extensions/attestation/index.ts",
   },
   dts: { resolve: true },
