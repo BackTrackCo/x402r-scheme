@@ -1,6 +1,6 @@
 # x402r-scheme
 
-authCapture scheme bridging the x402 protocol with the canonical AuthCaptureEscrow contracts (base/commerce-payments).
+auth-capture scheme bridging the x402 protocol with the canonical AuthCaptureEscrow contracts (base/commerce-payments).
 
 ## Commands
 
@@ -13,10 +13,10 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/mechanisms/evm/`:
 
 ```
-authCapture/client      → AuthCaptureEvmScheme (createPaymentPayload)
-authCapture/server      → AuthCaptureEvmScheme (parsePrice, enhancePaymentRequirements)
-authCapture/facilitator → AuthCaptureEvmScheme (verify, settle) + errors.ts
-authCapture/{types,constants,abi,nonce,utils}.ts → cross-layer code at scheme root
+auth-capture/client      → AuthCaptureEvmScheme (createPaymentPayload)
+auth-capture/server      → AuthCaptureEvmScheme (parsePrice, enhancePaymentRequirements)
+auth-capture/facilitator → AuthCaptureEvmScheme (verify, settle) + errors.ts
+auth-capture/{types,constants,abi,nonce,utils}.ts → cross-layer code at scheme root
 ```
 
 ## Dependencies

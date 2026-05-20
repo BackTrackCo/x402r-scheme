@@ -5,8 +5,8 @@
  * AuthCaptureEscrow contract from base/commerce-payments.
  */
 
-// authCapture scheme client
-export { AuthCaptureEvmScheme } from "./authCapture";
+// auth-capture scheme client
+export { AuthCaptureEvmScheme } from "./auth-capture";
 
 // Types
 export type {
@@ -15,13 +15,13 @@ export type {
   Eip3009Payload,
   PaymentInfoStruct,
   Permit2Payload,
-} from "./authCapture/types";
+} from "./auth-capture/types";
 export {
   isAuthCaptureExtra,
   isAuthCapturePayload,
   isEip3009Payload,
   isPermit2Payload,
-} from "./authCapture/types";
+} from "./auth-capture/types";
 
 // Constants
 export {
@@ -30,4 +30,4 @@ export {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
-} from "./authCapture/constants";
+} from "./auth-capture/constants";

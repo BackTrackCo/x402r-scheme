@@ -13,7 +13,7 @@ npm install @x402r/evm
 ### Client — Create payment payloads
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/client";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
 import { x402Client } from "@x402/core/client";
 
 const client = new x402Client();
@@ -23,7 +23,7 @@ client.register("eip155:84532", new AuthCaptureEvmScheme(signer));
 ### Server — Register with x402 resource server
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/server";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/server";
 import { x402ResourceServer } from "@x402/core/server";
 
 const server = new x402ResourceServer(facilitatorClient);
@@ -33,7 +33,7 @@ server.register("eip155:84532", new AuthCaptureEvmScheme());
 ### Facilitator — Verify and settle payments
 
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/authCapture/facilitator";
+import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/facilitator";
 import { x402Facilitator } from "@x402/core/facilitator";
 
 const facilitator = new x402Facilitator();
@@ -43,9 +43,9 @@ facilitator.register("eip155:84532", new AuthCaptureEvmScheme(signer));
 ## Exports
 
 - `@x402r/evm` — `AuthCaptureEvmScheme` (client class), payload/extra/struct types, `is*` guards, address + scheme constants
-- `@x402r/evm/authCapture/client` — `AuthCaptureEvmScheme` (client class)
-- `@x402r/evm/authCapture/server` — `AuthCaptureEvmScheme` (server class)
-- `@x402r/evm/authCapture/facilitator` — `AuthCaptureEvmScheme` (facilitator class)
+- `@x402r/evm/auth-capture/client` — `AuthCaptureEvmScheme` (client class)
+- `@x402r/evm/auth-capture/server` — `AuthCaptureEvmScheme` (server class)
+- `@x402r/evm/auth-capture/facilitator` — `AuthCaptureEvmScheme` (facilitator class)
 
 ## Testing
 

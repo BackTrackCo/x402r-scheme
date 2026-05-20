@@ -27,7 +27,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  examples/clients/authCapture:
+  examples/clients/auth-capture:
     dependencies:
       '@x402/core':
         specifier: ^2.12.0
@@ -68,10 +68,10 @@ importers:
         version: 50.8.0(eslint@9.39.3)
       eslint-plugin-prettier:
         specifier: ^5.2.6
-        version: 5.5.5(eslint@9.39.3)(prettier@3.8.1)
+        version: 5.5.5(eslint@9.39.3)(prettier@3.5.2)
       prettier:
         specifier: ^3.4.0
-        version: 3.8.1
+        version: 3.5.2
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
@@ -79,7 +79,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  examples/facilitator/authCapture:
+  examples/facilitator/auth-capture:
     dependencies:
       '@x402/core':
         specifier: ^2.12.0
@@ -123,10 +123,10 @@ importers:
         version: 50.8.0(eslint@9.39.3)
       eslint-plugin-prettier:
         specifier: ^5.2.6
-        version: 5.5.5(eslint@9.39.3)(prettier@3.8.1)
+        version: 5.5.5(eslint@9.39.3)(prettier@3.5.2)
       prettier:
         specifier: ^3.4.0
-        version: 3.8.1
+        version: 3.5.2
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
@@ -134,7 +134,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  examples/servers/authCapture:
+  examples/servers/auth-capture:
     dependencies:
       '@x402/core':
         specifier: ^2.12.0
@@ -181,10 +181,10 @@ importers:
         version: 50.8.0(eslint@9.39.3)
       eslint-plugin-prettier:
         specifier: ^5.2.6
-        version: 5.5.5(eslint@9.39.3)(prettier@3.8.1)
+        version: 5.5.5(eslint@9.39.3)(prettier@3.5.2)
       prettier:
         specifier: ^3.4.0
-        version: 3.8.1
+        version: 3.5.2
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
@@ -3204,13 +3204,6 @@ snapshots:
     dependencies:
       eslint: 9.39.3
       prettier: 3.5.2
-      prettier-linter-helpers: 1.0.1
-      synckit: 0.11.12
-
-  eslint-plugin-prettier@5.5.5(eslint@9.39.3)(prettier@3.8.1):
-    dependencies:
-      eslint: 9.39.3
-      prettier: 3.8.1
       prettier-linter-helpers: 1.0.1
       synckit: 0.11.12
 
