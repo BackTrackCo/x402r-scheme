@@ -205,9 +205,9 @@ In addition to the standard verification logic, a facilitator MUST:
    - No `requirements.asset` transfer to any address outside `{payer, receiver, feeReceiver, escrow}`.
 4. **Gas cap**. Apply an explicit gas cap to both the simulation and the broadcast transaction. A misbehaving captureAuthorizer can consume up to the gas field provided by the facilitator; the cap bounds the facilitator's gas exposure.
 
-The recommended cap is **400,000 gas**. This is approximately twice the worst-case legitimate `charge` path through the audited escrow with the ERC-3009 collector (measured at ~181k gas on Base via the upstream gas benchmark), with headroom for a thin passthrough wrapper. Permit2 is cheaper than ERC-3009, so the cap is not gated by Permit2.
+The recommended cap is **400,000 gas**. This comfortably covers a direct call to `AuthCaptureEscrow.authorize` or `.charge` for both supported `assetTransferMethod` values with headroom for a thin passthrough wrapper, while keeping a misbehaving captureAuthorizer from consuming a material fraction of the facilitator's gas balance on a single request.
 
-Facilitators MAY raise the cap for known-heavier captureAuthorizer contracts they advertise support for, but MUST NOT remove it.
+Facilitators MAY raise the cap for specific captureAuthorizer contracts they advertise support for, but MUST NOT remove it.
 
 #### Operational hardening
 
