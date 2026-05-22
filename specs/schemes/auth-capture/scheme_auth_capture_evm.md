@@ -176,11 +176,46 @@ The facilitator performs these checks in order:
 10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match `payer`.
 11. **Amount**: `authorization.value` (EIP-3009) or `permit2Authorization.permitted.amount` (Permit2) matches `requirements.amount`.
 12. **Nonce match**: Reconstruct `PaymentInfo` from extra + payload.salt + payer + requirements; recompute payer-agnostic hash; assert it matches the wire nonce. This transitively enforces equality on every field encoded in `PaymentInfo` (receiver, token, deadlines, fee bounds, feeRecipient), so individual field-by-field checks for those values are unnecessary.
-13. **Simulate** `AUTH_CAPTURE_ESCROW.authorize(...)` or `.charge(...)` to ensure success.
+13. **Simulate** the settle call to ensure success. The simulation target depends on whether `extra.captureAuthorizer` is an EOA or a smart contract (see [Smart Contract `captureAuthorizer`](#smart-contract-captureauthorizer)). When the captureAuthorizer is a smart contract, the simulation MUST be performed at trace level (e.g. `eth_simulateV1`), with the additional checks described in that section, and MUST apply the gas cap defined there.
 
 ### EIP-6492 Support
 
 For smart wallet clients, the signature may be EIP-6492 wrapped (containing deployment bytecode). The facilitator extracts the inner ECDSA signature for verification. The on-chain `ERC6492SignatureHandler` in the token collector handles wallet deployment during settlement.
+
+### Smart Contract `captureAuthorizer`
+
+`extra.captureAuthorizer` MAY be either an EOA or a smart contract. The escrow gates `authorize` / `capture` / `void` / `refund` / `charge` on `msg.sender` matching `paymentInfo.operator`, so a smart contract captureAuthorizer must end up calling escrow itself, with the facilitator's transaction passing through that contract first.
+
+Facilitators detect the path by probing `getCode(captureAuthorizer)`:
+
+- **Empty bytecode (EOA path)**: the facilitator submits the settle transaction directly to `AUTH_CAPTURE_ESCROW_ADDRESS` with `msg.sender = facilitator EOA = captureAuthorizer`. Standard simulation via `eth_call` is sufficient.
+- **Non-empty bytecode (contract path)**: the facilitator submits the settle transaction to the captureAuthorizer contract, which is then responsible for calling escrow with `msg.sender = captureAuthorizer`.
+
+The captureAuthorizer contract is merchant-set and not on any allowlist (every new arbiter or wrapper deploys at a new address). Facilitators MUST treat smart contract captureAuthorizers as untrusted code.
+
+#### Required checks on the contract path
+
+In addition to the standard verification logic, a facilitator MUST:
+
+1. **Trace-level simulation**. Simulate the settle call at trace level (`eth_simulateV1` or equivalent), capturing emitted logs and asset changes. A revert-only simulation is NOT sufficient.
+2. **Escrow call verification**. Assert that the trace contains the expected `AuthCaptureEscrow` event for the chosen entrypoint, emitted by `AUTH_CAPTURE_ESCROW_ADDRESS`, with `paymentInfoHash` matching the payer-agnostic hash recomputed in verification step 12. This confirms the captureAuthorizer actually forwards into escrow with the signed `PaymentInfo`.
+3. **Asset-delta verification**. Reconstruct ERC-20 `Transfer(from, to, value)` deltas for `requirements.asset` from the trace and assert that they match the signed `PaymentInfo`:
+   - On `authorize`: payer balance decreases by `amount`; escrow balance increases by `amount`; `receiver` and `feeReceiver` are unchanged.
+   - On `charge`: payer balance decreases by `amount`; receiver and `feeReceiver` receive the split implied by some `feeBps ∈ [minFeeBps, maxFeeBps]`.
+   - No `requirements.asset` transfer to any address outside `{payer, receiver, feeReceiver, escrow}`.
+4. **Gas cap**. Apply an explicit gas cap to both the simulation and the broadcast transaction. A misbehaving captureAuthorizer can consume up to the gas field provided by the facilitator; the cap bounds the facilitator's gas exposure.
+
+The recommended cap is **400,000 gas**. This is approximately twice the worst-case legitimate `charge` path through the audited escrow with the ERC-3009 collector (measured at ~181k gas on Base via the upstream gas benchmark), with headroom for a thin passthrough wrapper. Permit2 is cheaper than ERC-3009, so the cap is not gated by Permit2.
+
+Facilitators MAY raise the cap for known-heavier captureAuthorizer contracts they advertise support for, but MUST NOT remove it.
+
+#### Operational hardening
+
+Facilitators that support contract-path captureAuthorizers SHOULD:
+
+- Submit settle transactions from a gas-only hot wallet that holds no token balances and has no token approvals. The captureAuthorizer cannot exfiltrate value from such a wallet even on a successful unexpected call path.
+- Reject any settle attempt that requires sending native value. The auth-capture flow is ERC-20 only; a `value > 0` transaction to a captureAuthorizer indicates the contract is requesting funds the facilitator should not grant.
+- Apply the gas cap before broadcast, not just during simulation. A captureAuthorizer that simulates within the cap but executes above it would still be bounded.
 
 ## Settlement Logic
 
@@ -188,9 +223,10 @@ For smart wallet clients, the signature may be EIP-6492 wrapped (containing depl
 2. **Determine function**: `extra.autoCapture === true ? "charge" : "authorize"`.
 3. **Resolve collector**: `EIP3009_TOKEN_COLLECTOR_ADDRESS` or `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (per `assetTransferMethod`).
 4. **Encode `collectorData`**: raw ERC-3009 signature, or ABI-encoded Permit2 signature.
-5. **Call escrow**: `AUTH_CAPTURE_ESCROW.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`.
-6. **Wait for receipt**: 60s timeout.
-7. **Return result**: tx hash, network, payer.
+5. **Resolve target**: when `extra.captureAuthorizer` is an EOA, the target is `AUTH_CAPTURE_ESCROW_ADDRESS`; when it is a smart contract, the target is the captureAuthorizer contract itself (see [Smart Contract `captureAuthorizer`](#smart-contract-captureauthorizer)).
+6. **Call target**: `<target>.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`. When the target is a smart contract captureAuthorizer, the transaction MUST be submitted with the gas cap defined in that section.
+7. **Wait for receipt**: 60s timeout.
+8. **Return result**: tx hash, network, payer.
 
 ## Error Codes
 
@@ -218,6 +254,10 @@ The auth-capture scheme uses the standard x402 error codes plus these scheme-spe
 | `nonce_mismatch`                    | Wire nonce doesn't match the recomputed payer-agnostic PaymentInfo hash.          |
 | `insufficient_balance`              | Payer balance is less than required amount.                                       |
 | `simulation_failed`                 | Settlement simulation reverted with an unmapped error.                            |
+| `capture_authorizer_escrow_call_missing` | Trace-level simulation of a smart contract captureAuthorizer did not show the expected `AuthCaptureEscrow` event with a matching `paymentInfoHash`. |
+| `capture_authorizer_payment_info_mismatch` | The escrow event surfaced in the contract-path simulation references a `paymentInfoHash` that does not match the signed `PaymentInfo`.        |
+| `capture_authorizer_asset_divergence` | Contract-path simulation showed an ERC-20 transfer of `requirements.asset` to an address outside `{payer, receiver, feeReceiver, escrow}`, or split deltas inconsistent with `minFeeBps` / `maxFeeBps`. |
+| `capture_authorizer_gas_exceeded`   | Contract-path simulation reported `gasUsed` greater than the facilitator's gas cap. |
 
 ### Typed simulation reverts
 
