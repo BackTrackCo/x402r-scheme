@@ -20,8 +20,22 @@ import type {
   VerifyResponse,
 } from "@x402/core/types";
 import type { FacilitatorEvmSigner } from "@x402/evm";
-import { BaseError, ContractFunctionRevertedError, hexToBigInt, parseErc6492Signature } from "viem";
-import { ERC20_BALANCE_OF_ABI, ESCROW_ABI, ESCROW_ERRORS_ABI } from "../abi";
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  decodeEventLog,
+  encodeFunctionData,
+  hexToBigInt,
+  parseErc6492Signature,
+  type Log,
+} from "viem";
+import {
+  ERC20_BALANCE_OF_ABI,
+  ERC20_TRANSFER_EVENT_ABI,
+  ESCROW_ABI,
+  ESCROW_ERRORS_ABI,
+  ESCROW_EVENTS_ABI,
+} from "../abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   AUTH_CAPTURE_SCHEME,
@@ -33,6 +47,10 @@ import {
   ErrAmountMismatch,
   ErrAuthorizationExpired,
   ErrAuthorizationNotYetValid,
+  ErrCaptureAuthorizerAssetDivergence,
+  ErrCaptureAuthorizerEscrowCallMissing,
+  ErrCaptureAuthorizerGasExceeded,
+  ErrCaptureAuthorizerPaymentInfoMismatch,
   ErrCaptureDeadlineExpired,
   ErrInsufficientBalance,
   ErrInvalidAuthCaptureExtra,
@@ -52,6 +70,7 @@ import {
   ErrVerificationFailed,
 } from "./errors";
 import {
+  computeOnchainPaymentInfoHash,
   computePayerAgnosticPaymentInfoHash,
   verifyERC3009Signature,
   verifyPermit2Signature,
@@ -119,6 +138,18 @@ function reconstructPaymentInfo(
 function paymentInfoToContractTuple(p: PaymentInfoStruct) {
   return { ...p, maxAmount: BigInt(p.maxAmount), salt: BigInt(p.salt) };
 }
+
+/**
+ * Hard gas cap applied to both trace simulation and the broadcast settle tx
+ * when `extra.captureAuthorizer` is a smart contract. Bounds the facilitator's
+ * gas exposure to a misbehaving authorizer contract.
+ *
+ * 400_000 comfortably covers a direct authorize/charge call through the
+ * audited escrow with either supported assetTransferMethod, plus headroom for
+ * a thin passthrough wrapper. Anything that needs more should be supported
+ * explicitly per-authorizer, not absorbed by widening the global cap.
+ */
+export const CAPTURE_AUTHORIZER_GAS_LIMIT = 400_000n;
 
 /**
  * AuthCapture Facilitator Scheme - implements x402's SchemeNetworkFacilitator.
@@ -342,8 +373,18 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
       }
     }
 
-    // Simulate the settle call to catch issues before spending gas.
-    const settleResult = await this.simulateSettle(paymentInfo, amount, wirePayload, extra, payer);
+    // Simulate the settle call to catch issues before spending gas. The
+    // on-chain hash uses the real payer (matches escrow.getHash); the wire
+    // nonce uses a zeroed payer. Both come from the same PaymentInfo struct,
+    // so they're computed from the same source of truth.
+    const onchainHash = computeOnchainPaymentInfoHash(chainId, paymentInfo);
+    const settleResult = await this.simulateSettle(
+      paymentInfo,
+      amount,
+      wirePayload,
+      extra,
+      onchainHash,
+    );
     if (settleResult !== "ok") {
       // For balance-related failures, return a more actionable reason.
       try {
@@ -400,10 +441,7 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
     const payer = verification.payer as `0x${string}`;
 
-    const { preApprovalExpiry, amount, tokenCollector, collectorData } = unpackForSettle(
-      wirePayload,
-      assetTransferMethod,
-    );
+    const { preApprovalExpiry, amount } = unpackForSettle(wirePayload, assetTransferMethod);
     const paymentInfo = reconstructPaymentInfo(
       payer,
       preApprovalExpiry,
@@ -412,25 +450,14 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
       extra,
     );
 
-    const functionName = extra.autoCapture === true ? "charge" : "authorize";
-    const tuple = paymentInfoToContractTuple(paymentInfo);
     // charge() takes 6 args (adds feeBps + feeReceiver); authorize() takes 4.
     // Use minFeeBps as the safe default within the merchant's signed [min, max]
     // range; feeReceiver mirrors paymentInfo.feeReceiver (= extra.feeRecipient)
     // because _validateFee requires actual to match configured when configured != 0.
-    const args =
-      functionName === "charge"
-        ? ([
-            tuple,
-            amount,
-            tokenCollector,
-            collectorData,
-            paymentInfo.minFeeBps,
-            paymentInfo.feeReceiver,
-          ] as const)
-        : ([tuple, amount, tokenCollector, collectorData] as const);
+    const { functionName, args } = buildSettleArgs(paymentInfo, amount, wirePayload, extra);
 
     const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer);
+    const isContractPath = settleTarget !== AUTH_CAPTURE_ESCROW_ADDRESS;
 
     try {
       const txHash = await this.signer.writeContract({
@@ -438,6 +465,10 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
         abi: ESCROW_ABI,
         functionName,
         args,
+        // Apply the gas cap on the contract path so a misbehaving authorizer
+        // cannot drain the facilitator. The EOA path skips this so the audited
+        // escrow gets a normal eth_estimateGas-driven limit.
+        ...(isContractPath ? { gas: CAPTURE_AUTHORIZER_GAS_LIMIT } : {}),
       });
 
       const receiptPromise = this.signer.waitForTransactionReceipt({ hash: txHash });
@@ -474,19 +505,25 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
   }
 
   /**
-   * Simulate the settle call via `eth_call` and translate the result to a
-   * stable wire-level reason. Returns `"ok"` on simulated success; on revert
-   * viem walks the error chain for `ContractFunctionRevertedError` and decodes
-   * the custom-error name against `ESCROW_ABI + ESCROW_ERRORS_ABI`. Known
-   * errors map to typed reasons via `ESCROW_ERROR_TO_INVALID_REASON`; anything
-   * unmapped (e.g. token-collector reverts like a consumed ERC-3009 nonce)
-   * falls through to `simulation_failed`.
+   * Simulate the settle call and translate the result to a stable wire-level
+   * reason. Dispatches by captureAuthorizer kind:
+   *
+   * - **EOA path** (settle target == escrow): a revert-only `eth_call`
+   *   simulation is sufficient. The escrow is the same audited contract on
+   *   every chain; semantic guarantees are baked in.
+   * - **Contract path** (settle target == captureAuthorizer contract):
+   *   trace-level simulation is mandatory per `scheme_auth_capture_evm.md`'s
+   *   "Smart Contract `captureAuthorizer`" section. We verify the wrapper
+   *   actually reaches escrow with the signed PaymentInfo, that asset deltas
+   *   match the signed split, and that the simulated gas stays under the cap.
+   *
+   * Returns `"ok"` on simulated success, or a stable `invalidReason` string.
    *
    * @param paymentInfo - The reconstructed PaymentInfo struct.
    * @param amount - Settle amount in token base units.
    * @param wirePayload - The payer's wire payload.
    * @param extra - Validated `AuthCaptureExtra` from `requirements.extra`.
-   * @param _ - Unused payer address (interface compatibility).
+   * @param paymentInfoHash - On-chain `paymentInfoHash` (matches escrow event topic).
    * @returns `"ok"` on simulated success, or a stable `invalidReason` string.
    */
   private async simulateSettle(
@@ -494,36 +531,44 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     amount: bigint,
     wirePayload: AuthCapturePayload,
     extra: AuthCaptureExtra,
-    _: `0x${string}`,
+    paymentInfoHash: `0x${string}`,
   ): Promise<"ok" | string> {
-    const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
-    const { tokenCollector, collectorData } = unpackForSettle(wirePayload, assetTransferMethod);
-    const functionName = extra.autoCapture === true ? "charge" : "authorize";
-    const tuple = paymentInfoToContractTuple(paymentInfo);
-    const args =
-      functionName === "charge"
-        ? ([
-            tuple,
-            amount,
-            tokenCollector,
-            collectorData,
-            paymentInfo.minFeeBps,
-            paymentInfo.feeReceiver,
-          ] as const)
-        : ([tuple, amount, tokenCollector, collectorData] as const);
-
     const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer);
+    const isContractPath = settleTarget !== AUTH_CAPTURE_ESCROW_ADDRESS;
 
+    return isContractPath
+      ? this.simulateAuthorizerPassthrough(
+          settleTarget,
+          paymentInfo,
+          amount,
+          wirePayload,
+          extra,
+          paymentInfoHash,
+        )
+      : this.simulateEscrowDirect(paymentInfo, amount, wirePayload, extra);
+  }
+
+  /**
+   * EOA path: simulate `authorize` / `charge` against the canonical escrow
+   * with the facilitator EOA as `msg.sender`. Returns `"ok"` on success, or a
+   * stable wire reason decoded from a `ContractFunctionRevertedError`.
+   *
+   * @param paymentInfo - The reconstructed PaymentInfo struct.
+   * @param amount - Settle amount in token base units.
+   * @param wirePayload - The payer's wire payload.
+   * @param extra - Validated `AuthCaptureExtra` from `requirements.extra`.
+   * @returns `"ok"` on simulated success, or a stable `invalidReason` string.
+   */
+  private async simulateEscrowDirect(
+    paymentInfo: PaymentInfoStruct,
+    amount: bigint,
+    wirePayload: AuthCapturePayload,
+    extra: AuthCaptureExtra,
+  ): Promise<"ok" | string> {
+    const { functionName, args } = buildSettleArgs(paymentInfo, amount, wirePayload, extra);
     try {
-      // Simulate as the facilitator EOA so escrow's `onlySender(operator)` gate
-      // is evaluated against the same `msg.sender` that the real settle tx will
-      // have (EOA path: facilitator EOA; contract path: captureAuthorizer
-      // contract, which forwards as itself). viem's underlying readContract
-      // accepts `account`, but the FacilitatorEvmSigner type in @x402/evm
-      // doesn't declare it yet (pending upstream signer-type update in
-      // https://github.com/x402-foundation/x402/pull/2308).
       await this.signer.readContract({
-        address: settleTarget,
+        address: AUTH_CAPTURE_ESCROW_ADDRESS,
         abi: ESCROW_ABI_WITH_ERRORS,
         functionName,
         args,
@@ -533,6 +578,97 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     } catch (err) {
       return decodeRevertReason(err);
     }
+  }
+
+  /**
+   * Contract path: trace-level simulation of the settle call against an
+   * untrusted captureAuthorizer contract. Uses the signer's `simulateCalls`
+   * capability (viem PublicClient action) to capture logs and per-call gas.
+   * Checks layered on top of a revert-only simulation:
+   *
+   * 1. Gas: simulated `gasUsed` MUST be ≤ `CAPTURE_AUTHORIZER_GAS_LIMIT`.
+   * 2. Escrow event: the trace MUST contain the matching `PaymentAuthorized`
+   * or `PaymentCharged` event emitted by `AUTH_CAPTURE_ESCROW_ADDRESS`,
+   * with `paymentInfoHash` equal to the payer-agnostic hash verified in
+   * step 12.
+   * 3. Asset deltas: ERC-20 `Transfer` events for `requirements.asset` must
+   * move funds consistent with the signed PaymentInfo — payer pays
+   * `amount`; on `authorize` the receiver/feeReceiver are untouched and
+   * no address outside `{payer, receiver, feeReceiver}` net-receives
+   * other than as a known intermediate; on `charge` receiver +
+   * feeReceiver get the split with `feeBps ∈ [minFeeBps, maxFeeBps]`.
+   *
+   * Falls back to revert reason decoding on simulation failure. If the
+   * signer doesn't expose `simulateCalls`, we cannot satisfy the spec on
+   * the contract path and return `simulation_failed`.
+   *
+   * @param target - Resolved settle target — the captureAuthorizer contract.
+   * @param paymentInfo - The reconstructed PaymentInfo struct.
+   * @param amount - Settle amount in token base units.
+   * @param wirePayload - The payer's wire payload.
+   * @param extra - Validated `AuthCaptureExtra` from `requirements.extra`.
+   * @param paymentInfoHash - On-chain `paymentInfoHash` (matches escrow event topic).
+   * @returns `"ok"` on simulated success, or a stable `invalidReason` string.
+   */
+  private async simulateAuthorizerPassthrough(
+    target: `0x${string}`,
+    paymentInfo: PaymentInfoStruct,
+    amount: bigint,
+    wirePayload: AuthCapturePayload,
+    extra: AuthCaptureExtra,
+    paymentInfoHash: `0x${string}`,
+  ): Promise<"ok" | string> {
+    const simulateCalls = (this.signer as unknown as Partial<SimulateCallsCapable>).simulateCalls;
+    if (typeof simulateCalls !== "function") {
+      return ErrSimulationFailed;
+    }
+    const { functionName, args } = buildSettleArgs(paymentInfo, amount, wirePayload, extra);
+    const data = encodeFunctionData({
+      abi: ESCROW_ABI,
+      functionName,
+      args,
+    } as Parameters<typeof encodeFunctionData>[0]);
+
+    let traceResult: SimulateCallResult;
+    try {
+      const response = (await simulateCalls.call(this.signer, {
+        account: this.signer.getAddresses()[0],
+        calls: [
+          {
+            to: target,
+            data,
+            gas: CAPTURE_AUTHORIZER_GAS_LIMIT,
+          },
+        ],
+        traceTransfers: true,
+      })) as SimulateCallsResponse;
+      traceResult = response.results[0];
+    } catch (err) {
+      return decodeRevertReason(err);
+    }
+
+    if (traceResult.status !== "success") {
+      // Some RPCs surface the revert as `error` on the result; others throw.
+      // Try to decode whichever we got.
+      if (traceResult.error) return decodeRevertReason(traceResult.error);
+      return ErrSimulationFailed;
+    }
+
+    if (
+      typeof traceResult.gasUsed === "bigint" &&
+      traceResult.gasUsed > CAPTURE_AUTHORIZER_GAS_LIMIT
+    ) {
+      return ErrCaptureAuthorizerGasExceeded;
+    }
+
+    const logs = traceResult.logs ?? [];
+    const escrowCheck = verifyEscrowEvent(logs, functionName, paymentInfoHash);
+    if (escrowCheck !== "ok") return escrowCheck;
+
+    const assetCheck = verifyAssetDeltas(logs, paymentInfo, amount, functionName);
+    if (assetCheck !== "ok") return assetCheck;
+
+    return "ok";
   }
 
   /**
@@ -586,6 +722,214 @@ function decodeRevertReason(err: unknown): string {
     }
   }
   return ErrSimulationFailed;
+}
+
+/**
+ * Build the function name + args tuple used by both the simulate and settle
+ * paths so the two are guaranteed identical. Encodes `charge`'s 6-arg / 4-arg
+ * split in one place.
+ *
+ * @param paymentInfo - The reconstructed PaymentInfo struct.
+ * @param amount - Settle amount in token base units.
+ * @param wirePayload - The payer's wire payload.
+ * @param extra - Validated `AuthCaptureExtra` from `requirements.extra`.
+ * @returns `functionName` (authorize | charge) and the matching `args` tuple.
+ */
+function buildSettleArgs(
+  paymentInfo: PaymentInfoStruct,
+  amount: bigint,
+  wirePayload: AuthCapturePayload,
+  extra: AuthCaptureExtra,
+): { functionName: "authorize" | "charge"; args: readonly unknown[] } {
+  const assetTransferMethod = extra.assetTransferMethod ?? "eip3009";
+  const { tokenCollector, collectorData } = unpackForSettle(wirePayload, assetTransferMethod);
+  const functionName = extra.autoCapture === true ? "charge" : "authorize";
+  const tuple = paymentInfoToContractTuple(paymentInfo);
+  const args =
+    functionName === "charge"
+      ? ([
+          tuple,
+          amount,
+          tokenCollector,
+          collectorData,
+          paymentInfo.minFeeBps,
+          paymentInfo.feeReceiver,
+        ] as const)
+      : ([tuple, amount, tokenCollector, collectorData] as const);
+  return { functionName, args };
+}
+
+/**
+ * Shape the contract path expects from the signer for `eth_simulateV1`
+ * (viem PublicClient.simulateCalls). Not declared on FacilitatorEvmSigner
+ * because not every signer transport surfaces it; we feature-detect at use.
+ */
+type SimulateCallsCapable = {
+  simulateCalls(args: {
+    account?: `0x${string}`;
+    calls: Array<{ to: `0x${string}`; data: `0x${string}`; gas?: bigint }>;
+    traceTransfers?: boolean;
+  }): Promise<SimulateCallsResponse>;
+};
+
+type SimulateCallResult = {
+  status: "success" | "failure" | string;
+  gasUsed?: bigint;
+  logs?: ReadonlyArray<Log>;
+  error?: unknown;
+};
+
+type SimulateCallsResponse = {
+  results: ReadonlyArray<SimulateCallResult>;
+};
+
+/**
+ * Find the `PaymentAuthorized` / `PaymentCharged` event in a simulated trace,
+ * emitted by `AUTH_CAPTURE_ESCROW_ADDRESS`, and assert its indexed
+ * `paymentInfoHash` matches the hash recomputed in verify step 12.
+ *
+ * No matching event → `capture_authorizer_escrow_call_missing` (the wrapper
+ * didn't reach escrow at all). Hash mismatch → `capture_authorizer_payment_info_mismatch`
+ * (the wrapper reached escrow but with a different PaymentInfo than was signed).
+ *
+ * @param logs - All logs from the simulated trace.
+ * @param functionName - The escrow function the facilitator submitted.
+ * @param expectedHash - On-chain `paymentInfoHash` matching `escrow.getHash(paymentInfo)`.
+ * @returns `"ok"` or a stable wire reason.
+ */
+function verifyEscrowEvent(
+  logs: ReadonlyArray<Log>,
+  functionName: "authorize" | "charge",
+  expectedHash: `0x${string}`,
+): "ok" | string {
+  const escrow = AUTH_CAPTURE_ESCROW_ADDRESS.toLowerCase();
+  const expectedEventName = functionName === "authorize" ? "PaymentAuthorized" : "PaymentCharged";
+  let foundEscrowEvent = false;
+
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== escrow) continue;
+    let decoded: ReturnType<typeof decodeEventLog>;
+    try {
+      decoded = decodeEventLog({
+        abi: ESCROW_EVENTS_ABI,
+        data: log.data,
+        topics: log.topics,
+        strict: false,
+      });
+    } catch {
+      continue;
+    }
+    if (decoded.eventName !== expectedEventName) continue;
+    foundEscrowEvent = true;
+    const hash = (decoded.args as { paymentInfoHash: `0x${string}` }).paymentInfoHash;
+    if (hash.toLowerCase() === expectedHash.toLowerCase()) return "ok";
+  }
+
+  return foundEscrowEvent
+    ? ErrCaptureAuthorizerPaymentInfoMismatch
+    : ErrCaptureAuthorizerEscrowCallMissing;
+}
+
+/**
+ * Reconstruct net ERC-20 deltas for `paymentInfo.token` from the trace and
+ * assert they match the signed PaymentInfo.
+ *
+ * On `authorize`: payer must be -amount; receiver and feeReceiver must be 0;
+ * all other addresses with non-zero net delta must sum to +amount (the
+ * "escrow side" of the move — escrow's TokenStore is the typical destination,
+ * but we don't enumerate it explicitly).
+ *
+ * On `charge`: payer must be -amount; receiver + feeReceiver must sum to
+ * +amount with an implied `feeBps ∈ [minFeeBps, maxFeeBps]`; everything else
+ * must net to 0 (funds flow all the way through).
+ *
+ * Any divergence → `capture_authorizer_asset_divergence`.
+ *
+ * @param logs - All logs from the simulated trace.
+ * @param paymentInfo - The reconstructed PaymentInfo struct.
+ * @param amount - Settle amount in token base units.
+ * @param functionName - The escrow function the facilitator submitted.
+ * @returns `"ok"` or `capture_authorizer_asset_divergence`.
+ */
+function verifyAssetDeltas(
+  logs: ReadonlyArray<Log>,
+  paymentInfo: PaymentInfoStruct,
+  amount: bigint,
+  functionName: "authorize" | "charge",
+): "ok" | string {
+  const token = paymentInfo.token.toLowerCase();
+  const deltas = new Map<string, bigint>();
+
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== token) continue;
+    let decoded: ReturnType<typeof decodeEventLog>;
+    try {
+      decoded = decodeEventLog({
+        abi: ERC20_TRANSFER_EVENT_ABI,
+        data: log.data,
+        topics: log.topics,
+        strict: false,
+      });
+    } catch {
+      continue;
+    }
+    if (decoded.eventName !== "Transfer") continue;
+    const { from, to, value } = decoded.args as {
+      from: `0x${string}`;
+      to: `0x${string}`;
+      value: bigint;
+    };
+    const fromKey = from.toLowerCase();
+    const toKey = to.toLowerCase();
+    deltas.set(fromKey, (deltas.get(fromKey) ?? 0n) - value);
+    deltas.set(toKey, (deltas.get(toKey) ?? 0n) + value);
+  }
+
+  const payerKey = paymentInfo.payer.toLowerCase();
+  const receiverKey = paymentInfo.receiver.toLowerCase();
+  const feeReceiverKey = paymentInfo.feeReceiver.toLowerCase();
+
+  const payerDelta = deltas.get(payerKey) ?? 0n;
+  if (payerDelta !== -amount) return ErrCaptureAuthorizerAssetDivergence;
+
+  const receiverDelta = deltas.get(receiverKey) ?? 0n;
+  const feeReceiverDelta = deltas.get(feeReceiverKey) ?? 0n;
+
+  if (functionName === "authorize") {
+    // Receiver and feeReceiver are untouched at authorize time. The +amount
+    // ends up somewhere in the escrow system (its TokenStore in the canonical
+    // contracts); sum that "other" bucket and assert it equals +amount.
+    if (receiverDelta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
+    if (feeReceiverDelta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
+    let otherSum = 0n;
+    for (const [addr, delta] of deltas) {
+      if (addr === payerKey || addr === receiverKey || addr === feeReceiverKey) continue;
+      otherSum += delta;
+    }
+    return otherSum === amount ? "ok" : ErrCaptureAuthorizerAssetDivergence;
+  }
+
+  // charge path: receiver + feeReceiver split the amount; nothing else nets non-zero.
+  if (receiverDelta < 0n || feeReceiverDelta < 0n) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  if (receiverDelta + feeReceiverDelta !== amount) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  // Validate the implied feeBps falls inside the signed [min, max] range.
+  // amount * minFeeBps <= feeReceiverDelta * 10000 <= amount * maxFeeBps
+  const feeNumerator = feeReceiverDelta * 10000n;
+  if (feeNumerator < amount * BigInt(paymentInfo.minFeeBps)) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  if (feeNumerator > amount * BigInt(paymentInfo.maxFeeBps)) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  for (const [addr, delta] of deltas) {
+    if (addr === payerKey || addr === receiverKey || addr === feeReceiverKey) continue;
+    if (delta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
+  }
+  return "ok";
 }
 
 /**

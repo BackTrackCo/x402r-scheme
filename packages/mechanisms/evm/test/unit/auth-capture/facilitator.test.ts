@@ -2,20 +2,171 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   ContractFunctionExecutionError,
   ContractFunctionRevertedError,
+  encodeAbiParameters,
   encodeErrorResult,
+  encodeEventTopics,
   hexToBigInt,
+  type Log,
 } from "viem";
 import { AuthCaptureEvmScheme } from "../../../src/auth-capture/facilitator/scheme";
-import { ESCROW_ABI, ESCROW_ERRORS_ABI } from "../../../src/auth-capture/abi";
+import {
+  ERC20_TRANSFER_EVENT_ABI,
+  ESCROW_ABI,
+  ESCROW_EVENTS_ABI,
+  PAYMENT_INFO_COMPONENTS,
+} from "../../../src/auth-capture/abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_TOKEN_COLLECTOR_ADDRESS,
 } from "../../../src/auth-capture/constants";
-import { computePayerAgnosticPaymentInfoHash } from "../../../src/auth-capture/nonce";
+import {
+  computeOnchainPaymentInfoHash,
+  computePayerAgnosticPaymentInfoHash,
+} from "../../../src/auth-capture/nonce";
 import type { PaymentInfoStruct } from "../../../src/auth-capture/types";
 
+/**
+ * Build a fake ERC-20 Transfer log that the trace simulator can return.
+ */
+function transferLog(
+  token: `0x${string}`,
+  from: `0x${string}`,
+  to: `0x${string}`,
+  value: bigint,
+): Log {
+  const topics = encodeEventTopics({
+    abi: ERC20_TRANSFER_EVENT_ABI,
+    eventName: "Transfer",
+    args: { from, to },
+  });
+  const data = encodeAbiParameters([{ type: "uint256" }], [value]);
+  return {
+    address: token,
+    topics: topics as [`0x${string}`, ...`0x${string}`[]],
+    data,
+    blockNumber: 0n,
+    transactionHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
+    transactionIndex: 0,
+    blockHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
+    logIndex: 0,
+    removed: false,
+  } as Log;
+}
+
+/**
+ * Build a PaymentAuthorized / PaymentCharged log emitted by the canonical
+ * AuthCaptureEscrow address with the correct on-chain paymentInfoHash topic.
+ */
+function escrowEventLog(
+  paymentInfo: PaymentInfoStruct,
+  amount: bigint,
+  functionName: "authorize" | "charge",
+  tokenCollector: `0x${string}`,
+  chainId: number,
+  feeBps = 0,
+  feeReceiver: `0x${string}` = paymentInfo.feeReceiver,
+  override?: { paymentInfoHash?: `0x${string}`; address?: `0x${string}` },
+): Log {
+  const hash = override?.paymentInfoHash ?? computeOnchainPaymentInfoHash(chainId, paymentInfo);
+  const eventName = functionName === "authorize" ? "PaymentAuthorized" : "PaymentCharged";
+  const topics = encodeEventTopics({
+    abi: ESCROW_EVENTS_ABI,
+    eventName,
+    args: { paymentInfoHash: hash },
+  });
+  const paymentInfoTuple = {
+    ...paymentInfo,
+    maxAmount: BigInt(paymentInfo.maxAmount),
+    salt: BigInt(paymentInfo.salt),
+  };
+  const data =
+    functionName === "authorize"
+      ? encodeAbiParameters(
+          [
+            { type: "tuple", components: PAYMENT_INFO_COMPONENTS },
+            { type: "uint256" },
+            { type: "address" },
+          ],
+          [paymentInfoTuple, amount, tokenCollector],
+        )
+      : encodeAbiParameters(
+          [
+            { type: "tuple", components: PAYMENT_INFO_COMPONENTS },
+            { type: "uint256" },
+            { type: "address" },
+            { type: "uint16" },
+            { type: "address" },
+          ],
+          [paymentInfoTuple, amount, tokenCollector, feeBps, feeReceiver],
+        );
+  return {
+    address: override?.address ?? AUTH_CAPTURE_ESCROW_ADDRESS,
+    topics: topics as [`0x${string}`, ...`0x${string}`[]],
+    data,
+    blockNumber: 0n,
+    transactionHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
+    transactionIndex: 0,
+    blockHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
+    logIndex: 1,
+    removed: false,
+  } as Log;
+}
+
+/**
+ * A "honest passthrough" trace for the contract path. Returns a successful
+ * simulateCalls response with: escrow event w/ matching hash + Transfer
+ * events with deltas that match the signed PaymentInfo.
+ */
+function buildHonestTrace(
+  paymentInfo: PaymentInfoStruct,
+  amount: bigint,
+  functionName: "authorize" | "charge",
+  tokenCollector: `0x${string}`,
+  chainId: number,
+  options: { gasUsed?: bigint; feeBps?: number } = {},
+) {
+  const escrowLog = escrowEventLog(
+    paymentInfo,
+    amount,
+    functionName,
+    tokenCollector,
+    chainId,
+    options.feeBps ?? 0,
+  );
+  const intermediateBucket = "0x5555555555555555555555555555555555555555" as `0x${string}`; // stand-in for token store
+  const logs: Log[] =
+    functionName === "authorize"
+      ? [
+          escrowLog,
+          transferLog(paymentInfo.token, paymentInfo.payer, tokenCollector, amount),
+          transferLog(paymentInfo.token, tokenCollector, intermediateBucket, amount),
+        ]
+      : (() => {
+          const fee = (amount * BigInt(options.feeBps ?? 0)) / 10000n;
+          const net = amount - fee;
+          return [
+            escrowLog,
+            transferLog(paymentInfo.token, paymentInfo.payer, tokenCollector, amount),
+            transferLog(paymentInfo.token, tokenCollector, paymentInfo.receiver, net),
+            ...(fee > 0n
+              ? [transferLog(paymentInfo.token, tokenCollector, paymentInfo.feeReceiver, fee)]
+              : []),
+          ];
+        })();
+  return {
+    results: [
+      {
+        status: "success",
+        gasUsed: options.gasUsed ?? 220_000n,
+        logs,
+      },
+    ],
+  };
+}
+
 describe("AuthCaptureEvmScheme", () => {
+  const CHAIN_ID = 84532;
   const createMockSigner = () => ({
     getAddresses: () => ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
     readContract: vi.fn().mockResolvedValue(BigInt("1000000000")),
@@ -24,6 +175,7 @@ describe("AuthCaptureEvmScheme", () => {
     sendTransaction: vi.fn(),
     waitForTransactionReceipt: vi.fn().mockResolvedValue({ status: "success" }),
     getCode: vi.fn().mockResolvedValue("0x"),
+    simulateCalls: vi.fn(),
   });
 
   let mockSigner: ReturnType<typeof createMockSigner>;
@@ -177,6 +329,15 @@ describe("AuthCaptureEvmScheme", () => {
 
     it("should route authorize × eip3009 × contract via the captureAuthorizer with the literal escrow ABI and 4 args", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "authorize",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
 
@@ -190,6 +351,15 @@ describe("AuthCaptureEvmScheme", () => {
 
     it("should route charge × eip3009 × contract via the captureAuthorizer with the 6-arg ABI", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "charge",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
@@ -212,6 +382,15 @@ describe("AuthCaptureEvmScheme", () => {
 
     it("should route authorize × permit2 × contract via the captureAuthorizer with the permit2 collector", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "authorize",
+          PERMIT2_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
@@ -229,6 +408,15 @@ describe("AuthCaptureEvmScheme", () => {
 
     it("should route charge × permit2 × contract via the captureAuthorizer with 6 args + permit2 collector", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "charge",
+          PERMIT2_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       const reqs = {
         ...mockRequirements,
@@ -248,18 +436,26 @@ describe("AuthCaptureEvmScheme", () => {
       expect(call.args[2]).toBe(PERMIT2_TOKEN_COLLECTOR_ADDRESS);
     });
 
-    it("should route simulateSettle through the captureAuthorizer contract with ESCROW_ABI + errors", async () => {
+    it("should route contract-path simulation through simulateCalls targeting the captureAuthorizer with the gas cap applied", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "authorize",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.verify(buildEip3009Payload(), mockRequirements);
 
-      const simulateCall = mockSigner.readContract.mock.calls.find(
-        c => c[0].functionName === "authorize" || c[0].functionName === "charge",
-      );
-      expect(simulateCall).toBeDefined();
-      const call = simulateCall![0];
-      expect(call.address).toBe(CAPTURE_AUTHORIZER);
-      expect(call.abi).toHaveLength(ESCROW_ABI.length + ESCROW_ERRORS_ABI.length);
+      expect(mockSigner.simulateCalls).toHaveBeenCalledTimes(1);
+      const call = mockSigner.simulateCalls.mock.calls[0][0];
+      expect(call.calls).toHaveLength(1);
+      expect(call.calls[0].to).toBe(CAPTURE_AUTHORIZER);
+      expect(call.calls[0].gas).toBe(400_000n);
+      expect(call.traceTransfers).toBe(true);
     });
 
     it("should pass EIP3009_TOKEN_COLLECTOR as the tokenCollector arg for eip3009", async () => {
@@ -663,6 +859,210 @@ describe("AuthCaptureEvmScheme", () => {
     it("should return undefined — escrow + tokenCollector are constants, not advertised", () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       expect(scheme.getExtra("eip155:8453")).toBeUndefined();
+    });
+  });
+
+  describe("verify — contract-path captureAuthorizer hardening", () => {
+    beforeEach(() => {
+      // Default: contract path
+      mockSigner.getCode.mockResolvedValue("0x6080604052");
+    });
+
+    it("should fail with capture_authorizer_gas_exceeded when simulated gasUsed exceeds the cap", async () => {
+      const trace = buildHonestTrace(
+        buildPaymentInfo(),
+        1_000_000n,
+        "authorize",
+        EIP3009_TOKEN_COLLECTOR_ADDRESS,
+        CHAIN_ID,
+        { gasUsed: 500_000n },
+      );
+      mockSigner.simulateCalls.mockResolvedValue(trace);
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_gas_exceeded");
+    });
+
+    it("should fail with capture_authorizer_escrow_call_missing when no escrow event was emitted", async () => {
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "success",
+            gasUsed: 100_000n,
+            logs: [
+              // Only Transfer logs — the authorizer pulled funds but never reached escrow.
+              transferLog(ASSET, PAYER, CAPTURE_AUTHORIZER, 1_000_000n),
+            ],
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_escrow_call_missing");
+    });
+
+    it("should fail with capture_authorizer_payment_info_mismatch when the escrow event hash differs from the signed PaymentInfo", async () => {
+      const wrongHash =
+        "0x1111111111111111111111111111111111111111111111111111111111111111" as `0x${string}`;
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "success",
+            gasUsed: 200_000n,
+            logs: [
+              escrowEventLog(
+                buildPaymentInfo(),
+                1_000_000n,
+                "authorize",
+                EIP3009_TOKEN_COLLECTOR_ADDRESS,
+                CHAIN_ID,
+                0,
+                FEE_RECIPIENT,
+                { paymentInfoHash: wrongHash },
+              ),
+              transferLog(ASSET, PAYER, EIP3009_TOKEN_COLLECTOR_ADDRESS, 1_000_000n),
+              transferLog(
+                ASSET,
+                EIP3009_TOKEN_COLLECTOR_ADDRESS,
+                "0x5555555555555555555555555555555555555555",
+                1_000_000n,
+              ),
+            ],
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_payment_info_mismatch");
+    });
+
+    it("should fail with capture_authorizer_asset_divergence when an unrelated address receives the asset on charge", async () => {
+      const attacker = "0xbadbadbadbadbadbadbadbadbadbadbadbadbadb" as `0x${string}`;
+      const escrowLog = escrowEventLog(
+        buildPaymentInfo(),
+        1_000_000n,
+        "charge",
+        EIP3009_TOKEN_COLLECTOR_ADDRESS,
+        CHAIN_ID,
+      );
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "success",
+            gasUsed: 200_000n,
+            logs: [
+              escrowLog,
+              // Payer pays full amount, but only part goes to receiver — attacker skims.
+              transferLog(ASSET, PAYER, EIP3009_TOKEN_COLLECTOR_ADDRESS, 1_000_000n),
+              transferLog(ASSET, EIP3009_TOKEN_COLLECTOR_ADDRESS, PAY_TO, 900_000n),
+              transferLog(ASSET, EIP3009_TOKEN_COLLECTOR_ADDRESS, attacker, 100_000n),
+            ],
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, autoCapture: true },
+      };
+      const result = await scheme.verify(buildEip3009Payload(), reqs);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_asset_divergence");
+    });
+
+    it("should fail with capture_authorizer_asset_divergence when the implied feeBps falls outside [minFeeBps, maxFeeBps]", async () => {
+      // Reqs declare maxFeeBps=100 (1%). Stage a charge that takes 500 bps (5%).
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "success",
+            gasUsed: 200_000n,
+            logs: [
+              escrowEventLog(
+                buildPaymentInfo(),
+                1_000_000n,
+                "charge",
+                EIP3009_TOKEN_COLLECTOR_ADDRESS,
+                CHAIN_ID,
+              ),
+              transferLog(ASSET, PAYER, EIP3009_TOKEN_COLLECTOR_ADDRESS, 1_000_000n),
+              transferLog(ASSET, EIP3009_TOKEN_COLLECTOR_ADDRESS, PAY_TO, 950_000n),
+              transferLog(ASSET, EIP3009_TOKEN_COLLECTOR_ADDRESS, FEE_RECIPIENT, 50_000n),
+            ],
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, autoCapture: true },
+      };
+      const result = await scheme.verify(buildEip3009Payload(), reqs);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_asset_divergence");
+    });
+
+    it("should accept an honest passthrough", async () => {
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "authorize",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(true);
+    });
+
+    it("should fall back to simulation_failed when the signer does not expose simulateCalls", async () => {
+      const signerWithoutSimulate = {
+        getAddresses: mockSigner.getAddresses,
+        readContract: mockSigner.readContract,
+        writeContract: mockSigner.writeContract,
+        verifyTypedData: mockSigner.verifyTypedData,
+        sendTransaction: mockSigner.sendTransaction,
+        waitForTransactionReceipt: mockSigner.waitForTransactionReceipt,
+        getCode: mockSigner.getCode,
+      };
+      const scheme = new AuthCaptureEvmScheme(
+        signerWithoutSimulate as unknown as typeof mockSigner,
+      );
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("simulation_failed");
+    });
+  });
+
+  describe("settle — gas cap on contract path", () => {
+    it("should pass gas: 400_000n to writeContract when settling against a smart contract captureAuthorizer", async () => {
+      mockSigner.getCode.mockResolvedValue("0x6080604052");
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          buildPaymentInfo(),
+          1_000_000n,
+          "authorize",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+        ),
+      );
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      await scheme.settle(buildEip3009Payload(), mockRequirements);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.gas).toBe(400_000n);
+    });
+
+    it("should NOT set a gas field on writeContract on the EOA path", async () => {
+      mockSigner.getCode.mockResolvedValue("0x");
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      await scheme.settle(buildEip3009Payload(), mockRequirements);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.gas).toBeUndefined();
     });
   });
 });

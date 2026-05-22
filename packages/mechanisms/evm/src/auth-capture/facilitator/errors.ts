@@ -27,6 +27,13 @@ export const ErrNonceMismatch = "nonce_mismatch";
 export const ErrInsufficientBalance = "insufficient_balance";
 export const ErrSimulationFailed = "simulation_failed";
 
+// Contract-path captureAuthorizer hardening errors. Surfaced by trace-level
+// simulation when extra.captureAuthorizer is a smart contract.
+export const ErrCaptureAuthorizerEscrowCallMissing = "capture_authorizer_escrow_call_missing";
+export const ErrCaptureAuthorizerPaymentInfoMismatch = "capture_authorizer_payment_info_mismatch";
+export const ErrCaptureAuthorizerAssetDivergence = "capture_authorizer_asset_divergence";
+export const ErrCaptureAuthorizerGasExceeded = "capture_authorizer_gas_exceeded";
+
 // Typed simulation reverts — surfaced when the on-chain simulate call reverts
 // with a known AuthCaptureEscrow custom error.
 export const ErrPaymentAlreadyCollected = "payment_already_collected";

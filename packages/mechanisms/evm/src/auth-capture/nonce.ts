@@ -87,6 +87,69 @@ export function computePayerAgnosticPaymentInfoHash(
 }
 
 /**
+ * Compute the on-chain `paymentInfoHash` (TS mirror of `AuthCaptureEscrow.getHash`).
+ *
+ * Differs from {@link computePayerAgnosticPaymentInfoHash} by encoding the
+ * actual `paymentInfo.payer` instead of `address(0)`. The escrow emits this
+ * hash as the indexed `paymentInfoHash` topic of `PaymentAuthorized` /
+ * `PaymentCharged`, so trace-level simulation checks compare against this
+ * function — NOT against the wire nonce.
+ *
+ * @param chainId - EVM chain id.
+ * @param paymentInfo - The reconstructed PaymentInfo struct with the real payer.
+ * @returns The on-chain payment-info hash.
+ */
+export function computeOnchainPaymentInfoHash(
+  chainId: number,
+  paymentInfo: PaymentInfoStruct,
+): `0x${string}` {
+  const paymentInfoEncoded = encodeAbiParameters(
+    [
+      { name: "typehash", type: "bytes32" },
+      { name: "operator", type: "address" },
+      { name: "payer", type: "address" },
+      { name: "receiver", type: "address" },
+      { name: "token", type: "address" },
+      { name: "maxAmount", type: "uint120" },
+      { name: "preApprovalExpiry", type: "uint48" },
+      { name: "authorizationExpiry", type: "uint48" },
+      { name: "refundExpiry", type: "uint48" },
+      { name: "minFeeBps", type: "uint16" },
+      { name: "maxFeeBps", type: "uint16" },
+      { name: "feeReceiver", type: "address" },
+      { name: "salt", type: "uint256" },
+    ],
+    [
+      PAYMENT_INFO_TYPEHASH,
+      paymentInfo.operator,
+      paymentInfo.payer,
+      paymentInfo.receiver,
+      paymentInfo.token,
+      BigInt(paymentInfo.maxAmount),
+      paymentInfo.preApprovalExpiry,
+      paymentInfo.authorizationExpiry,
+      paymentInfo.refundExpiry,
+      paymentInfo.minFeeBps,
+      paymentInfo.maxFeeBps,
+      paymentInfo.feeReceiver,
+      BigInt(paymentInfo.salt),
+    ],
+  );
+  const paymentInfoHash = keccak256(paymentInfoEncoded);
+
+  const outerEncoded = encodeAbiParameters(
+    [
+      { name: "chainId", type: "uint256" },
+      { name: "escrow", type: "address" },
+      { name: "paymentInfoHash", type: "bytes32" },
+    ],
+    [BigInt(chainId), AUTH_CAPTURE_ESCROW_ADDRESS, paymentInfoHash],
+  );
+
+  return keccak256(outerEncoded);
+}
+
+/**
  * Sign an ERC-3009 `ReceiveWithAuthorization` over the supplied authorization
  * fields. The EIP-712 domain is bound to the **token contract** (not the
  * escrow), so the token's `name` and `version` come from `extra` because they
