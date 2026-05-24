@@ -35,6 +35,7 @@ import {
   ESCROW_ABI,
   ESCROW_ERRORS_ABI,
   ESCROW_EVENTS_ABI,
+  ESCROW_VIEW_ABI,
 } from "../abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
@@ -141,15 +142,21 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
 
 /**
  * Hard gas cap applied to both trace simulation and the broadcast settle tx
- * when `extra.captureAuthorizer` is a smart contract. Bounds the facilitator's
- * gas exposure to a misbehaving authorizer contract.
+ * when `extra.captureAuthorizer` is a smart contract.
  *
- * 400_000 comfortably covers a direct authorize/charge call through the
- * audited escrow with either supported assetTransferMethod, plus headroom for
- * a thin passthrough wrapper. Anything that needs more should be supported
- * explicitly per-authorizer, not absorbed by widening the global cap.
+ * This is a DoS bound on facilitator gas spend, NOT a correctness primitive.
+ * EIP-150's 63/64 rule means the outer cap does not strictly bound the inner
+ * escrow call's gas — a wrapper can pre-burn gas so escrow OOGs internally and
+ * still return success. Catching that case is `verifyEscrowEvent`'s job: an
+ * OOG'd escrow call emits no `PaymentAuthorized` / `PaymentCharged` event,
+ * which fails with `capture_authorizer_escrow_call_missing`. Do not drop the
+ * event check on the assumption that this cap protects correctness.
+ *
+ * 3_000_000 comfortably covers a direct authorize/charge call through the
+ * audited escrow plus on-chain logic up to and including modern zk verifier
+ * circuits (Groth16, PLONK, Halo2, most STARK constructions).
  */
-export const CAPTURE_AUTHORIZER_GAS_LIMIT = 400_000n;
+export const CAPTURE_AUTHORIZER_GAS_LIMIT = 3_000_000n;
 
 /**
  * AuthCapture Facilitator Scheme - implements x402's SchemeNetworkFacilitator.
@@ -629,6 +636,22 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
       args,
     } as Parameters<typeof encodeFunctionData>[0]);
 
+    // Resolve the operator's TokenStore up front; we need it to enumerate
+    // the allowed asset-delta recipients on both authorize and charge.
+    // Deterministic CREATE2 from (tokenStoreImpl, salt=bytes20(operator),
+    // deployer=escrow) — querying the escrow is the most robust source.
+    let tokenStore: `0x${string}`;
+    try {
+      tokenStore = (await this.signer.readContract({
+        address: AUTH_CAPTURE_ESCROW_ADDRESS,
+        abi: ESCROW_VIEW_ABI,
+        functionName: "getTokenStore",
+        args: [paymentInfo.operator],
+      })) as `0x${string}`;
+    } catch {
+      return ErrSimulationFailed;
+    }
+
     let traceResult: SimulateCallResult;
     try {
       const response = (await simulateCalls.call(this.signer, {
@@ -662,10 +685,17 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     }
 
     const logs = traceResult.logs ?? [];
-    const escrowCheck = verifyEscrowEvent(logs, functionName, paymentInfoHash);
-    if (escrowCheck !== "ok") return escrowCheck;
+    const eventCheck = verifyEscrowEvent(logs, functionName, paymentInfoHash);
+    if (!eventCheck.ok) return eventCheck.reason;
 
-    const assetCheck = verifyAssetDeltas(logs, paymentInfo, amount, functionName);
+    const assetCheck = verifyAssetDeltas(
+      logs,
+      paymentInfo,
+      amount,
+      functionName,
+      tokenStore,
+      eventCheck.chargeFee,
+    );
     if (assetCheck !== "ok") return assetCheck;
 
     return "ok";
@@ -784,24 +814,43 @@ type SimulateCallsResponse = {
 };
 
 /**
+ * Result of `verifyEscrowEvent`. On `ok`, exposes the actual `feeReceiver`
+ * and `feeBps` from the `PaymentCharged` event so the asset-delta check can
+ * authoritatively know who got the fee (essential when
+ * `paymentInfo.feeReceiver === address(0)`, which delegates fee-recipient
+ * choice to the captureAuthorizer at charge time).
+ */
+type EscrowEventCheck =
+  | {
+      ok: true;
+      chargeFee?: { feeReceiver: `0x${string}`; feeBps: number };
+    }
+  | { ok: false; reason: string };
+
+/**
  * Find the `PaymentAuthorized` / `PaymentCharged` event in a simulated trace,
  * emitted by `AUTH_CAPTURE_ESCROW_ADDRESS`, and assert its indexed
- * `paymentInfoHash` matches the hash recomputed in verify step 12.
+ * `paymentInfoHash` matches the on-chain hash recomputed in verify step 12.
  *
- * No matching event → `capture_authorizer_escrow_call_missing` (the wrapper
- * didn't reach escrow at all). Hash mismatch → `capture_authorizer_payment_info_mismatch`
- * (the wrapper reached escrow but with a different PaymentInfo than was signed).
+ * On `charge`, also surfaces the `feeReceiver` and `feeBps` from the event
+ * so the asset-delta check can use the actual values escrow used (vs. the
+ * `paymentInfo.feeReceiver`, which may be `address(0)` per spec to delegate
+ * fee-recipient choice).
+ *
+ * No matching event → `capture_authorizer_escrow_call_missing`. Hash mismatch
+ * → `capture_authorizer_payment_info_mismatch`.
  *
  * @param logs - All logs from the simulated trace.
  * @param functionName - The escrow function the facilitator submitted.
  * @param expectedHash - On-chain `paymentInfoHash` matching `escrow.getHash(paymentInfo)`.
- * @returns `"ok"` or a stable wire reason.
+ * @returns Event check result; on `ok: true` for `charge`, includes the
+ *   actual `feeReceiver` and `feeBps` from the event.
  */
 function verifyEscrowEvent(
   logs: ReadonlyArray<Log>,
   functionName: "authorize" | "charge",
   expectedHash: `0x${string}`,
-): "ok" | string {
+): EscrowEventCheck {
   const escrow = AUTH_CAPTURE_ESCROW_ADDRESS.toLowerCase();
   const expectedEventName = functionName === "authorize" ? "PaymentAuthorized" : "PaymentCharged";
   let foundEscrowEvent = false;
@@ -821,27 +870,49 @@ function verifyEscrowEvent(
     }
     if (decoded.eventName !== expectedEventName) continue;
     foundEscrowEvent = true;
-    const hash = (decoded.args as { paymentInfoHash: `0x${string}` }).paymentInfoHash;
-    if (hash.toLowerCase() === expectedHash.toLowerCase()) return "ok";
+    const args = decoded.args as {
+      paymentInfoHash: `0x${string}`;
+      feeReceiver?: `0x${string}`;
+      feeBps?: number;
+    };
+    if (args.paymentInfoHash.toLowerCase() !== expectedHash.toLowerCase()) continue;
+    if (functionName === "charge") {
+      return {
+        ok: true,
+        chargeFee: {
+          feeReceiver: args.feeReceiver as `0x${string}`,
+          feeBps: Number(args.feeBps),
+        },
+      };
+    }
+    return { ok: true };
   }
 
-  return foundEscrowEvent
-    ? ErrCaptureAuthorizerPaymentInfoMismatch
-    : ErrCaptureAuthorizerEscrowCallMissing;
+  return {
+    ok: false,
+    reason: foundEscrowEvent
+      ? ErrCaptureAuthorizerPaymentInfoMismatch
+      : ErrCaptureAuthorizerEscrowCallMissing,
+  };
 }
 
 /**
  * Reconstruct net ERC-20 deltas for `paymentInfo.token` from the trace and
  * assert they match the signed PaymentInfo.
  *
- * On `authorize`: payer must be -amount; receiver and feeReceiver must be 0;
- * all other addresses with non-zero net delta must sum to +amount (the
- * "escrow side" of the move — escrow's TokenStore is the typical destination,
- * but we don't enumerate it explicitly).
+ * Allowed-recipient enumeration: every address with a non-zero net delta MUST
+ * be one of `{payer, receiver, feeReceiver, tokenStore}`. Anything else is a
+ * sign the wrapper redirected funds and fails the check immediately.
  *
- * On `charge`: payer must be -amount; receiver + feeReceiver must sum to
- * +amount with an implied `feeBps ∈ [minFeeBps, maxFeeBps]`; everything else
- * must net to 0 (funds flow all the way through).
+ * On `authorize`: payer = -amount; receiver = 0; feeReceiver = 0;
+ * tokenStore = +amount.
+ *
+ * On `charge`: payer = -amount; tokenStore net 0 (funds flow through); the
+ * actual fee recipient is whatever escrow emitted in the `PaymentCharged`
+ * event (necessary when `paymentInfo.feeReceiver === address(0)` per spec).
+ * `feeBps` from the event must satisfy `[minFeeBps, maxFeeBps]`. Handles
+ * `receiver === feeReceiver` (combined delta = amount, fee check still runs
+ * against the event's `feeBps`).
  *
  * Any divergence → `capture_authorizer_asset_divergence`.
  *
@@ -849,6 +920,11 @@ function verifyEscrowEvent(
  * @param paymentInfo - The reconstructed PaymentInfo struct.
  * @param amount - Settle amount in token base units.
  * @param functionName - The escrow function the facilitator submitted.
+ * @param tokenStore - `escrow.getTokenStore(paymentInfo.operator)`.
+ * @param chargeFee - On `charge`, the actual `feeReceiver` and `feeBps`
+ *   surfaced by `verifyEscrowEvent`.
+ * @param chargeFee.feeReceiver - Recipient escrow actually paid the fee to.
+ * @param chargeFee.feeBps - Fee basis points escrow actually used.
  * @returns `"ok"` or `capture_authorizer_asset_divergence`.
  */
 function verifyAssetDeltas(
@@ -856,6 +932,8 @@ function verifyAssetDeltas(
   paymentInfo: PaymentInfoStruct,
   amount: bigint,
   functionName: "authorize" | "charge",
+  tokenStore: `0x${string}`,
+  chargeFee?: { feeReceiver: `0x${string}`; feeBps: number },
 ): "ok" | string {
   const token = paymentInfo.token.toLowerCase();
   const deltas = new Map<string, bigint>();
@@ -887,47 +965,76 @@ function verifyAssetDeltas(
 
   const payerKey = paymentInfo.payer.toLowerCase();
   const receiverKey = paymentInfo.receiver.toLowerCase();
-  const feeReceiverKey = paymentInfo.feeReceiver.toLowerCase();
-
-  const payerDelta = deltas.get(payerKey) ?? 0n;
-  if (payerDelta !== -amount) return ErrCaptureAuthorizerAssetDivergence;
-
-  const receiverDelta = deltas.get(receiverKey) ?? 0n;
-  const feeReceiverDelta = deltas.get(feeReceiverKey) ?? 0n;
+  const tokenStoreKey = tokenStore.toLowerCase();
 
   if (functionName === "authorize") {
-    // Receiver and feeReceiver are untouched at authorize time. The +amount
-    // ends up somewhere in the escrow system (its TokenStore in the canonical
-    // contracts); sum that "other" bucket and assert it equals +amount.
-    if (receiverDelta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
-    if (feeReceiverDelta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
-    let otherSum = 0n;
+    const feeReceiverKey = paymentInfo.feeReceiver.toLowerCase();
+    const allowed = new Set([payerKey, receiverKey, feeReceiverKey, tokenStoreKey]);
     for (const [addr, delta] of deltas) {
-      if (addr === payerKey || addr === receiverKey || addr === feeReceiverKey) continue;
-      otherSum += delta;
+      if (delta === 0n) continue;
+      if (!allowed.has(addr)) return ErrCaptureAuthorizerAssetDivergence;
     }
-    return otherSum === amount ? "ok" : ErrCaptureAuthorizerAssetDivergence;
+    if ((deltas.get(payerKey) ?? 0n) !== -amount) return ErrCaptureAuthorizerAssetDivergence;
+    if ((deltas.get(tokenStoreKey) ?? 0n) !== amount) {
+      return ErrCaptureAuthorizerAssetDivergence;
+    }
+    // receiver / feeReceiver untouched at authorize time. If receiver ==
+    // tokenStore (pathological) the receiver-net-zero check would conflict
+    // with tokenStore having +amount; in practice escrow's tokenStore is a
+    // CREATE2 deploy from the operator-derived salt and won't collide with
+    // a merchant-set receiver, but be defensive.
+    if (receiverKey !== tokenStoreKey && (deltas.get(receiverKey) ?? 0n) !== 0n) {
+      return ErrCaptureAuthorizerAssetDivergence;
+    }
+    if (
+      feeReceiverKey !== tokenStoreKey &&
+      feeReceiverKey !== receiverKey &&
+      (deltas.get(feeReceiverKey) ?? 0n) !== 0n
+    ) {
+      return ErrCaptureAuthorizerAssetDivergence;
+    }
+    return "ok";
   }
 
-  // charge path: receiver + feeReceiver split the amount; nothing else nets non-zero.
-  if (receiverDelta < 0n || feeReceiverDelta < 0n) {
-    return ErrCaptureAuthorizerAssetDivergence;
-  }
-  if (receiverDelta + feeReceiverDelta !== amount) {
-    return ErrCaptureAuthorizerAssetDivergence;
-  }
-  // Validate the implied feeBps falls inside the signed [min, max] range.
-  // amount * minFeeBps <= feeReceiverDelta * 10000 <= amount * maxFeeBps
-  const feeNumerator = feeReceiverDelta * 10000n;
-  if (feeNumerator < amount * BigInt(paymentInfo.minFeeBps)) {
-    return ErrCaptureAuthorizerAssetDivergence;
-  }
-  if (feeNumerator > amount * BigInt(paymentInfo.maxFeeBps)) {
-    return ErrCaptureAuthorizerAssetDivergence;
-  }
+  // charge path. Use the actual feeReceiver / feeBps from the escrow event
+  // (essential when paymentInfo.feeReceiver == 0, where the wrapper supplies
+  // any non-zero recipient).
+  if (!chargeFee) return ErrCaptureAuthorizerAssetDivergence;
+  const actualFeeReceiverKey = chargeFee.feeReceiver.toLowerCase();
+  const allowed = new Set([payerKey, receiverKey, actualFeeReceiverKey, tokenStoreKey]);
   for (const [addr, delta] of deltas) {
-    if (addr === payerKey || addr === receiverKey || addr === feeReceiverKey) continue;
-    if (delta !== 0n) return ErrCaptureAuthorizerAssetDivergence;
+    if (delta === 0n) continue;
+    if (!allowed.has(addr)) return ErrCaptureAuthorizerAssetDivergence;
+  }
+  if ((deltas.get(payerKey) ?? 0n) !== -amount) return ErrCaptureAuthorizerAssetDivergence;
+  // tokenStore is transient on charge; whatever flowed through nets to 0.
+  if (
+    tokenStoreKey !== payerKey &&
+    tokenStoreKey !== receiverKey &&
+    tokenStoreKey !== actualFeeReceiverKey
+  ) {
+    if ((deltas.get(tokenStoreKey) ?? 0n) !== 0n) return ErrCaptureAuthorizerAssetDivergence;
+  }
+
+  // Resolve the receiver / feeReceiver split. If receiver === actualFeeReceiver
+  // they share a Map entry; the combined delta must equal `amount` and the
+  // feeBps still has to be inside the signed [min, max] range.
+  const expectedFee = (amount * BigInt(chargeFee.feeBps)) / 10000n;
+  const expectedNet = amount - expectedFee;
+  if (chargeFee.feeBps < paymentInfo.minFeeBps || chargeFee.feeBps > paymentInfo.maxFeeBps) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  if (receiverKey === actualFeeReceiverKey) {
+    if ((deltas.get(receiverKey) ?? 0n) !== amount) {
+      return ErrCaptureAuthorizerAssetDivergence;
+    }
+    return "ok";
+  }
+  if ((deltas.get(receiverKey) ?? 0n) !== expectedNet) {
+    return ErrCaptureAuthorizerAssetDivergence;
+  }
+  if ((deltas.get(actualFeeReceiverKey) ?? 0n) !== expectedFee) {
+    return ErrCaptureAuthorizerAssetDivergence;
   }
   return "ok";
 }

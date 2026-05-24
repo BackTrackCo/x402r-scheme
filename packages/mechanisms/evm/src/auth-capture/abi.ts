@@ -149,6 +149,13 @@ export const ESCROW_VIEW_ABI = [
       },
     ],
   },
+  {
+    name: "getTokenStore",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "operator", type: "address" }],
+    outputs: [{ type: "address" }],
+  },
 ] as const;
 
 // AuthCaptureEscrow custom errors. Spliced into the ABI passed to simulateContract

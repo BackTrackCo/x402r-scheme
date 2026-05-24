@@ -113,10 +113,19 @@ function escrowEventLog(
   } as Log;
 }
 
+// Stable stand-in for escrow.getTokenStore(operator) in tests. Real on-chain
+// value is CREATE2-derived from the operator; for unit tests we just need a
+// stable address the mock signer can return and the trace builder can use.
+const TOKEN_STORE = "0x5555555555555555555555555555555555555555" as `0x${string}`;
+
 /**
  * A "honest passthrough" trace for the contract path. Returns a successful
  * simulateCalls response with: escrow event w/ matching hash + Transfer
  * events with deltas that match the signed PaymentInfo.
+ *
+ * `tokenStore` is the address the operator's `AuthCaptureEscrow.getTokenStore`
+ * returns; the new asset-delta check enumerates allowed recipients to include
+ * it explicitly.
  */
 function buildHonestTrace(
   paymentInfo: PaymentInfoStruct,
@@ -124,8 +133,15 @@ function buildHonestTrace(
   functionName: "authorize" | "charge",
   tokenCollector: `0x${string}`,
   chainId: number,
-  options: { gasUsed?: bigint; feeBps?: number } = {},
+  options: {
+    gasUsed?: bigint;
+    feeBps?: number;
+    tokenStore?: `0x${string}`;
+    actualFeeReceiver?: `0x${string}`;
+  } = {},
 ) {
+  const tokenStore = options.tokenStore ?? TOKEN_STORE;
+  const actualFeeReceiver = options.actualFeeReceiver ?? paymentInfo.feeReceiver;
   const escrowLog = escrowEventLog(
     paymentInfo,
     amount,
@@ -133,14 +149,14 @@ function buildHonestTrace(
     tokenCollector,
     chainId,
     options.feeBps ?? 0,
+    actualFeeReceiver,
   );
-  const intermediateBucket = "0x5555555555555555555555555555555555555555" as `0x${string}`; // stand-in for token store
   const logs: Log[] =
     functionName === "authorize"
       ? [
           escrowLog,
           transferLog(paymentInfo.token, paymentInfo.payer, tokenCollector, amount),
-          transferLog(paymentInfo.token, tokenCollector, intermediateBucket, amount),
+          transferLog(paymentInfo.token, tokenCollector, tokenStore, amount),
         ]
       : (() => {
           const fee = (amount * BigInt(options.feeBps ?? 0)) / 10000n;
@@ -148,9 +164,10 @@ function buildHonestTrace(
           return [
             escrowLog,
             transferLog(paymentInfo.token, paymentInfo.payer, tokenCollector, amount),
-            transferLog(paymentInfo.token, tokenCollector, paymentInfo.receiver, net),
+            transferLog(paymentInfo.token, tokenCollector, tokenStore, amount),
+            transferLog(paymentInfo.token, tokenStore, paymentInfo.receiver, net),
             ...(fee > 0n
-              ? [transferLog(paymentInfo.token, tokenCollector, paymentInfo.feeReceiver, fee)]
+              ? [transferLog(paymentInfo.token, tokenStore, actualFeeReceiver, fee)]
               : []),
           ];
         })();
@@ -167,9 +184,17 @@ function buildHonestTrace(
 
 describe("AuthCaptureEvmScheme", () => {
   const CHAIN_ID = 84532;
+  // Default readContract dispatch: getTokenStore returns the stand-in
+  // TokenStore address; everything else (balanceOf, etc.) returns a large
+  // bigint balance. Tests can still chain .mockResolvedValueOnce(...) /
+  // .mockRejectedValueOnce(...) for specific call sequences (e.g. typed
+  // simulation reverts).
   const createMockSigner = () => ({
     getAddresses: () => ["0x1234567890123456789012345678901234567890"] as readonly `0x${string}`[],
-    readContract: vi.fn().mockResolvedValue(BigInt("1000000000")),
+    readContract: vi.fn(async (args: { functionName: string }) => {
+      if (args.functionName === "getTokenStore") return TOKEN_STORE;
+      return BigInt("1000000000");
+    }),
     writeContract: vi.fn().mockResolvedValue("0xabcdef1234567890" as `0x${string}`),
     verifyTypedData: vi.fn().mockResolvedValue(true),
     sendTransaction: vi.fn(),
@@ -235,13 +260,16 @@ describe("AuthCaptureEvmScheme", () => {
   }
 
   function buildEip3009Payload() {
-    const paymentInfo = buildPaymentInfo();
+    return buildEip3009PayloadFor(buildPaymentInfo(), mockRequirements);
+  }
+
+  function buildEip3009PayloadFor(paymentInfo: PaymentInfoStruct, reqs: typeof mockRequirements) {
     const nonce = computePayerAgnosticPaymentInfoHash(84532, paymentInfo);
     return {
       x402Version: 2,
       scheme: "auth-capture",
       resource: { url: "https://example.com/weather", method: "GET" },
-      accepted: { ...mockRequirements },
+      accepted: { ...reqs },
       payload: {
         authorization: {
           from: PAYER,
@@ -454,7 +482,7 @@ describe("AuthCaptureEvmScheme", () => {
       const call = mockSigner.simulateCalls.mock.calls[0][0];
       expect(call.calls).toHaveLength(1);
       expect(call.calls[0].to).toBe(CAPTURE_AUTHORIZER);
-      expect(call.calls[0].gas).toBe(400_000n);
+      expect(call.calls[0].gas).toBe(3_000_000n);
       expect(call.traceTransfers).toBe(true);
     });
 
@@ -875,7 +903,7 @@ describe("AuthCaptureEvmScheme", () => {
         "authorize",
         EIP3009_TOKEN_COLLECTOR_ADDRESS,
         CHAIN_ID,
-        { gasUsed: 500_000n },
+        { gasUsed: 4_000_000n },
       );
       mockSigner.simulateCalls.mockResolvedValue(trace);
       const scheme = new AuthCaptureEvmScheme(mockSigner);
@@ -1037,10 +1065,120 @@ describe("AuthCaptureEvmScheme", () => {
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("simulation_failed");
     });
+
+    // Bug 1 (review): paymentInfo.feeReceiver == address(0) is a spec-valid
+    // configuration (delegates fee-recipient choice to the captureAuthorizer
+    // at charge time). The asset-delta check must use the actual feeReceiver
+    // from the PaymentCharged event, not the zeroed value from PaymentInfo.
+    it("should accept a charge where paymentInfo.feeReceiver == 0 and event specifies a non-zero feeReceiver", async () => {
+      const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+      const actualFeeReceiver = "0xfee0fee0fee0fee0fee0fee0fee0fee0fee0fee0" as `0x${string}`;
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          feeRecipient: ZERO,
+          autoCapture: true,
+          minFeeBps: 0,
+          maxFeeBps: 100,
+        },
+      };
+      const paymentInfoZeroFee = { ...buildPaymentInfo(), feeReceiver: ZERO };
+      const payload = buildEip3009PayloadFor(paymentInfoZeroFee, reqs);
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          paymentInfoZeroFee,
+          1_000_000n,
+          "charge",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+          { feeBps: 50, actualFeeReceiver },
+        ),
+      );
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(payload, reqs);
+      expect(result.isValid).toBe(true);
+    });
+
+    // Bug 3 (review): receiver == feeReceiver should not double-count the
+    // delta. Honest case where the same address gets both legs of the split
+    // must pass.
+    it("should accept a charge where receiver == feeReceiver (combined delta == amount)", async () => {
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          feeRecipient: PAY_TO, // receiver IS feeReceiver
+          autoCapture: true,
+          minFeeBps: 0,
+          maxFeeBps: 100,
+        },
+      };
+      const paymentInfoMerged = { ...buildPaymentInfo(), feeReceiver: PAY_TO };
+      const payload = buildEip3009PayloadFor(paymentInfoMerged, reqs);
+      mockSigner.simulateCalls.mockResolvedValue(
+        buildHonestTrace(
+          paymentInfoMerged,
+          1_000_000n,
+          "charge",
+          EIP3009_TOKEN_COLLECTOR_ADDRESS,
+          CHAIN_ID,
+          { feeBps: 50, actualFeeReceiver: PAY_TO },
+        ),
+      );
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(payload, reqs);
+      expect(result.isValid).toBe(true);
+    });
+
+    // Bug 2 (review): authorize-path siphon. The old "sum-other-deltas ==
+    // amount" check passed tautologically from mass conservation. The new
+    // allowed-recipient enumeration must reject a trace where escrow's
+    // tokenStore is bypassed and funds go to an attacker.
+    it("should fail with capture_authorizer_asset_divergence when the authorize trace routes funds to an unexpected address instead of the tokenStore", async () => {
+      const attacker = "0xbadbadbadbadbadbadbadbadbadbadbadbadbadb" as `0x${string}`;
+      const paymentInfo = buildPaymentInfo();
+      // Honest event but funds are redirected to attacker instead of tokenStore.
+      const escrowLog = escrowEventLog(
+        paymentInfo,
+        1_000_000n,
+        "authorize",
+        EIP3009_TOKEN_COLLECTOR_ADDRESS,
+        CHAIN_ID,
+      );
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "success",
+            gasUsed: 200_000n,
+            logs: [
+              escrowLog,
+              transferLog(ASSET, PAYER, EIP3009_TOKEN_COLLECTOR_ADDRESS, 1_000_000n),
+              transferLog(ASSET, EIP3009_TOKEN_COLLECTOR_ADDRESS, attacker, 1_000_000n),
+            ],
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("capture_authorizer_asset_divergence");
+    });
+
+    it("should fail with simulation_failed if the escrow getTokenStore read throws", async () => {
+      mockSigner.readContract.mockImplementation(async (args: { functionName: string }) => {
+        if (args.functionName === "getTokenStore") throw new Error("rpc unavailable");
+        return BigInt("1000000000");
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("simulation_failed");
+    });
   });
 
   describe("settle — gas cap on contract path", () => {
-    it("should pass gas: 400_000n to writeContract when settling against a smart contract captureAuthorizer", async () => {
+    it("should pass gas: 3_000_000n to writeContract when settling against a smart contract captureAuthorizer", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
       mockSigner.simulateCalls.mockResolvedValue(
         buildHonestTrace(
@@ -1054,7 +1192,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
       const call = mockSigner.writeContract.mock.calls[0][0];
-      expect(call.gas).toBe(400_000n);
+      expect(call.gas).toBe(3_000_000n);
     });
 
     it("should NOT set a gas field on writeContract on the EOA path", async () => {
