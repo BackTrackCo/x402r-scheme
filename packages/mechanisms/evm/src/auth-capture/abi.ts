@@ -65,6 +65,57 @@ export const ERC20_BALANCE_OF_ABI = [
   },
 ] as const;
 
+// ERC-20 Transfer event for asset-delta reconstruction from a trace.
+export const ERC20_TRANSFER_EVENT_ABI = [
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
+// AuthCaptureEscrow event signatures used by the contract-path simulation
+// check. We only decode the events emitted by the entrypoints the facilitator
+// can submit (authorize, charge) — every other escrow event is out of scope.
+export const ESCROW_EVENTS_ABI = [
+  {
+    type: "event",
+    name: "PaymentAuthorized",
+    inputs: [
+      { name: "paymentInfoHash", type: "bytes32", indexed: true },
+      {
+        name: "paymentInfo",
+        type: "tuple",
+        components: PAYMENT_INFO_COMPONENTS,
+        indexed: false,
+      },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "tokenCollector", type: "address", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "PaymentCharged",
+    inputs: [
+      { name: "paymentInfoHash", type: "bytes32", indexed: true },
+      {
+        name: "paymentInfo",
+        type: "tuple",
+        components: PAYMENT_INFO_COMPONENTS,
+        indexed: false,
+      },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "tokenCollector", type: "address", indexed: false },
+      { name: "feeBps", type: "uint16", indexed: false },
+      { name: "feeReceiver", type: "address", indexed: false },
+    ],
+  },
+] as const;
+
 // View functions on AuthCaptureEscrow used by tests / introspection. Not part
 // of ESCROW_ABI because settle/simulate paths only need authorize + charge.
 export const ESCROW_VIEW_ABI = [
@@ -97,6 +148,13 @@ export const ESCROW_VIEW_ABI = [
         ],
       },
     ],
+  },
+  {
+    name: "getTokenStore",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "operator", type: "address" }],
+    outputs: [{ type: "address" }],
   },
 ] as const;
 

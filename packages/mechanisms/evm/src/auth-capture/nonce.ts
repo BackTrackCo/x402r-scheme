@@ -22,23 +22,28 @@ const PAYMENT_INFO_TYPEHASH = keccak256(
 );
 
 /**
- * Compute the payer-agnostic PaymentInfo hash that auth-capture uses as both
- * the ERC-3009 nonce (`bytes32`) and the Permit2 nonce (`uint256`, via the
- * same 32 bytes interpreted as an integer). The payer field is zeroed before
- * hashing so the facilitator can reconstruct the same hash on the verify side
- * without knowing payer identity in advance.
+ * Compute a PaymentInfo hash matching the canonical `AuthCaptureEscrow.getHash`
+ * shape: `keccak256(chainId, escrow, keccak256(typehash, paymentInfo))`.
+ * Caller picks whether to zero the payer before hashing (the wire nonce uses
+ * payer-agnostic; the on-chain `paymentInfoHash` topic uses the real payer).
  *
- * Freshness comes from `paymentInfo.salt`; generate a new salt per signing
- * call via `generateSalt`. Identical extras + same salt would collide across
- * payers.
+ * NOTE: `AUTH_CAPTURE_ESCROW_ADDRESS` is hardcoded as the canonical CREATE2
+ * deploy address. If a chain ever ships with a non-canonical escrow address,
+ * this hash diverges from the on-chain `getHash` silently — fail-loud at
+ * deploy time rather than relying on this function.
  *
- * @param chainId - EVM chain id; binds the hash to a specific chain.
- * @param paymentInfo - The reconstructed PaymentInfo struct (canonical Solidity field names).
- * @returns The 32-byte hash to use as the nonce on the wire.
+ * @param chainId - EVM chain id.
+ * @param paymentInfo - The reconstructed PaymentInfo struct.
+ * @param options - Hash mode.
+ * @param options.payerAgnostic - True → zero `paymentInfo.payer` before
+ *   hashing (wire nonce). False → use `paymentInfo.payer` as-is (matches
+ *   the indexed `paymentInfoHash` topic of `PaymentAuthorized` / `PaymentCharged`).
+ * @returns The 32-byte hash.
  */
-export function computePayerAgnosticPaymentInfoHash(
+function computePaymentInfoHash(
   chainId: number,
   paymentInfo: PaymentInfoStruct,
+  options: { payerAgnostic: boolean },
 ): `0x${string}` {
   const paymentInfoEncoded = encodeAbiParameters(
     [
@@ -59,7 +64,7 @@ export function computePayerAgnosticPaymentInfoHash(
     [
       PAYMENT_INFO_TYPEHASH,
       paymentInfo.operator,
-      zeroAddress,
+      options.payerAgnostic ? zeroAddress : paymentInfo.payer,
       paymentInfo.receiver,
       paymentInfo.token,
       BigInt(paymentInfo.maxAmount),
@@ -84,6 +89,48 @@ export function computePayerAgnosticPaymentInfoHash(
   );
 
   return keccak256(outerEncoded);
+}
+
+/**
+ * Compute the payer-agnostic PaymentInfo hash that auth-capture uses as both
+ * the ERC-3009 nonce (`bytes32`) and the Permit2 nonce (`uint256`, via the
+ * same 32 bytes interpreted as an integer). The payer field is zeroed before
+ * hashing so the facilitator can reconstruct the same hash on the verify side
+ * without knowing payer identity in advance.
+ *
+ * Freshness comes from `paymentInfo.salt`; generate a new salt per signing
+ * call via `generateSalt`. Identical extras + same salt would collide across
+ * payers.
+ *
+ * @param chainId - EVM chain id; binds the hash to a specific chain.
+ * @param paymentInfo - The reconstructed PaymentInfo struct (canonical Solidity field names).
+ * @returns The 32-byte hash to use as the nonce on the wire.
+ */
+export function computePayerAgnosticPaymentInfoHash(
+  chainId: number,
+  paymentInfo: PaymentInfoStruct,
+): `0x${string}` {
+  return computePaymentInfoHash(chainId, paymentInfo, { payerAgnostic: true });
+}
+
+/**
+ * Compute the on-chain `paymentInfoHash` (TS mirror of `AuthCaptureEscrow.getHash`).
+ *
+ * Differs from {@link computePayerAgnosticPaymentInfoHash} by encoding the
+ * actual `paymentInfo.payer` instead of `address(0)`. The escrow emits this
+ * hash as the indexed `paymentInfoHash` topic of `PaymentAuthorized` /
+ * `PaymentCharged`, so trace-level simulation checks compare against this
+ * function — NOT against the wire nonce.
+ *
+ * @param chainId - EVM chain id.
+ * @param paymentInfo - The reconstructed PaymentInfo struct with the real payer.
+ * @returns The on-chain payment-info hash.
+ */
+export function computeOnchainPaymentInfoHash(
+  chainId: number,
+  paymentInfo: PaymentInfoStruct,
+): `0x${string}` {
+  return computePaymentInfoHash(chainId, paymentInfo, { payerAgnostic: false });
 }
 
 /**
