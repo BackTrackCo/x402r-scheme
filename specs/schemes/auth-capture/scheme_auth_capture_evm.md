@@ -205,17 +205,19 @@ In addition to the standard verification logic, a facilitator MUST:
    - No `requirements.asset` transfer to any address outside `{payer, receiver, feeReceiver, escrow}`.
 4. **Gas cap**. Apply an explicit gas cap to both the simulation and the broadcast transaction. A misbehaving captureAuthorizer can consume up to the gas field provided by the facilitator; the cap bounds the facilitator's gas exposure.
 
-The recommended cap is **400,000 gas**. This comfortably covers a direct call to `AuthCaptureEscrow.authorize` or `.charge` for both supported `assetTransferMethod` values with headroom for a thin passthrough wrapper, while keeping a misbehaving captureAuthorizer from consuming a material fraction of the facilitator's gas balance on a single request.
+   Implementations MUST express checks (2) and (3) in terms of decoded `Transfer` and escrow events, not the raw trace structure. `eth_simulateV1` layout is not uniform across execution clients; relying on decoded events keeps the check portable.
 
-Facilitators MAY raise the cap for specific captureAuthorizer contracts they advertise support for, but MUST NOT remove it.
+   The gas cap is a DoS bound on facilitator gas spend, not a correctness primitive. EIP-150's 63/64 rule means the outer cap does not strictly bound the inner escrow call's gas — a wrapper can pre-burn gas so that escrow OOGs internally and the wrapper still returns success. The escrow event check (2) is what catches that case: if escrow ran out of gas mid-call, no `PaymentAuthorized` / `PaymentCharged` event is emitted from `AUTH_CAPTURE_ESCROW_ADDRESS`, and (2) fails with `capture_authorizer_escrow_call_missing`. Correctness comes from (2); (4) just bounds blast radius.
+
+The recommended cap is **3,000,000 gas**. This comfortably covers a direct call to `AuthCaptureEscrow.authorize` or `.charge` for both supported `assetTransferMethod` values plus on-chain logic up to and including modern zk verifier circuits (Groth16, PLONK, Halo2, most STARK constructions), while keeping per-attack DoS exposure modest. Facilitators MUST NOT remove the cap.
 
 #### Operational hardening
 
-Facilitators that support contract-path captureAuthorizers SHOULD:
+Facilitators that support contract-path captureAuthorizers:
 
-- Submit settle transactions from a gas-only hot wallet that holds no token balances and has no token approvals. The captureAuthorizer cannot exfiltrate value from such a wallet even on a successful unexpected call path.
-- Reject any settle attempt that requires sending native value. The auth-capture flow is ERC-20 only; a `value > 0` transaction to a captureAuthorizer indicates the contract is requesting funds the facilitator should not grant.
-- Apply the gas cap before broadcast, not just during simulation. A captureAuthorizer that simulates within the cap but executes above it would still be bounded.
+- **MUST submit settle transactions from a partitioned hot wallet** that holds no token balances of `requirements.asset` and has no token approvals to any external contract for that asset. A captureAuthorizer cannot exfiltrate value from such a wallet even on a check bypass: the trace checks are tripwires, but the wallet partition is the wall. This is the only mitigation that survives unexpected wrapper behavior at broadcast time (state-dependent on `block.number`, `block.timestamp`, oracle reads).
+- SHOULD reject any settle attempt that requires sending native value. The auth-capture flow is ERC-20 only; a `value > 0` transaction to a captureAuthorizer indicates the contract is requesting funds the facilitator should not grant.
+- SHOULD apply the gas cap before broadcast, not just during simulation. A captureAuthorizer that simulates within the cap but executes above it would still be bounded.
 
 ## Settlement Logic
 
