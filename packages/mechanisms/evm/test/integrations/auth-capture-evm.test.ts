@@ -11,7 +11,7 @@ import {
   SupportedResponse,
 } from "@x402/core/types";
 import { toClientEvmSigner, toFacilitatorEvmSigner } from "@x402/evm";
-import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/auth-capture/client/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/auth-capture/client";
 import { AuthCaptureEvmScheme as AuthCaptureEvmServer } from "../../src/auth-capture/server/scheme";
 import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/auth-capture/facilitator/scheme";
 import type { AuthCaptureExtra } from "../../src/auth-capture/types";

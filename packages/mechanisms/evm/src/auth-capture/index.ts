@@ -1,1 +1,1 @@
-export { AuthCaptureEvmScheme } from "./client/scheme";
+export { AuthCaptureEvmScheme } from "./client";

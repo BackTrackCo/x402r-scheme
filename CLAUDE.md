@@ -13,7 +13,7 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/mechanisms/evm/`:
 
 ```
-auth-capture/client      → AuthCaptureEvmScheme (createPaymentPayload)
+auth-capture/client      → re-exports AuthCaptureEvmScheme from @x402/evm/auth-capture/client (upstreamed; not implemented here)
 auth-capture/server      → AuthCaptureEvmScheme (parsePrice, enhancePaymentRequirements)
 auth-capture/facilitator → AuthCaptureEvmScheme (verify, settle) + errors.ts
 auth-capture/{types,constants,abi,nonce,utils}.ts → cross-layer code at scheme root

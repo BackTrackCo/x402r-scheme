@@ -21,6 +21,8 @@ See the [scheme specification](https://github.com/x402-foundation/x402/blob/main
 
 Register `AuthCaptureEvmScheme` with an `x402Client`. The client signs the payer-agnostic PaymentInfo hash and emits an ERC-3009 (default) or Permit2 payload.
 
+> The client scheme is re-exported from `@x402/evm/auth-capture/client` — the same implementation, now maintained upstream. `@x402r/evm/auth-capture/client` keeps the import path stable. The server and facilitator layers below remain in this package.
+
 ```typescript
 import { x402Client } from "@x402/core/client";
 import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";

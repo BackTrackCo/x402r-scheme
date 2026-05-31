@@ -28,7 +28,7 @@ import {
 } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
-import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/auth-capture/client/scheme";
+import { AuthCaptureEvmScheme as AuthCaptureEvmClient } from "../../src/auth-capture/client";
 import { AuthCaptureEvmScheme as AuthCaptureEvmFacilitator } from "../../src/auth-capture/facilitator/scheme";
 import { ESCROW_VIEW_ABI } from "../../src/auth-capture/abi";
 import { AUTH_CAPTURE_ESCROW_ADDRESS, PERMIT2_ADDRESS } from "../../src/auth-capture/constants";
