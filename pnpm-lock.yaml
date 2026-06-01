@@ -27,55 +27,6 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  examples/clients/auth-capture:
-    dependencies:
-      '@x402/core':
-        specifier: ^2.14.0
-        version: 2.14.0
-      '@x402/evm':
-        specifier: ^2.14.0
-        version: 2.14.0(typescript@5.9.3)
-      '@x402/fetch':
-        specifier: ^2.14.0
-        version: 2.14.0
-      dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
-      viem:
-        specifier: ^2.48.11
-        version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.7
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.29.1
-        version: 8.56.1(@typescript-eslint/parser@8.56.1(eslint@9.39.3)(typescript@5.9.3))(eslint@9.39.3)(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.29.1
-        version: 8.56.1(eslint@9.39.3)(typescript@5.9.3)
-      eslint:
-        specifier: ^9.24.0
-        version: 9.39.3
-      eslint-plugin-import:
-        specifier: ^2.31.0
-        version: 2.32.0(@typescript-eslint/parser@8.56.1(eslint@9.39.3)(typescript@5.9.3))(eslint@9.39.3)
-      eslint-plugin-jsdoc:
-        specifier: ^50.6.9
-        version: 50.8.0(eslint@9.39.3)
-      eslint-plugin-prettier:
-        specifier: ^5.2.6
-        version: 5.5.5(eslint@9.39.3)(prettier@3.5.2)
-      prettier:
-        specifier: ^3.4.0
-        version: 3.5.2
-      tsx:
-        specifier: ^4.7.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
   examples/facilitator/auth-capture:
     dependencies:
       '@x402/core':
@@ -796,9 +747,6 @@ packages:
 
   '@x402/extensions@2.14.0':
     resolution: {integrity: sha512-2zu8hxf0j4BRvSWNPRKziQLdubnQpzzmU9xopKK5ZyXa434hvmGEUPMBOA2NIYvaTkyZjQH3JZ3GPDyzjBvFqA==}
-
-  '@x402/fetch@2.14.0':
-    resolution: {integrity: sha512-GSCnxdrbmtuKeki2MTy2vnJq4e6PrA7XfF1yX23VxKvASIYaXUioW1HtRzNYU7imeMe13YcwefRH1jO7Ei7Tyg==}
 
   abitype@1.2.3:
     resolution: {integrity: sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==}
@@ -2752,10 +2700,6 @@ snapshots:
       - ethers
       - typescript
       - utf-8-validate
-
-  '@x402/fetch@2.14.0':
-    dependencies:
-      '@x402/core': 2.14.0
 
   abitype@1.2.3(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:

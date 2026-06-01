@@ -187,7 +187,9 @@ If neither condition holds (e.g., an unrelated EOA), the escrow's `onlySender` g
 
 ## Examples
 
-- [Client example](../../../../../examples/clients/auth-capture)
+The server and facilitator examples are the x402r-specific legs of the demo. The buyer leg is the upstream client example, run against the server example's URL — no x402r-specific client code exists, so there is nothing to duplicate here.
+
+- Client (buyer): [upstream `@x402/evm` auth-capture client example](https://github.com/x402-foundation/x402/tree/main/examples/typescript/clients/auth-capture) — run it with `RESOURCE_SERVER_URL` set to the server example's URL (default `http://localhost:4021`)
 - [Server example](../../../../../examples/servers/auth-capture)
 - [Facilitator example](../../../../../examples/facilitator/auth-capture)
 
