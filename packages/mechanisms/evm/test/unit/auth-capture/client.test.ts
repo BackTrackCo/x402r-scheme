@@ -132,6 +132,12 @@ describe("upstream auth-capture client compatibility", () => {
       // (2) collector address matches our canonical constant
       expect(payload.authorization.to).toBe(EIP3009_TOKEN_COLLECTOR_ADDRESS);
 
+      // amount + window are not bound by the nonce hash and are read back off the
+      // signed payload, so assert them explicitly — a wrong-but-self-consistent
+      // value would otherwise pass nonce + signature checks undetected.
+      expect(payload.authorization.value).toBe(requirements.amount);
+      expect(payload.authorization.validAfter).toBe("0");
+
       // (3) the wire nonce equals OUR payer-agnostic hash for the same struct
       const paymentInfo = reconstructPaymentInfo(preApprovalExpiry, payload.salt);
       const expectedNonce = computePayerAgnosticPaymentInfoHash(CHAIN_ID, paymentInfo);
@@ -164,6 +170,10 @@ describe("upstream auth-capture client compatibility", () => {
 
       // (2) collector address matches our canonical constant
       expect(payload.permit2Authorization.spender).toBe(PERMIT2_TOKEN_COLLECTOR_ADDRESS);
+
+      // amount is not bound by the nonce hash — assert it explicitly (see ERC-3009 note)
+      expect(payload.permit2Authorization.permitted.token).toBe(requirements.asset);
+      expect(payload.permit2Authorization.permitted.amount).toBe(requirements.amount);
 
       // (3) the Permit2 nonce equals OUR payer-agnostic hash as a uint256
       const paymentInfo = reconstructPaymentInfo(preApprovalExpiry, payload.salt);
