@@ -11,21 +11,19 @@ See the [scheme specification](https://github.com/x402-foundation/x402/blob/main
 
 ## Import Paths
 
-| Role        | Import                                |
-| ----------- | ------------------------------------- |
-| Client      | `@x402r/evm/auth-capture/client`      |
-| Server      | `@x402r/evm/auth-capture/server`      |
-| Facilitator | `@x402r/evm/auth-capture/facilitator` |
+| Role        | Import                                     |
+| ----------- | ------------------------------------------ |
+| Client      | `@x402/evm/auth-capture/client` (upstream) |
+| Server      | `@x402r/evm/auth-capture/server`           |
+| Facilitator | `@x402r/evm/auth-capture/facilitator`      |
 
 ## Client Usage
 
-Register `AuthCaptureEvmScheme` with an `x402Client`. The client signs the payer-agnostic PaymentInfo hash and emits an ERC-3009 (default) or Permit2 payload.
-
-> The client scheme is re-exported from `@x402/evm/auth-capture/client` — the same implementation, now maintained upstream. `@x402r/evm/auth-capture/client` keeps the import path stable. The server and facilitator layers below remain in this package.
+Register `AuthCaptureEvmScheme` with an `x402Client`. The client signs the payer-agnostic PaymentInfo hash and emits an ERC-3009 (default) or Permit2 payload. The client scheme is maintained upstream in `@x402/evm`; the server and facilitator layers below live in this package.
 
 ```typescript
 import { x402Client } from "@x402/core/client";
-import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import { privateKeyToAccount } from "viem/accounts";
 
 const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`);

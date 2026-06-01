@@ -12,8 +12,10 @@ npm install @x402r/evm
 
 ### Client — Create payment payloads
 
+The client-side signing scheme ships with `@x402/evm`; this package provides the server and facilitator.
+
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import { x402Client } from "@x402/core/client";
 
 const client = new x402Client();
@@ -42,10 +44,10 @@ facilitator.register("eip155:84532", new AuthCaptureEvmScheme(signer));
 
 ## Exports
 
-- `@x402r/evm` — `AuthCaptureEvmScheme` (client class), payload/extra/struct types, `is*` guards, address + scheme constants
-- `@x402r/evm/auth-capture/client` — `AuthCaptureEvmScheme` (client class)
+- `@x402r/evm` — payload/extra/struct types, `is*` guards, address + scheme constants
 - `@x402r/evm/auth-capture/server` — `AuthCaptureEvmScheme` (server class)
 - `@x402r/evm/auth-capture/facilitator` — `AuthCaptureEvmScheme` (facilitator class)
+- client class: `AuthCaptureEvmScheme` from `@x402/evm/auth-capture/client` (upstream)
 
 ## Testing
 

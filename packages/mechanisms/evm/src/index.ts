@@ -3,10 +3,12 @@
  *
  * Refundable payments scheme for the x402 protocol, built on the
  * AuthCaptureEscrow contract from base/commerce-payments.
+ *
+ * The server and facilitator scheme classes are published under their own
+ * subpaths (`@x402r/evm/auth-capture/{server,facilitator}`). The client-side
+ * signing scheme lives upstream in `@x402/evm/auth-capture/client`. This entry
+ * point exposes the shared wire types and constants.
  */
-
-// auth-capture scheme client
-export { AuthCaptureEvmScheme } from "./auth-capture";
 
 // Types
 export type {

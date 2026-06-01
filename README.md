@@ -18,8 +18,10 @@ Peer dependencies: `@x402/core`, `@x402/evm`, `viem`
 
 ### Client
 
+The client-side signing scheme ships with `@x402/evm`; this package provides the server and facilitator.
+
 ```typescript
-import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import { x402Client } from "@x402/core/client";
 
 const client = new x402Client();

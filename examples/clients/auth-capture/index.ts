@@ -1,4 +1,4 @@
-import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
 import { config } from "dotenv";
 import { privateKeyToAccount } from "viem/accounts";

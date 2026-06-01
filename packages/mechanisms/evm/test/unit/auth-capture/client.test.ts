@@ -1,9 +1,8 @@
 /**
  * Compatibility guard for the upstream auth-capture client.
  *
- * The client-side signing scheme is no longer implemented here — it lives in
- * `@x402/evm/auth-capture/client` and is re-exported by
- * `src/auth-capture/client`. That means there are now two copies of the
+ * The client-side signing scheme is not implemented here — it lives upstream
+ * in `@x402/evm/auth-capture/client`. That means there are two copies of the
  * payer-agnostic hash + EIP-712 signing logic: upstream's (inside the client)
  * and ours (`nonce.ts`, used by the facilitator's `verify`). They MUST stay
  * byte-compatible or the facilitator will reject payloads its own clients
@@ -24,8 +23,9 @@
 import { describe, it, expect } from "vitest";
 import { hexToBigInt, recoverTypedDataAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-// Imported through our public client export — i.e. the re-exported upstream class.
-import { AuthCaptureEvmScheme } from "../../../src/auth-capture/client";
+// The client lives upstream; the facilitator-side verification it must stay
+// compatible with lives in this package (nonce.ts).
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import {
   EIP3009_TOKEN_COLLECTOR_ADDRESS,
   PERMIT2_ADDRESS,

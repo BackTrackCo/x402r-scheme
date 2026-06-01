@@ -38,9 +38,6 @@ importers:
       '@x402/fetch':
         specifier: ^2.14.0
         version: 2.14.0
-      '@x402r/evm':
-        specifier: workspace:*
-        version: link:../../../packages/mechanisms/evm
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
