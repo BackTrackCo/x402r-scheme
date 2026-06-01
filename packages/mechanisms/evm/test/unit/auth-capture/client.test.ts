@@ -114,7 +114,7 @@ function reconstructPaymentInfo(preApprovalExpiry: number, salt: `0x${string}`):
 }
 
 describe("upstream auth-capture client compatibility", () => {
-  it("re-exports a scheme tagged 'auth-capture'", () => {
+  it("exposes a scheme tagged 'auth-capture'", () => {
     expect(new AuthCaptureEvmScheme(account).scheme).toBe("auth-capture");
   });
 
