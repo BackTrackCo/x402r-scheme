@@ -143,8 +143,8 @@ importers:
   packages/mechanisms/evm:
     dependencies:
       '@x402/core':
-        specifier: ^2.11.0
-        version: 2.12.0
+        specifier: ^2.14.0
+        version: 2.14.0
       '@x402/evm':
         specifier: ^2.14.0
         version: 2.14.0(typescript@5.9.3)
@@ -726,9 +726,6 @@ packages:
 
   '@vitest/utils@4.0.18':
     resolution: {integrity: sha512-msMRKLMVLWygpK3u2Hybgi4MNjcYJvwTb0Ru09+fOyCXIgT5raYP041DRRdiJiI3k/2U6SEbAETB3YtBrUkCFA==}
-
-  '@x402/core@2.12.0':
-    resolution: {integrity: sha512-dLae9AbZRN/W7GsKe9ngqGsflnP+esE72s0GjmqDZbPihM/tlHCA6UnDdgM0qfOiDOf9iL+mmCs1OyLWpwnGLQ==}
 
   '@x402/core@2.14.0':
     resolution: {integrity: sha512-+xTM6hfGduYvFcQ7QwKvCwommL6+zqzqmr5IuPojbt+RZjo4QUjSkHW+arMtPoIKRLxWAI+e6P4UJMMblwG+Dw==}
@@ -2654,10 +2651,6 @@ snapshots:
     dependencies:
       '@vitest/pretty-format': 4.0.18
       tinyrainbow: 3.0.3
-
-  '@x402/core@2.12.0':
-    dependencies:
-      zod: 3.25.76
 
   '@x402/core@2.14.0':
     dependencies:
