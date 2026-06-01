@@ -10,9 +10,9 @@
     "lint:check": "eslint ."
   },
   "dependencies": {
-    "@x402/core": "^2.12.0",
-    "@x402/evm": "^2.12.0",
-    "@x402/express": "^2.12.0",
+    "@x402/core": "^2.14.0",
+    "@x402/evm": "^2.14.0",
+    "@x402/express": "^2.14.0",
     "@x402r/evm": "workspace:*",
     "dotenv": "^16.4.7",
     "express": "^4.19.2",

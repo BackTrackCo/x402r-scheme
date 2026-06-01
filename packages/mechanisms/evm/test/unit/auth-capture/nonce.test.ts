@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { zeroAddress } from "viem";
-import { computePayerAgnosticPaymentInfoHash, generateSalt } from "../../../src/auth-capture/nonce";
+import { computePayerAgnosticPaymentInfoHash } from "../../../src/auth-capture/nonce";
 import type { PaymentInfoStruct } from "../../../src/auth-capture/types";
 
 describe("nonce utilities", () => {
@@ -70,28 +70,6 @@ describe("nonce utilities", () => {
       });
       expect(nonceA).toBe(nonceB);
       expect(nonceA).toBe(nonceZero);
-    });
-  });
-
-  describe("generateSalt", () => {
-    it("should produce a 32-byte hex string", () => {
-      const salt = generateSalt();
-      expect(salt).toMatch(/^0x[a-fA-F0-9]{64}$/);
-    });
-
-    it("should produce unique values on each call", () => {
-      const salt1 = generateSalt();
-      const salt2 = generateSalt();
-      const salt3 = generateSalt();
-      expect(salt1).not.toBe(salt2);
-      expect(salt2).not.toBe(salt3);
-      expect(salt1).not.toBe(salt3);
-    });
-
-    it("should produce valid hex characters only", () => {
-      const salt = generateSalt();
-      const hexPart = salt.slice(2);
-      expect(hexPart).toMatch(/^[0-9a-f]+$/);
     });
   });
 });

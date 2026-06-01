@@ -27,66 +27,14 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  examples/clients/auth-capture:
-    dependencies:
-      '@x402/core':
-        specifier: ^2.12.0
-        version: 2.12.0
-      '@x402/evm':
-        specifier: ^2.12.0
-        version: 2.12.0(typescript@5.9.3)
-      '@x402/fetch':
-        specifier: ^2.12.0
-        version: 2.12.0
-      '@x402r/evm':
-        specifier: workspace:*
-        version: link:../../../packages/mechanisms/evm
-      dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
-      viem:
-        specifier: ^2.48.11
-        version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.7
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.29.1
-        version: 8.56.1(@typescript-eslint/parser@8.56.1(eslint@9.39.3)(typescript@5.9.3))(eslint@9.39.3)(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.29.1
-        version: 8.56.1(eslint@9.39.3)(typescript@5.9.3)
-      eslint:
-        specifier: ^9.24.0
-        version: 9.39.3
-      eslint-plugin-import:
-        specifier: ^2.31.0
-        version: 2.32.0(@typescript-eslint/parser@8.56.1(eslint@9.39.3)(typescript@5.9.3))(eslint@9.39.3)
-      eslint-plugin-jsdoc:
-        specifier: ^50.6.9
-        version: 50.8.0(eslint@9.39.3)
-      eslint-plugin-prettier:
-        specifier: ^5.2.6
-        version: 5.5.5(eslint@9.39.3)(prettier@3.5.2)
-      prettier:
-        specifier: ^3.4.0
-        version: 3.5.2
-      tsx:
-        specifier: ^4.7.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
   examples/facilitator/auth-capture:
     dependencies:
       '@x402/core':
-        specifier: ^2.12.0
-        version: 2.12.0
+        specifier: ^2.14.0
+        version: 2.14.0
       '@x402/evm':
-        specifier: ^2.12.0
-        version: 2.12.0(typescript@5.9.3)
+        specifier: ^2.14.0
+        version: 2.14.0(typescript@5.9.3)
       '@x402r/evm':
         specifier: workspace:*
         version: link:../../../packages/mechanisms/evm
@@ -137,14 +85,14 @@ importers:
   examples/servers/auth-capture:
     dependencies:
       '@x402/core':
-        specifier: ^2.12.0
-        version: 2.12.0
+        specifier: ^2.14.0
+        version: 2.14.0
       '@x402/evm':
-        specifier: ^2.12.0
-        version: 2.12.0(typescript@5.9.3)
+        specifier: ^2.14.0
+        version: 2.14.0(typescript@5.9.3)
       '@x402/express':
-        specifier: ^2.12.0
-        version: 2.12.0(express@4.22.2)(typescript@5.9.3)
+        specifier: ^2.14.0
+        version: 2.14.0(express@4.22.2)(typescript@5.9.3)
       '@x402r/evm':
         specifier: workspace:*
         version: link:../../../packages/mechanisms/evm
@@ -195,11 +143,11 @@ importers:
   packages/mechanisms/evm:
     dependencies:
       '@x402/core':
-        specifier: ^2.11.0
-        version: 2.12.0
+        specifier: ^2.14.0
+        version: 2.14.0
       '@x402/evm':
-        specifier: ^2.12.0
-        version: 2.12.0(typescript@5.9.3)
+        specifier: ^2.14.0
+        version: 2.14.0(typescript@5.9.3)
       viem:
         specifier: ^2.48.11
         version: 2.48.11(typescript@5.9.3)(zod@3.25.76)
@@ -779,26 +727,23 @@ packages:
   '@vitest/utils@4.0.18':
     resolution: {integrity: sha512-msMRKLMVLWygpK3u2Hybgi4MNjcYJvwTb0Ru09+fOyCXIgT5raYP041DRRdiJiI3k/2U6SEbAETB3YtBrUkCFA==}
 
-  '@x402/core@2.12.0':
-    resolution: {integrity: sha512-dLae9AbZRN/W7GsKe9ngqGsflnP+esE72s0GjmqDZbPihM/tlHCA6UnDdgM0qfOiDOf9iL+mmCs1OyLWpwnGLQ==}
+  '@x402/core@2.14.0':
+    resolution: {integrity: sha512-+xTM6hfGduYvFcQ7QwKvCwommL6+zqzqmr5IuPojbt+RZjo4QUjSkHW+arMtPoIKRLxWAI+e6P4UJMMblwG+Dw==}
 
-  '@x402/evm@2.12.0':
-    resolution: {integrity: sha512-kZUoHPVdBS8wlTg5K1eoh/1V0+5n9ABGRPC5DOQwRlkAwIrAFOEi2pQE+jgvOx0iM5ib2xj9gJjpldRbasX12w==}
+  '@x402/evm@2.14.0':
+    resolution: {integrity: sha512-Qrm0+hN1gMK1vrX4vW4sdcx5txYTx8J2uDNulcNoIdtz15kTU5hjNUyZaCpI3i6x0MXnUBGfyar9Ut9uoAoPMw==}
 
-  '@x402/express@2.12.0':
-    resolution: {integrity: sha512-bPc6jpRr4iCh7KRJETK/2/bVTKHy/EeybQd9s+Mz4Ab+C64F1IH20GeW4gyj27dtAd2YgOiFrk8uyxSbZPKhkQ==}
+  '@x402/express@2.14.0':
+    resolution: {integrity: sha512-dkM4A1EanDciS2iJwxl5B/Qsz+ENWmL5O8jt5i+hRc8w+rQ6Loj04C4cIN3RCAIwmD91NTCmivGsIJ+4WrdEwQ==}
     peerDependencies:
-      '@x402/paywall': ^2.12.0
+      '@x402/paywall': ^2.14.0
       express: ^4.0.0 || ^5.0.0
     peerDependenciesMeta:
       '@x402/paywall':
         optional: true
 
-  '@x402/extensions@2.12.0':
-    resolution: {integrity: sha512-1B6a/ubCiAoNrVbrZ4btUcWXjM5e71fB2rxSrtW+mINGVonW4w7QDjAKdOlKzi6xqRSoGRVQm5ajL9hIGvkE2A==}
-
-  '@x402/fetch@2.12.0':
-    resolution: {integrity: sha512-lkN/fzkZjnbJreLwI3fessKAaTKsOrrc0mFPGHWwZy0W/s8KFusLwdHuS8ul/XdUyNcYYrwcV6z0faGGSWNUNA==}
+  '@x402/extensions@2.14.0':
+    resolution: {integrity: sha512-2zu8hxf0j4BRvSWNPRKziQLdubnQpzzmU9xopKK5ZyXa434hvmGEUPMBOA2NIYvaTkyZjQH3JZ3GPDyzjBvFqA==}
 
   abitype@1.2.3:
     resolution: {integrity: sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==}
@@ -2707,13 +2652,13 @@ snapshots:
       '@vitest/pretty-format': 4.0.18
       tinyrainbow: 3.0.3
 
-  '@x402/core@2.12.0':
+  '@x402/core@2.14.0':
     dependencies:
       zod: 3.25.76
 
-  '@x402/evm@2.12.0(typescript@5.9.3)':
+  '@x402/evm@2.14.0(typescript@5.9.3)':
     dependencies:
-      '@x402/core': 2.12.0
+      '@x402/core': 2.14.0
       viem: 2.48.11(typescript@5.9.3)(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -2721,10 +2666,10 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@x402/express@2.12.0(express@4.22.2)(typescript@5.9.3)':
+  '@x402/express@2.14.0(express@4.22.2)(typescript@5.9.3)':
     dependencies:
-      '@x402/core': 2.12.0
-      '@x402/extensions': 2.12.0(typescript@5.9.3)
+      '@x402/core': 2.14.0
+      '@x402/extensions': 2.14.0(typescript@5.9.3)
       express: 4.22.2
     transitivePeerDependencies:
       - bufferutil
@@ -2732,12 +2677,12 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@x402/extensions@2.12.0(typescript@5.9.3)':
+  '@x402/extensions@2.14.0(typescript@5.9.3)':
     dependencies:
       '@noble/curves': 1.9.1
       '@scure/base': 1.2.6
       '@signinwithethereum/siwe': 4.2.0(viem@2.48.11(typescript@5.9.3)(zod@3.25.76))
-      '@x402/core': 2.12.0
+      '@x402/core': 2.14.0
       ajv: 8.20.0
       jose: 5.10.0
       tweetnacl: 1.0.3
@@ -2748,10 +2693,6 @@ snapshots:
       - ethers
       - typescript
       - utf-8-validate
-
-  '@x402/fetch@2.12.0':
-    dependencies:
-      '@x402/core': 2.12.0
 
   abitype@1.2.3(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:

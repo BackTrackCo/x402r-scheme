@@ -11,19 +11,19 @@ See the [scheme specification](https://github.com/x402-foundation/x402/blob/main
 
 ## Import Paths
 
-| Role        | Import                                |
-| ----------- | ------------------------------------- |
-| Client      | `@x402r/evm/auth-capture/client`      |
-| Server      | `@x402r/evm/auth-capture/server`      |
-| Facilitator | `@x402r/evm/auth-capture/facilitator` |
+| Role        | Import                                     |
+| ----------- | ------------------------------------------ |
+| Client      | `@x402/evm/auth-capture/client` (upstream) |
+| Server      | `@x402r/evm/auth-capture/server`           |
+| Facilitator | `@x402r/evm/auth-capture/facilitator`      |
 
 ## Client Usage
 
-Register `AuthCaptureEvmScheme` with an `x402Client`. The client signs the payer-agnostic PaymentInfo hash and emits an ERC-3009 (default) or Permit2 payload.
+Register `AuthCaptureEvmScheme` with an `x402Client`. The client signs the payer-agnostic PaymentInfo hash and emits an ERC-3009 (default) or Permit2 payload. The client scheme is maintained upstream in `@x402/evm`; the server and facilitator layers below live in this package.
 
 ```typescript
 import { x402Client } from "@x402/core/client";
-import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/client";
+import { AuthCaptureEvmScheme } from "@x402/evm/auth-capture/client";
 import { privateKeyToAccount } from "viem/accounts";
 
 const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`);
@@ -187,7 +187,9 @@ If neither condition holds (e.g., an unrelated EOA), the escrow's `onlySender` g
 
 ## Examples
 
-- [Client example](../../../../../examples/clients/auth-capture)
+The server and facilitator examples are the x402r-specific legs of the demo. The buyer leg is the upstream client example, run against the server example's URL — no x402r-specific client code exists, so there is nothing to duplicate here.
+
+- Client (buyer): [upstream `@x402/evm` auth-capture client example](https://github.com/x402-foundation/x402/tree/main/examples/typescript/clients/auth-capture) — run it with `RESOURCE_SERVER_URL` set to the server example's URL (default `http://localhost:4021`)
 - [Server example](../../../../../examples/servers/auth-capture)
 - [Facilitator example](../../../../../examples/facilitator/auth-capture)
 

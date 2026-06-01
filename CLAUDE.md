@@ -13,11 +13,12 @@ pnpm build / pnpm test / pnpm format
 Single package `@x402r/evm` at `packages/mechanisms/evm/`:
 
 ```
-auth-capture/client      → AuthCaptureEvmScheme (createPaymentPayload)
 auth-capture/server      → AuthCaptureEvmScheme (parsePrice, enhancePaymentRequirements)
 auth-capture/facilitator → AuthCaptureEvmScheme (verify, settle) + errors.ts
 auth-capture/{types,constants,abi,nonce,utils}.ts → cross-layer code at scheme root
 ```
+
+The client-side signing scheme is NOT in this package — it lives upstream in `@x402/evm/auth-capture/client`. This package ships only the server + facilitator. `nonce.ts` holds the facilitator-side hash/verify; its `test/unit/auth-capture/client.test.ts` is a compatibility guard pinning it byte-for-byte against the upstream client.
 
 ## Dependencies
 
