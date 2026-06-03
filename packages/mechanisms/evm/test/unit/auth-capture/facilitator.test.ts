@@ -65,7 +65,9 @@ describe("AuthCaptureEvmScheme", () => {
   };
 
   // Build a PaymentInfoStruct that matches what the facilitator will reconstruct.
-  function buildPaymentInfo(): PaymentInfoStruct {
+  // `feeBand` overrides the default [0, 100] band so the nonce stays bound to the
+  // band a given test puts in `requirements.extra`.
+  function buildPaymentInfo(feeBand?: { minFeeBps: number; maxFeeBps: number }): PaymentInfoStruct {
     return {
       operator: CAPTURE_AUTHORIZER,
       payer: PAYER,
@@ -75,15 +77,15 @@ describe("AuthCaptureEvmScheme", () => {
       preApprovalExpiry: futureSeconds,
       authorizationExpiry: captureDeadline,
       refundExpiry: refundDeadline,
-      minFeeBps: 0,
-      maxFeeBps: 100,
+      minFeeBps: feeBand?.minFeeBps ?? 0,
+      maxFeeBps: feeBand?.maxFeeBps ?? 100,
       feeReceiver: FEE_RECIPIENT,
       salt: SALT,
     };
   }
 
-  function buildEip3009Payload() {
-    const paymentInfo = buildPaymentInfo();
+  function buildEip3009Payload(feeBand?: { minFeeBps: number; maxFeeBps: number }) {
+    const paymentInfo = buildPaymentInfo(feeBand);
     const nonce = computePayerAgnosticPaymentInfoHash(84532, paymentInfo);
     return {
       x402Version: 2,
@@ -656,6 +658,72 @@ describe("AuthCaptureEvmScheme", () => {
       const call = mockSigner.writeContract.mock.calls[0][0];
       expect(call.functionName).toBe("authorize");
       expect(call.args.length).toBe(4);
+    });
+  });
+
+  describe("settle — facilitator feeBps policy (selectFeeBps)", () => {
+    // Widen the band so the default floor (10) and a policy pick (50) differ.
+    // The payload nonce must be built with the SAME band — it hashes the band.
+    const FEE_BAND = { minFeeBps: 10, maxFeeBps: 100 };
+    const chargeReqs = {
+      ...mockRequirements,
+      extra: { ...mockRequirements.extra, autoCapture: true, ...FEE_BAND },
+    };
+    const chargePayload = () => buildEip3009Payload(FEE_BAND);
+
+    it("should default to the band floor (minFeeBps) when no policy is configured", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      await scheme.settle(chargePayload(), chargeReqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.functionName).toBe("charge");
+      expect(call.args[4]).toBe(10);
+    });
+
+    it("should forward an in-band value chosen by selectFeeBps", async () => {
+      const selectFeeBps = vi.fn().mockReturnValue(50);
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps });
+      await scheme.settle(chargePayload(), chargeReqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.args[4]).toBe(50);
+      // Selector sees the reconstructed PaymentInfo (with the band) it picks from.
+      expect(selectFeeBps).toHaveBeenCalledWith(
+        expect.objectContaining({ minFeeBps: 10, maxFeeBps: 100 }),
+      );
+    });
+
+    it("should simulate with the same policy-chosen feeBps the real tx carries", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 50 });
+      await scheme.settle(chargePayload(), chargeReqs);
+      const simulateCall = mockSigner.readContract.mock.calls.find(
+        c => c[0].functionName === "charge",
+      );
+      expect(simulateCall?.[0].args[4]).toBe(50);
+    });
+
+    it("should reject an above-band policy value with fee_bps_out_of_range, before submitting", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 101 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should reject a below-band policy value with fee_bps_out_of_range", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 0 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should not invoke selectFeeBps for authorize (no fee tail)", async () => {
+      const selectFeeBps = vi.fn().mockReturnValue(50);
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps });
+      // autoCapture omitted → authorize path; default band → default payload
+      await scheme.settle(buildEip3009Payload(), mockRequirements);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.functionName).toBe("authorize");
+      expect(selectFeeBps).not.toHaveBeenCalled();
     });
   });
 
