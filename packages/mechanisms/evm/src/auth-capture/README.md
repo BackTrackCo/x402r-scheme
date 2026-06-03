@@ -156,7 +156,7 @@ new AuthCaptureEvmScheme(evmSigner, {
   // choose the in-band fee (defaults to minFeeBps)
   selectFeeBps: paymentInfo => paymentInfo.maxFeeBps,
   // choose the receiver only when the merchant set feeRecipient = address(0)
-  selectFeeReceiver: () => "0xYourFeeAddress",
+  selectFeeReceiver: () => "0x1111111111111111111111111111111111111111",
 });
 ```
 
