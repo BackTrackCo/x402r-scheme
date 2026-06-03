@@ -195,6 +195,12 @@ export interface AuthCaptureFacilitatorOptions {
  * revert.
  */
 class FeeSelectionError extends Error {
+  /**
+   * Construct a fee-selection error carrying the wire reason to surface.
+   *
+   * @param reason - Stable wire reason to surface (e.g. `fee_bps_out_of_range`).
+   * @param message - Human-readable detail for logs.
+   */
   constructor(
     readonly reason: string,
     message: string,
@@ -261,61 +267,6 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     private signer: FacilitatorEvmSigner,
     private options: AuthCaptureFacilitatorOptions = {},
   ) {}
-
-  /**
-   * Resolve the actual `feeBps` + `feeReceiver` to forward on a `charge`/
-   * `capture` call. Single source of truth shared by `settle` and
-   * `simulateSettle` so the two can never drift on the applied fee.
-   *
-   * `feeBps`: defaults to the band floor (`minFeeBps`) when no `selectFeeBps`
-   * policy is configured — the conservative choice that least surprises the
-   * payer. A configured policy's result is validated against the signed
-   * `[minFeeBps, maxFeeBps]` band (never silently clamped).
-   *
-   * `feeReceiver`: when the merchant configured a non-zero `feeRecipient` the
-   * escrow forces a match, so it is passed through unchanged and the
-   * `selectFeeReceiver` policy is not consulted. When the merchant delegated by
-   * setting `feeRecipient == address(0)`, the policy (if any) chooses the
-   * recipient. A non-zero fee paired with a zero receiver is rejected here
-   * (mirroring the escrow's `ZeroFeeReceiver`) instead of reverting on-chain.
-   *
-   * @param paymentInfo - The reconstructed PaymentInfo carrying the fee band
-   *   and the configured (or delegated) `feeReceiver`.
-   * @returns The band-validated `feeBps` and the resolved `feeReceiver`.
-   * @throws {FeeSelectionError} If a policy returns an out-of-band/non-integer
-   *   `feeBps`, or a fee is taken with no non-zero receiver.
-   */
-  private resolveFee(paymentInfo: PaymentInfoStruct): {
-    feeBps: number;
-    feeReceiver: `0x${string}`;
-  } {
-    const { minFeeBps, maxFeeBps } = paymentInfo;
-    const feeBps = this.options.selectFeeBps ? this.options.selectFeeBps(paymentInfo) : minFeeBps;
-    if (!Number.isInteger(feeBps) || feeBps < minFeeBps || feeBps > maxFeeBps) {
-      throw new FeeSelectionError(
-        ErrFeeBpsOutOfRange,
-        `selectFeeBps returned ${feeBps}, outside signed band [${minFeeBps}, ${maxFeeBps}]`,
-      );
-    }
-
-    // Configured (non-zero) recipient is fixed by the escrow; delegated
-    // (address(0)) recipient is the facilitator's choice via policy.
-    const delegated = paymentInfo.feeReceiver.toLowerCase() === zeroAddress;
-    const feeReceiver =
-      delegated && this.options.selectFeeReceiver
-        ? this.options.selectFeeReceiver(paymentInfo)
-        : paymentInfo.feeReceiver;
-
-    if (feeBps > 0 && feeReceiver.toLowerCase() === zeroAddress) {
-      throw new FeeSelectionError(
-        ErrZeroFeeReceiver,
-        `feeBps ${feeBps} > 0 requires a non-zero feeReceiver; merchant delegated ` +
-          `feeRecipient=address(0) and no selectFeeReceiver policy supplied one`,
-      );
-    }
-
-    return { feeBps, feeReceiver };
-  }
 
   /**
    * Return the EOA address(es) this facilitator submits transactions from.
@@ -662,6 +613,61 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
         payer,
       };
     }
+  }
+
+  /**
+   * Resolve the actual `feeBps` + `feeReceiver` to forward on a `charge`/
+   * `capture` call. Single source of truth shared by `settle` and
+   * `simulateSettle` so the two can never drift on the applied fee.
+   *
+   * `feeBps`: defaults to the band floor (`minFeeBps`) when no `selectFeeBps`
+   * policy is configured — the conservative choice that least surprises the
+   * payer. A configured policy's result is validated against the signed
+   * `[minFeeBps, maxFeeBps]` band (never silently clamped).
+   *
+   * `feeReceiver`: when the merchant configured a non-zero `feeRecipient` the
+   * escrow forces a match, so it is passed through unchanged and the
+   * `selectFeeReceiver` policy is not consulted. When the merchant delegated by
+   * setting `feeRecipient == address(0)`, the policy (if any) chooses the
+   * recipient. A non-zero fee paired with a zero receiver is rejected here
+   * (mirroring the escrow's `ZeroFeeReceiver`) instead of reverting on-chain.
+   *
+   * @param paymentInfo - The reconstructed PaymentInfo carrying the fee band
+   *   and the configured (or delegated) `feeReceiver`.
+   * @returns The band-validated `feeBps` and the resolved `feeReceiver`.
+   * @throws {FeeSelectionError} If a policy returns an out-of-band/non-integer
+   *   `feeBps`, or a fee is taken with no non-zero receiver.
+   */
+  private resolveFee(paymentInfo: PaymentInfoStruct): {
+    feeBps: number;
+    feeReceiver: `0x${string}`;
+  } {
+    const { minFeeBps, maxFeeBps } = paymentInfo;
+    const feeBps = this.options.selectFeeBps ? this.options.selectFeeBps(paymentInfo) : minFeeBps;
+    if (!Number.isInteger(feeBps) || feeBps < minFeeBps || feeBps > maxFeeBps) {
+      throw new FeeSelectionError(
+        ErrFeeBpsOutOfRange,
+        `selectFeeBps returned ${feeBps}, outside signed band [${minFeeBps}, ${maxFeeBps}]`,
+      );
+    }
+
+    // Configured (non-zero) recipient is fixed by the escrow; delegated
+    // (address(0)) recipient is the facilitator's choice via policy.
+    const delegated = paymentInfo.feeReceiver.toLowerCase() === zeroAddress;
+    const feeReceiver =
+      delegated && this.options.selectFeeReceiver
+        ? this.options.selectFeeReceiver(paymentInfo)
+        : paymentInfo.feeReceiver;
+
+    if (feeBps > 0 && feeReceiver.toLowerCase() === zeroAddress) {
+      throw new FeeSelectionError(
+        ErrZeroFeeReceiver,
+        `feeBps ${feeBps} > 0 requires a non-zero feeReceiver; merchant delegated ` +
+          `feeRecipient=address(0) and no selectFeeReceiver policy supplied one`,
+      );
+    }
+
+    return { feeBps, feeReceiver };
   }
 
   /**
