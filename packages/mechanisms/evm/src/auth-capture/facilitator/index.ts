@@ -1,2 +1,2 @@
 export { AuthCaptureEvmScheme } from "./scheme";
-export type { AuthCaptureFacilitatorOptions, FeeBpsSelector } from "./scheme";
+export type { AuthCaptureFacilitatorOptions, FeeBpsSelector, FeeReceiverSelector } from "./scheme";
