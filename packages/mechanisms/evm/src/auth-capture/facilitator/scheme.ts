@@ -24,6 +24,7 @@ import {
   BaseError,
   ContractFunctionRevertedError,
   hexToBigInt,
+  isAddress,
   parseErc6492Signature,
   zeroAddress,
 } from "viem";
@@ -45,6 +46,7 @@ import {
   ErrInvalidAuthCaptureExtra,
   ErrInvalidAuthCaptureSignature,
   ErrInvalidDeadlineOrdering,
+  ErrInvalidFeeReceiver,
   ErrInvalidNetwork,
   ErrInvalidPayloadFormat,
   ErrNetworkMismatch,
@@ -259,9 +261,12 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
    * Construct a facilitator-side auth-capture scheme bound to a specific signer.
    *
    * @param signer - Facilitator signer with on-chain read + write capability.
-   * @param options - Optional facilitator policy. `options.selectFeeBps` chooses
-   *   the actual in-band `feeBps` applied on `charge`/`capture`; omit it to
-   *   default to the band floor (`minFeeBps`). See {@link FeeBpsSelector}.
+   * @param options - Optional facilitator fee policy. `options.selectFeeBps`
+   *   chooses the in-band `feeBps` applied on `charge`/`capture` (defaults to the
+   *   band floor `minFeeBps`); `options.selectFeeReceiver` chooses the
+   *   `feeReceiver` when the merchant delegated it via `feeRecipient ==
+   *   address(0)` (ignored otherwise). See {@link FeeBpsSelector} and
+   *   {@link FeeReceiverSelector}.
    */
   constructor(
     private signer: FacilitatorEvmSigner,
@@ -629,14 +634,21 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
    * escrow forces a match, so it is passed through unchanged and the
    * `selectFeeReceiver` policy is not consulted. When the merchant delegated by
    * setting `feeRecipient == address(0)`, the policy (if any) chooses the
-   * recipient. A non-zero fee paired with a zero receiver is rejected here
+   * recipient; its return is validated as a well-formed address (so a malformed
+   * value surfaces as `invalid_fee_receiver` here rather than throwing inside
+   * viem's ABI encoder). A non-zero fee paired with a zero receiver is rejected
    * (mirroring the escrow's `ZeroFeeReceiver`) instead of reverting on-chain.
+   *
+   * The `selectFeeBps`/`selectFeeReceiver` callbacks must be total: any bad
+   * *return* value (non-integer/out-of-band bps, malformed/zero receiver) is
+   * converted to a typed reason, but a callback that itself *throws* propagates
+   * — a thrown policy is an operator misconfiguration and should fail loudly.
    *
    * @param paymentInfo - The reconstructed PaymentInfo carrying the fee band
    *   and the configured (or delegated) `feeReceiver`.
    * @returns The band-validated `feeBps` and the resolved `feeReceiver`.
    * @throws {FeeSelectionError} If a policy returns an out-of-band/non-integer
-   *   `feeBps`, or a fee is taken with no non-zero receiver.
+   *   `feeBps`, a malformed receiver, or a fee with no non-zero receiver.
    */
   private resolveFee(paymentInfo: PaymentInfoStruct): {
     feeBps: number;
@@ -654,10 +666,19 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     // Configured (non-zero) recipient is fixed by the escrow; delegated
     // (address(0)) recipient is the facilitator's choice via policy.
     const delegated = paymentInfo.feeReceiver.toLowerCase() === zeroAddress;
-    const feeReceiver =
-      delegated && this.options.selectFeeReceiver
-        ? this.options.selectFeeReceiver(paymentInfo)
-        : paymentInfo.feeReceiver;
+    let feeReceiver = paymentInfo.feeReceiver;
+    if (delegated && this.options.selectFeeReceiver) {
+      feeReceiver = this.options.selectFeeReceiver(paymentInfo);
+      // The callback's return is untyped at runtime; reject anything that is not
+      // a well-formed address before it reaches the ABI encoder. strict:false
+      // skips EIP-55 checksum (addresses are case-insensitive on-chain).
+      if (!isAddress(feeReceiver, { strict: false })) {
+        throw new FeeSelectionError(
+          ErrInvalidFeeReceiver,
+          `selectFeeReceiver returned ${feeReceiver}, not a well-formed address`,
+        );
+      }
+    }
 
     if (feeBps > 0 && feeReceiver.toLowerCase() === zeroAddress) {
       throw new FeeSelectionError(

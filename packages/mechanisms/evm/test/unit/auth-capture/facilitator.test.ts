@@ -717,6 +717,15 @@ describe("AuthCaptureEvmScheme", () => {
       expect(mockSigner.writeContract).not.toHaveBeenCalled();
     });
 
+    it("should reject a non-integer (in-range) policy value with fee_bps_out_of_range", async () => {
+      // 50.5 is within [10, 100] — only the integer guard rejects it.
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 50.5 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
     it("should not invoke selectFeeBps for authorize (no fee tail)", async () => {
       const selectFeeBps = vi.fn().mockReturnValue(50);
       const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps });
@@ -766,6 +775,18 @@ describe("AuthCaptureEvmScheme", () => {
       // simulate carried the same recipient
       const sim = mockSigner.readContract.mock.calls.find(c => c[0].functionName === "charge");
       expect(sim?.[0].args[5]).toBe(CHOSEN_RECEIVER);
+    });
+
+    it("should reject a malformed policy-returned receiver with invalid_fee_receiver", async () => {
+      // A user callback can return a non-address string despite the 0x${string}
+      // type; reject it before it reaches viem's ABI encoder.
+      const scheme = new AuthCaptureEvmScheme(mockSigner, {
+        selectFeeReceiver: () => "0xnotanaddress" as `0x${string}`,
+      });
+      const result = await scheme.settle(delegatedPayload(), delegatedReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("invalid_fee_receiver");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
     });
 
     it("should reject a fee with a delegated-but-unresolved (zero) receiver", async () => {
