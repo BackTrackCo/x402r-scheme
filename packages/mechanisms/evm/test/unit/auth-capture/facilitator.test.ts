@@ -65,7 +65,10 @@ describe("AuthCaptureEvmScheme", () => {
   };
 
   // Build a PaymentInfoStruct that matches what the facilitator will reconstruct.
-  function buildPaymentInfo(): PaymentInfoStruct {
+  // `feePolicy` overrides the default band [0, 100] and/or feeReceiver so the
+  // nonce stays bound to the values a given test puts in `requirements.extra`.
+  type FeeOverride = { minFeeBps?: number; maxFeeBps?: number; feeReceiver?: `0x${string}` };
+  function buildPaymentInfo(fee?: FeeOverride): PaymentInfoStruct {
     return {
       operator: CAPTURE_AUTHORIZER,
       payer: PAYER,
@@ -75,15 +78,15 @@ describe("AuthCaptureEvmScheme", () => {
       preApprovalExpiry: futureSeconds,
       authorizationExpiry: captureDeadline,
       refundExpiry: refundDeadline,
-      minFeeBps: 0,
-      maxFeeBps: 100,
-      feeReceiver: FEE_RECIPIENT,
+      minFeeBps: fee?.minFeeBps ?? 0,
+      maxFeeBps: fee?.maxFeeBps ?? 100,
+      feeReceiver: fee?.feeReceiver ?? FEE_RECIPIENT,
       salt: SALT,
     };
   }
 
-  function buildEip3009Payload() {
-    const paymentInfo = buildPaymentInfo();
+  function buildEip3009Payload(fee?: FeeOverride) {
+    const paymentInfo = buildPaymentInfo(fee);
     const nonce = computePayerAgnosticPaymentInfoHash(84532, paymentInfo);
     return {
       x402Version: 2,
@@ -656,6 +659,164 @@ describe("AuthCaptureEvmScheme", () => {
       const call = mockSigner.writeContract.mock.calls[0][0];
       expect(call.functionName).toBe("authorize");
       expect(call.args.length).toBe(4);
+    });
+  });
+
+  describe("settle — facilitator feeBps policy (selectFeeBps)", () => {
+    // Widen the band so the default floor (10) and a policy pick (50) differ.
+    // The payload nonce must be built with the SAME band — it hashes the band.
+    const FEE_BAND = { minFeeBps: 10, maxFeeBps: 100 };
+    const chargeReqs = {
+      ...mockRequirements,
+      extra: { ...mockRequirements.extra, autoCapture: true, ...FEE_BAND },
+    };
+    const chargePayload = () => buildEip3009Payload(FEE_BAND);
+
+    it("should default to the band floor (minFeeBps) when no policy is configured", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      await scheme.settle(chargePayload(), chargeReqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.functionName).toBe("charge");
+      expect(call.args[4]).toBe(10);
+    });
+
+    it("should forward an in-band value chosen by selectFeeBps", async () => {
+      const selectFeeBps = vi.fn().mockReturnValue(50);
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps });
+      await scheme.settle(chargePayload(), chargeReqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.args[4]).toBe(50);
+      // Selector sees the reconstructed PaymentInfo (with the band) it picks from.
+      expect(selectFeeBps).toHaveBeenCalledWith(
+        expect.objectContaining({ minFeeBps: 10, maxFeeBps: 100 }),
+      );
+    });
+
+    it("should simulate with the same policy-chosen feeBps the real tx carries", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 50 });
+      await scheme.settle(chargePayload(), chargeReqs);
+      const simulateCall = mockSigner.readContract.mock.calls.find(
+        c => c[0].functionName === "charge",
+      );
+      expect(simulateCall?.[0].args[4]).toBe(50);
+    });
+
+    it("should reject an above-band policy value with fee_bps_out_of_range, before submitting", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 101 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should reject a below-band policy value with fee_bps_out_of_range", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 0 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should reject a non-integer (in-range) policy value with fee_bps_out_of_range", async () => {
+      // 50.5 is within [10, 100] — only the integer guard rejects it.
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps: () => 50.5 });
+      const result = await scheme.settle(chargePayload(), chargeReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("fee_bps_out_of_range");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should not invoke selectFeeBps for authorize (no fee tail)", async () => {
+      const selectFeeBps = vi.fn().mockReturnValue(50);
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeBps });
+      // autoCapture omitted → authorize path; default band → default payload
+      await scheme.settle(buildEip3009Payload(), mockRequirements);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.functionName).toBe("authorize");
+      expect(selectFeeBps).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("settle — feeReceiver delegation (selectFeeReceiver)", () => {
+    const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+    const CHOSEN_RECEIVER = "0x9999999999999999999999999999999999999999" as `0x${string}`;
+    // Floor > 0 so a fee is taken without needing a selectFeeBps policy.
+    const FEE_BAND = { minFeeBps: 50, maxFeeBps: 100 };
+
+    // Merchant delegates the receiver (feeRecipient = address(0)). Payload nonce
+    // and requirements.extra must both carry the zero receiver + band.
+    const delegatedPayload = () => buildEip3009Payload({ ...FEE_BAND, feeReceiver: ZERO });
+    const delegatedReqs = {
+      ...mockRequirements,
+      extra: { ...mockRequirements.extra, autoCapture: true, ...FEE_BAND, feeRecipient: ZERO },
+    };
+
+    it("should pass through a configured (non-zero) recipient and not consult the policy", async () => {
+      const selectFeeReceiver = vi.fn().mockReturnValue(CHOSEN_RECEIVER);
+      const scheme = new AuthCaptureEvmScheme(mockSigner, { selectFeeReceiver });
+      const reqs = {
+        ...mockRequirements,
+        extra: { ...mockRequirements.extra, autoCapture: true, ...FEE_BAND },
+      };
+      await scheme.settle(buildEip3009Payload(FEE_BAND), reqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.args[5]).toBe(FEE_RECIPIENT);
+      expect(selectFeeReceiver).not.toHaveBeenCalled();
+    });
+
+    it("should forward a delegated recipient chosen by selectFeeReceiver", async () => {
+      const scheme = new AuthCaptureEvmScheme(mockSigner, {
+        selectFeeReceiver: () => CHOSEN_RECEIVER,
+      });
+      await scheme.settle(delegatedPayload(), delegatedReqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.args[4]).toBe(50); // floor fee still applied
+      expect(call.args[5]).toBe(CHOSEN_RECEIVER);
+      // simulate carried the same recipient
+      const sim = mockSigner.readContract.mock.calls.find(c => c[0].functionName === "charge");
+      expect(sim?.[0].args[5]).toBe(CHOSEN_RECEIVER);
+    });
+
+    it("should reject a malformed policy-returned receiver with invalid_fee_receiver", async () => {
+      // A user callback can return a non-address string despite the 0x${string}
+      // type; reject it before it reaches viem's ABI encoder.
+      const scheme = new AuthCaptureEvmScheme(mockSigner, {
+        selectFeeReceiver: () => "0xnotanaddress" as `0x${string}`,
+      });
+      const result = await scheme.settle(delegatedPayload(), delegatedReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("invalid_fee_receiver");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should reject a fee with a delegated-but-unresolved (zero) receiver", async () => {
+      // feeRecipient = address(0), fee floor 50 > 0, no selectFeeReceiver policy.
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.settle(delegatedPayload(), delegatedReqs);
+      expect(result.success).toBe(false);
+      expect(result.errorReason).toBe("zero_fee_receiver");
+      expect(mockSigner.writeContract).not.toHaveBeenCalled();
+    });
+
+    it("should allow a zero receiver when no fee is taken (feeBps == 0)", async () => {
+      // Band floor 0 → no policy → feeBps 0, so a zero receiver is valid.
+      const payload = buildEip3009Payload({ minFeeBps: 0, maxFeeBps: 100, feeReceiver: ZERO });
+      const reqs = {
+        ...mockRequirements,
+        extra: {
+          ...mockRequirements.extra,
+          autoCapture: true,
+          minFeeBps: 0,
+          maxFeeBps: 100,
+          feeRecipient: ZERO,
+        },
+      };
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      await scheme.settle(payload, reqs);
+      const call = mockSigner.writeContract.mock.calls[0][0];
+      expect(call.functionName).toBe("charge");
+      expect(call.args[4]).toBe(0);
+      expect(call.args[5]).toBe(ZERO);
     });
   });
 

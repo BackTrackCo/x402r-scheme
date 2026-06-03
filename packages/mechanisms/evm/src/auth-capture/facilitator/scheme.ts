@@ -20,7 +20,14 @@ import type {
   VerifyResponse,
 } from "@x402/core/types";
 import type { FacilitatorEvmSigner } from "@x402/evm";
-import { BaseError, ContractFunctionRevertedError, hexToBigInt, parseErc6492Signature } from "viem";
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  hexToBigInt,
+  isAddress,
+  parseErc6492Signature,
+  zeroAddress,
+} from "viem";
 import { ERC20_BALANCE_OF_ABI, ESCROW_ABI, ESCROW_ERRORS_ABI } from "../abi";
 import {
   AUTH_CAPTURE_ESCROW_ADDRESS,
@@ -34,10 +41,12 @@ import {
   ErrAuthorizationExpired,
   ErrAuthorizationNotYetValid,
   ErrCaptureDeadlineExpired,
+  ErrFeeBpsOutOfRange,
   ErrInsufficientBalance,
   ErrInvalidAuthCaptureExtra,
   ErrInvalidAuthCaptureSignature,
   ErrInvalidDeadlineOrdering,
+  ErrInvalidFeeReceiver,
   ErrInvalidNetwork,
   ErrInvalidPayloadFormat,
   ErrNetworkMismatch,
@@ -50,6 +59,7 @@ import {
   ErrUnsupportedAssetTransferMethod,
   ErrUnsupportedScheme,
   ErrVerificationFailed,
+  ErrZeroFeeReceiver,
 } from "./errors";
 import {
   computePayerAgnosticPaymentInfoHash,
@@ -121,6 +131,118 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
 }
 
 /**
+ * Facilitator-side policy for choosing the actual `feeBps` applied at settle.
+ *
+ * The payer's signature commits only to the band `[minFeeBps, maxFeeBps]` on
+ * the PaymentInfo hash — never to a concrete `feeBps`. The escrow's
+ * `_validateFee` enforces `min <= feeBps <= max`, so any in-band value is
+ * already within the payer's authorization, and picking the value is the
+ * settle-time operator's discretion. In x402's facilitator-submits flow the
+ * facilitator IS that operator, so the choice belongs to facilitator config,
+ * not the merchant-authored wire `extra` (a merchant who wants an exact fee
+ * collapses the band to `minFeeBps == maxFeeBps`).
+ *
+ * A selector receives the reconstructed PaymentInfo (so it can read the band,
+ * receiver, token, amount, etc.) and returns the bps to forward. The returned
+ * value is band-validated by {@link AuthCaptureEvmScheme} before use; an
+ * out-of-band result is rejected with a typed reason, never silently clamped.
+ */
+export type FeeBpsSelector = (paymentInfo: PaymentInfoStruct) => number;
+
+/**
+ * Facilitator-side policy for choosing the `feeReceiver` applied at settle when
+ * the merchant has *delegated* the choice.
+ *
+ * Per the scheme spec, `feeRecipient` is committed on-chain as
+ * `PaymentInfo.feeReceiver`. The escrow gives it the same configured-or-free
+ * shape as the fee band: when `feeReceiver != address(0)` the escrow forces the
+ * settle-time value to match it (so it is fixed, and this selector is not
+ * consulted), but when the merchant sets `feeRecipient == address(0)` the
+ * captureAuthorizer "can specify any non-zero address" at capture/charge time.
+ * In x402's facilitator-submits flow the facilitator is that captureAuthorizer,
+ * so the choice belongs to facilitator config — the same reasoning as
+ * {@link FeeBpsSelector}.
+ *
+ * The result is validated by {@link AuthCaptureEvmScheme}: a non-zero fee with
+ * a zero receiver is rejected (the escrow's `ZeroFeeReceiver` rule) rather than
+ * left to revert on-chain.
+ */
+export type FeeReceiverSelector = (paymentInfo: PaymentInfoStruct) => `0x${string}`;
+
+/** Construction options for the facilitator-side auth-capture scheme. */
+export interface AuthCaptureFacilitatorOptions {
+  /**
+   * Policy for the actual `feeBps` applied on `charge`/`capture` settle calls.
+   * Omit to default to `minFeeBps` (the conservative floor — least surprise to
+   * the payer). See {@link FeeBpsSelector}.
+   */
+  selectFeeBps?: FeeBpsSelector;
+  /**
+   * Policy for the `feeReceiver` when the merchant delegates it by setting
+   * `feeRecipient == address(0)`. Ignored when the merchant configured a
+   * non-zero recipient (the escrow forces that exact value). Omit to leave the
+   * receiver as `address(0)` — valid only when no fee is taken. See
+   * {@link FeeReceiverSelector}.
+   */
+  selectFeeReceiver?: FeeReceiverSelector;
+}
+
+/**
+ * Internal control-flow signal raised by the facilitator-side fee policy
+ * ({@link FeeBpsSelector} / {@link FeeReceiverSelector}) when it produces a
+ * value the escrow would reject. Caught at the settle/simulate boundary and
+ * surfaced as the carried stable reason — the same wire reasons the escrow's
+ * on-chain `FeeBpsOutOfRange` / `ZeroFeeReceiver` map to — so a misconfigured
+ * facilitator fails fast with a clean reason instead of an opaque on-chain
+ * revert.
+ */
+class FeeSelectionError extends Error {
+  /**
+   * Construct a fee-selection error carrying the wire reason to surface.
+   *
+   * @param reason - Stable wire reason to surface (e.g. `fee_bps_out_of_range`).
+   * @param message - Human-readable detail for logs.
+   */
+  constructor(
+    readonly reason: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "FeeSelectionError";
+  }
+}
+
+/**
+ * Build the positional args for an `authorize`/`charge` escrow call. Single
+ * source of truth shared by `settle` and `simulateSettle` so the two can never
+ * drift on arg shape or the forwarded `feeBps`/`feeReceiver` tail.
+ *
+ * `charge` takes 6 args (adds `feeBps` + `feeReceiver`); `authorize` takes 4.
+ *
+ * @param functionName - `"charge"` (single-shot) or `"authorize"` (two-phase).
+ * @param tuple - The bigint-coerced PaymentInfo tuple.
+ * @param amount - Settle amount in token base units.
+ * @param tokenCollector - Resolved token-collector address for the method.
+ * @param collectorData - Encoded collector calldata for the method.
+ * @param feeBps - Band-validated fee to forward (only used for `charge`).
+ * @param feeReceiver - Fee recipient address (only used for `charge`).
+ * @returns The positional args array for the call.
+ */
+function buildSettleArgs(
+  functionName: "charge" | "authorize",
+  tuple: ReturnType<typeof paymentInfoToContractTuple>,
+  amount: bigint,
+  tokenCollector: `0x${string}`,
+  collectorData: `0x${string}`,
+  feeBps: number,
+  feeReceiver: `0x${string}`,
+) {
+  return functionName === "charge"
+    ? ([tuple, amount, tokenCollector, collectorData, feeBps, feeReceiver] as const)
+    : ([tuple, amount, tokenCollector, collectorData] as const);
+}
+
+/**
  * AuthCapture Facilitator Scheme - implements x402's SchemeNetworkFacilitator.
  *
  * Settle dispatch:
@@ -139,8 +261,17 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
    * Construct a facilitator-side auth-capture scheme bound to a specific signer.
    *
    * @param signer - Facilitator signer with on-chain read + write capability.
+   * @param options - Optional facilitator fee policy. `options.selectFeeBps`
+   *   chooses the in-band `feeBps` applied on `charge`/`capture` (defaults to the
+   *   band floor `minFeeBps`); `options.selectFeeReceiver` chooses the
+   *   `feeReceiver` when the merchant delegated it via `feeRecipient ==
+   *   address(0)` (ignored otherwise). See {@link FeeBpsSelector} and
+   *   {@link FeeReceiverSelector}.
    */
-  constructor(private signer: FacilitatorEvmSigner) {}
+  constructor(
+    private signer: FacilitatorEvmSigner,
+    private options: AuthCaptureFacilitatorOptions = {},
+  ) {}
 
   /**
    * Return the EOA address(es) this facilitator submits transactions from.
@@ -414,21 +545,37 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
 
     const functionName = extra.autoCapture === true ? "charge" : "authorize";
     const tuple = paymentInfoToContractTuple(paymentInfo);
-    // charge() takes 6 args (adds feeBps + feeReceiver); authorize() takes 4.
-    // Use minFeeBps as the safe default within the merchant's signed [min, max]
-    // range; feeReceiver mirrors paymentInfo.feeReceiver (= extra.feeRecipient)
-    // because _validateFee requires actual to match configured when configured != 0.
-    const args =
-      functionName === "charge"
-        ? ([
-            tuple,
-            amount,
-            tokenCollector,
-            collectorData,
-            paymentInfo.minFeeBps,
-            paymentInfo.feeReceiver,
-          ] as const)
-        : ([tuple, amount, tokenCollector, collectorData] as const);
+    // feeBps + feeReceiver are chosen by facilitator policy within what the
+    // merchant signed (band for the fee; delegated receiver when feeRecipient is
+    // address(0)), defaulting to the band floor and the configured recipient.
+    // Only `charge` consumes the fee tail.
+    let feeBps = 0;
+    let feeReceiver = paymentInfo.feeReceiver;
+    if (functionName === "charge") {
+      try {
+        ({ feeBps, feeReceiver } = this.resolveFee(paymentInfo));
+      } catch (err) {
+        if (err instanceof FeeSelectionError) {
+          return {
+            success: false,
+            errorReason: err.reason,
+            transaction: "",
+            network: requirements.network,
+            payer,
+          };
+        }
+        throw err;
+      }
+    }
+    const args = buildSettleArgs(
+      functionName,
+      tuple,
+      amount,
+      tokenCollector,
+      collectorData,
+      feeBps,
+      feeReceiver,
+    );
 
     const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer);
 
@@ -474,6 +621,77 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
   }
 
   /**
+   * Resolve the actual `feeBps` + `feeReceiver` to forward on a `charge`/
+   * `capture` call. Single source of truth shared by `settle` and
+   * `simulateSettle` so the two can never drift on the applied fee.
+   *
+   * `feeBps`: defaults to the band floor (`minFeeBps`) when no `selectFeeBps`
+   * policy is configured — the conservative choice that least surprises the
+   * payer. A configured policy's result is validated against the signed
+   * `[minFeeBps, maxFeeBps]` band (never silently clamped).
+   *
+   * `feeReceiver`: when the merchant configured a non-zero `feeRecipient` the
+   * escrow forces a match, so it is passed through unchanged and the
+   * `selectFeeReceiver` policy is not consulted. When the merchant delegated by
+   * setting `feeRecipient == address(0)`, the policy (if any) chooses the
+   * recipient; its return is validated as a well-formed address (so a malformed
+   * value surfaces as `invalid_fee_receiver` here rather than throwing inside
+   * viem's ABI encoder). A non-zero fee paired with a zero receiver is rejected
+   * (mirroring the escrow's `ZeroFeeReceiver`) instead of reverting on-chain.
+   *
+   * The `selectFeeBps`/`selectFeeReceiver` callbacks must be total: any bad
+   * *return* value (non-integer/out-of-band bps, malformed/zero receiver) is
+   * converted to a typed reason, but a callback that itself *throws* propagates
+   * — a thrown policy is an operator misconfiguration and should fail loudly.
+   *
+   * @param paymentInfo - The reconstructed PaymentInfo carrying the fee band
+   *   and the configured (or delegated) `feeReceiver`.
+   * @returns The band-validated `feeBps` and the resolved `feeReceiver`.
+   * @throws {FeeSelectionError} If a policy returns an out-of-band/non-integer
+   *   `feeBps`, a malformed receiver, or a fee with no non-zero receiver.
+   */
+  private resolveFee(paymentInfo: PaymentInfoStruct): {
+    feeBps: number;
+    feeReceiver: `0x${string}`;
+  } {
+    const { minFeeBps, maxFeeBps } = paymentInfo;
+    const feeBps = this.options.selectFeeBps ? this.options.selectFeeBps(paymentInfo) : minFeeBps;
+    if (!Number.isInteger(feeBps) || feeBps < minFeeBps || feeBps > maxFeeBps) {
+      throw new FeeSelectionError(
+        ErrFeeBpsOutOfRange,
+        `selectFeeBps returned ${feeBps}, outside signed band [${minFeeBps}, ${maxFeeBps}]`,
+      );
+    }
+
+    // Configured (non-zero) recipient is fixed by the escrow; delegated
+    // (address(0)) recipient is the facilitator's choice via policy.
+    const delegated = paymentInfo.feeReceiver.toLowerCase() === zeroAddress;
+    let feeReceiver = paymentInfo.feeReceiver;
+    if (delegated && this.options.selectFeeReceiver) {
+      feeReceiver = this.options.selectFeeReceiver(paymentInfo);
+      // The callback's return is untyped at runtime; reject anything that is not
+      // a well-formed address before it reaches the ABI encoder. strict:false
+      // skips EIP-55 checksum (addresses are case-insensitive on-chain).
+      if (!isAddress(feeReceiver, { strict: false })) {
+        throw new FeeSelectionError(
+          ErrInvalidFeeReceiver,
+          `selectFeeReceiver returned ${feeReceiver}, not a well-formed address`,
+        );
+      }
+    }
+
+    if (feeBps > 0 && feeReceiver.toLowerCase() === zeroAddress) {
+      throw new FeeSelectionError(
+        ErrZeroFeeReceiver,
+        `feeBps ${feeBps} > 0 requires a non-zero feeReceiver; merchant delegated ` +
+          `feeRecipient=address(0) and no selectFeeReceiver policy supplied one`,
+      );
+    }
+
+    return { feeBps, feeReceiver };
+  }
+
+  /**
    * Simulate the settle call via `eth_call` and translate the result to a
    * stable wire-level reason. Returns `"ok"` on simulated success; on revert
    * viem walks the error chain for `ContractFunctionRevertedError` and decodes
@@ -500,17 +718,28 @@ export class AuthCaptureEvmScheme implements SchemeNetworkFacilitator {
     const { tokenCollector, collectorData } = unpackForSettle(wirePayload, assetTransferMethod);
     const functionName = extra.autoCapture === true ? "charge" : "authorize";
     const tuple = paymentInfoToContractTuple(paymentInfo);
-    const args =
-      functionName === "charge"
-        ? ([
-            tuple,
-            amount,
-            tokenCollector,
-            collectorData,
-            paymentInfo.minFeeBps,
-            paymentInfo.feeReceiver,
-          ] as const)
-        : ([tuple, amount, tokenCollector, collectorData] as const);
+    // Mirror settle's fee selection so the simulated call exercises the exact
+    // feeBps + feeReceiver the real tx will carry. A misconfigured policy
+    // surfaces here as its typed reason before any gas is spent.
+    let feeBps = 0;
+    let feeReceiver = paymentInfo.feeReceiver;
+    if (functionName === "charge") {
+      try {
+        ({ feeBps, feeReceiver } = this.resolveFee(paymentInfo));
+      } catch (err) {
+        if (err instanceof FeeSelectionError) return err.reason;
+        throw err;
+      }
+    }
+    const args = buildSettleArgs(
+      functionName,
+      tuple,
+      amount,
+      tokenCollector,
+      collectorData,
+      feeBps,
+      feeReceiver,
+    );
 
     const settleTarget = await this.resolveSettleTarget(extra.captureAuthorizer);
 

@@ -147,6 +147,21 @@ facilitator.register("eip155:84532", new AuthCaptureEvmScheme(evmSigner));
 
 `settle` re-verifies then submits `authorize` (two-phase) or `charge` (single-shot) to the escrow contract, or — if the `captureAuthorizer` is a smart contract — routes the call through that contract (auto-detected, see below).
 
+### Fee policy (optional)
+
+On `charge`/`capture` the escrow accepts any `feeBps` within the merchant's signed `[minFeeBps, maxFeeBps]` band, and any non-zero `feeReceiver` when the merchant delegated by setting `feeRecipient == address(0)`. The signature commits to the band, not a concrete value, so the facilitator chooses within it. Pass an optional second argument to select those values; both default to the conservative choice (band floor + the configured recipient), so omitting it is unchanged behavior:
+
+```typescript
+new AuthCaptureEvmScheme(evmSigner, {
+  // choose the in-band fee (defaults to minFeeBps)
+  selectFeeBps: paymentInfo => paymentInfo.maxFeeBps,
+  // choose the receiver only when the merchant set feeRecipient = address(0)
+  selectFeeReceiver: () => "0x1111111111111111111111111111111111111111",
+});
+```
+
+A value outside the band, a malformed receiver, or a fee with no receiver is rejected with a typed reason (`fee_bps_out_of_range` / `invalid_fee_receiver` / `zero_fee_receiver`) before the transaction is submitted. The selectors must be total — a callback that throws propagates rather than being masked as a settle failure.
+
 ## Supported Networks
 
 | Network      | CAIP-2 ID      |
