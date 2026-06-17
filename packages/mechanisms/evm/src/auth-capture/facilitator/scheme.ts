@@ -152,11 +152,11 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
  * which fails with `capture_authorizer_escrow_call_missing`. Do not drop the
  * event check on the assumption that this cap protects correctness.
  *
- * 3_000_000 comfortably covers a direct authorize/charge call through the
- * audited escrow plus typical on-chain logic, including pairing-based SNARK
- * verifiers such as Groth16 and PLONK. Heavier verifiers (notably STARK
- * constructions, which routinely exceed this) may require the cap raised for
- * the specific deployment.
+ * 3_000_000 covers a direct authorize/charge call through the audited escrow
+ * plus modest on-chain logic. zk-heavy authorizers (worst-case Halo2, STARK
+ * verifiers) can exceed it; a deployment routing through such a
+ * captureAuthorizer can raise the cap or refuse to settle
+ * (`capture_authorizer_gas_exceeded`). Do not remove the cap.
  */
 export const CAPTURE_AUTHORIZER_GAS_LIMIT = 3_000_000n;
 
