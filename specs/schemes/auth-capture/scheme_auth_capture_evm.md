@@ -176,7 +176,10 @@ The facilitator performs these checks in order:
 10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match `payer`.
 11. **Amount**: `authorization.value` (EIP-3009) or `permit2Authorization.permitted.amount` (Permit2) matches `requirements.amount`.
 12. **Nonce match**: Reconstruct `PaymentInfo` from extra + payload.salt + payer + requirements; recompute payer-agnostic hash; assert it matches the wire nonce. This transitively enforces equality on every field encoded in `PaymentInfo` (receiver, token, deadlines, fee bounds, feeRecipient), so individual field-by-field checks for those values are unnecessary.
-13. **Simulate** `AUTH_CAPTURE_ESCROW.authorize(...)` or `.charge(...)` to ensure success.
+13. **Simulate** `AUTH_CAPTURE_ESCROW.authorize(...)` or `.charge(...)` to ensure success. When `extra.captureAuthorizer` is a smart contract (detected via `getCode`), the facilitator submits through that contract, which forwards into escrow, so it MUST be treated as untrusted code: trace-simulate (`eth_simulateV1` or equivalent; revert-only is NOT sufficient) and verify, over decoded `Transfer` / escrow events:
+    - **Escrow call**: the trace contains the entrypoint's escrow event (`PaymentAuthorized` for `authorize`, `PaymentCharged` for `charge`) from `AUTH_CAPTURE_ESCROW_ADDRESS`, with `paymentInfoHash` equal to the step-12 hash (else `capture_authorizer_escrow_call_missing` / `capture_authorizer_payment_info_mismatch`).
+    - **Asset deltas**: escrow routes funds through the operator's TokenStore (`escrow.getTokenStore(captureAuthorizer)`, a per-operator CREATE2 clone, not the escrow address), so no `requirements.asset` `Transfer` has a counterparty outside `{payer, receiver, feeReceiver, tokenStore}` and net deltas match the signed split: `authorize` moves payer `-amount` and tokenStore `+amount`; `charge` has `receiver` and `feeReceiver` net-receive a split for some `feeBps ∈ [minFeeBps, maxFeeBps]` (when `paymentInfo.feeReceiver == address(0)`, use the non-zero `feeReceiver` from the `PaymentCharged` event). Else `capture_authorizer_asset_divergence`.
+    - **Gas cap**: simulated `gasUsed` stays within an explicit cap, recommended **3,000,000 gas** (a direct `authorize` / `charge` plus modest on-chain logic; zk-heavy authorizers such as STARK verifiers may need a per-deployment raise, or the facilitator MAY refuse with `capture_authorizer_gas_exceeded`). The same cap applies to the broadcast (settlement step 5) and MUST NOT be removed. It bounds DoS, not correctness: EIP-150's 63/64 rule lets a wrapper OOG escrow internally while still returning success, in which case the escrow-call check fails.
 
 ### EIP-6492 Support
 
@@ -188,7 +191,7 @@ For smart wallet clients, the signature may be EIP-6492 wrapped (containing depl
 2. **Determine function**: `extra.autoCapture === true ? "charge" : "authorize"`.
 3. **Resolve collector**: `EIP3009_TOKEN_COLLECTOR_ADDRESS` or `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (per `assetTransferMethod`).
 4. **Encode `collectorData`**: raw ERC-3009 signature, or ABI-encoded Permit2 signature.
-5. **Call escrow**: `AUTH_CAPTURE_ESCROW.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`.
+5. **Call settle target**: `<target>.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`. For an EOA captureAuthorizer `<target>` is `AUTH_CAPTURE_ESCROW_ADDRESS`; for a smart contract one it is the captureAuthorizer contract, and the transaction MUST be sent under the gas cap from verification step 13, from a partitioned hot wallet that holds zero `requirements.asset` balance and zero non-revoked allowance to any contract, with no native value.
 6. **Wait for receipt**: 60s timeout.
 7. **Return result**: tx hash, network, payer.
 
@@ -218,6 +221,10 @@ The auth-capture scheme uses the standard x402 error codes plus these scheme-spe
 | `nonce_mismatch`                    | Wire nonce doesn't match the recomputed payer-agnostic PaymentInfo hash.          |
 | `insufficient_balance`              | Payer balance is less than required amount.                                       |
 | `simulation_failed`                 | Settlement simulation reverted with an unmapped error.                            |
+| `capture_authorizer_escrow_call_missing` | Trace-level simulation of a smart contract captureAuthorizer did not show the expected `AuthCaptureEscrow` event with a matching `paymentInfoHash`. |
+| `capture_authorizer_payment_info_mismatch` | The escrow event surfaced in the contract-path simulation references a `paymentInfoHash` that does not match the signed `PaymentInfo`.        |
+| `capture_authorizer_asset_divergence` | Contract-path simulation showed a `requirements.asset` `Transfer` with a counterparty outside `{payer, receiver, feeReceiver, tokenStore}`, or net deltas inconsistent with `minFeeBps` / `maxFeeBps`. |
+| `capture_authorizer_gas_exceeded`   | Contract-path simulation reported `gasUsed` greater than the facilitator's gas cap. |
 
 ### Typed simulation reverts
 
