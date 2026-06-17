@@ -153,8 +153,10 @@ function paymentInfoToContractTuple(p: PaymentInfoStruct) {
  * event check on the assumption that this cap protects correctness.
  *
  * 3_000_000 comfortably covers a direct authorize/charge call through the
- * audited escrow plus on-chain logic up to and including modern zk verifier
- * circuits (Groth16, PLONK, Halo2, most STARK constructions).
+ * audited escrow plus typical on-chain logic, including pairing-based SNARK
+ * verifiers such as Groth16 and PLONK. Heavier verifiers (notably STARK
+ * constructions, which routinely exceed this) may require the cap raised for
+ * the specific deployment.
  */
 export const CAPTURE_AUTHORIZER_GAS_LIMIT = 3_000_000n;
 
@@ -803,7 +805,7 @@ type SimulateCallsCapable = {
 };
 
 type SimulateCallResult = {
-  status: "success" | "failure" | string;
+  status: "success" | "failure";
   gasUsed?: bigint;
   logs?: ReadonlyArray<Log>;
   error?: unknown;

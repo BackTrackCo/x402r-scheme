@@ -8,7 +8,10 @@ import {
   hexToBigInt,
   type Log,
 } from "viem";
-import { AuthCaptureEvmScheme } from "../../../src/auth-capture/facilitator/scheme";
+import {
+  AuthCaptureEvmScheme,
+  CAPTURE_AUTHORIZER_GAS_LIMIT,
+} from "../../../src/auth-capture/facilitator/scheme";
 import {
   ERC20_TRANSFER_EVENT_ABI,
   ESCROW_ABI,
@@ -111,6 +114,27 @@ function escrowEventLog(
     logIndex: 1,
     removed: false,
   } as Log;
+}
+
+/**
+ * Build a viem ContractFunctionExecutionError that wraps a real
+ * ContractFunctionRevertedError encoded from the named custom error.
+ * Mirrors what viem produces when the chain reverts with a known error
+ * declared in the call's ABI.
+ */
+function buildRevertError(errorName: string): Error {
+  const errorAbi = [{ type: "error" as const, name: errorName, inputs: [] }];
+  const data = encodeErrorResult({ abi: errorAbi, errorName });
+  const inner = new ContractFunctionRevertedError({
+    abi: errorAbi,
+    data,
+    functionName: "authorize",
+  });
+  return new ContractFunctionExecutionError(inner, {
+    abi: errorAbi,
+    functionName: "authorize",
+    args: [],
+  });
 }
 
 // Stable stand-in for escrow.getTokenStore(operator) in tests. Real on-chain
@@ -482,7 +506,7 @@ describe("AuthCaptureEvmScheme", () => {
       const call = mockSigner.simulateCalls.mock.calls[0][0];
       expect(call.calls).toHaveLength(1);
       expect(call.calls[0].to).toBe(CAPTURE_AUTHORIZER);
-      expect(call.calls[0].gas).toBe(3_000_000n);
+      expect(call.calls[0].gas).toBe(CAPTURE_AUTHORIZER_GAS_LIMIT);
       expect(call.traceTransfers).toBe(true);
     });
 
@@ -758,27 +782,6 @@ describe("AuthCaptureEvmScheme", () => {
   });
 
   describe("verify — typed simulation revert decoding", () => {
-    /**
-     * Build a viem ContractFunctionExecutionError that wraps a real
-     * ContractFunctionRevertedError encoded from the named custom error.
-     * Mirrors what viem produces when the chain reverts with a known error
-     * declared in the call's ABI.
-     */
-    function buildRevertError(errorName: string): Error {
-      const errorAbi = [{ type: "error" as const, name: errorName, inputs: [] }];
-      const data = encodeErrorResult({ abi: errorAbi, errorName });
-      const inner = new ContractFunctionRevertedError({
-        abi: errorAbi,
-        data,
-        functionName: "authorize",
-      });
-      return new ContractFunctionExecutionError(inner, {
-        abi: errorAbi,
-        functionName: "authorize",
-        args: [],
-      });
-    }
-
     it("should decode AfterPreApprovalExpiry → authorization_expired", async () => {
       mockSigner.readContract.mockReset();
       mockSigner.readContract
@@ -903,13 +906,41 @@ describe("AuthCaptureEvmScheme", () => {
         "authorize",
         EIP3009_TOKEN_COLLECTOR_ADDRESS,
         CHAIN_ID,
-        { gasUsed: 4_000_000n },
+        { gasUsed: CAPTURE_AUTHORIZER_GAS_LIMIT + 1_000_000n },
       );
       mockSigner.simulateCalls.mockResolvedValue(trace);
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
       expect(result.isValid).toBe(false);
       expect(result.invalidReason).toBe("capture_authorizer_gas_exceeded");
+    });
+
+    // Some RPCs surface an inner revert as `status: "failure"` on the trace
+    // result instead of throwing. The `status !== "success"` branch must decode
+    // the attached `error` to the same stable invalidReason as the throw path.
+    it("should decode a status:failure trace result with an error to a stable invalidReason", async () => {
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [
+          {
+            status: "failure",
+            error: buildRevertError("AfterPreApprovalExpiry"),
+          },
+        ],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("authorization_expired");
+    });
+
+    it("should fall back to simulation_failed on a status:failure trace result with no error", async () => {
+      mockSigner.simulateCalls.mockResolvedValue({
+        results: [{ status: "failure" }],
+      });
+      const scheme = new AuthCaptureEvmScheme(mockSigner);
+      const result = await scheme.verify(buildEip3009Payload(), mockRequirements);
+      expect(result.isValid).toBe(false);
+      expect(result.invalidReason).toBe("simulation_failed");
     });
 
     it("should fail with capture_authorizer_escrow_call_missing when no escrow event was emitted", async () => {
@@ -1178,7 +1209,7 @@ describe("AuthCaptureEvmScheme", () => {
   });
 
   describe("settle — gas cap on contract path", () => {
-    it("should pass gas: 3_000_000n to writeContract when settling against a smart contract captureAuthorizer", async () => {
+    it("should pass the gas cap to writeContract when settling against a smart contract captureAuthorizer", async () => {
       mockSigner.getCode.mockResolvedValue("0x6080604052");
       mockSigner.simulateCalls.mockResolvedValue(
         buildHonestTrace(
@@ -1192,7 +1223,7 @@ describe("AuthCaptureEvmScheme", () => {
       const scheme = new AuthCaptureEvmScheme(mockSigner);
       await scheme.settle(buildEip3009Payload(), mockRequirements);
       const call = mockSigner.writeContract.mock.calls[0][0];
-      expect(call.gas).toBe(3_000_000n);
+      expect(call.gas).toBe(CAPTURE_AUTHORIZER_GAS_LIMIT);
     });
 
     it("should NOT set a gas field on writeContract on the EOA path", async () => {
